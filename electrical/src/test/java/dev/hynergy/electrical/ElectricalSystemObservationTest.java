@@ -25,7 +25,7 @@ final class ElectricalSystemObservationTest {
 
             assertTrue(subscription.isActive());
             assertNotEquals(0, subscription.nativeId());
-            assertEquals(resistor.id(), subscription.deviceId());
+            assertEquals(resistor.id().value(), subscription.deviceId());
             assertSame(NOOP_LISTENER, subscription.listener());
         }
     }

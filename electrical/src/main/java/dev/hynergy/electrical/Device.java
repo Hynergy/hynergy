@@ -20,8 +20,8 @@ import java.util.Objects;
 public abstract class Device {
     private @Nullable ElectricalSystem system;
 
-    private int id;
-    private int generation;
+    private @Nullable DeviceId deviceId;
+    private @Nullable DeviceDefinition definition;
 
     /**
      * Creates an unbound device.
@@ -54,26 +54,40 @@ public abstract class Device {
         return requireBound().subscribe(this, observerId, listener);
     }
 
-    final void bind(ElectricalSystem system, int id, int generation) {
+    final void bind(ElectricalSystem system, DeviceId deviceId, DeviceDefinition definition) {
         requireUnbound();
 
-        this.system = Objects.requireNonNull(system, "system");
-        this.id = id;
-        this.generation = generation;
+        Objects.requireNonNull(system, "system");
+        Objects.requireNonNull(deviceId, "deviceId");
+        Objects.requireNonNull(definition, "definition");
+
+        this.system = system;
+        this.deviceId = deviceId;
+        this.definition = definition;
+    }
+
+    final DeviceDefinition definition() {
+        requireBound();
+        return Objects.requireNonNull(definition, "definition");
+    }
+
+    final void validateParameter(int parameterId, double value) {
+        requireBound().validateParameter(this, parameterId, value);
     }
 
     final boolean belongsTo(ElectricalSystem system) {
         return this.system == system;
     }
 
-    protected final int id() {
+    /**
+     * Returns the persistent identity of this device.
+     *
+     * @return the device ID
+     * @throws IllegalStateException if the device is not bound
+     */
+    public final DeviceId id() {
         requireBound();
-        return id;
-    }
-
-    final int generation() {
-        requireBound();
-        return generation;
+        return Objects.requireNonNull(deviceId, "Bound device identity is missing");
     }
 
     /**
@@ -87,6 +101,7 @@ public abstract class Device {
      *
      * @param parameterId the parameter ID
      * @param value the parameter value
+     * @throws IllegalArgumentException if the index or value violates the native definition
      *
      * @throws IllegalStateException if the device or its system is not usable
      */

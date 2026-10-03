@@ -126,6 +126,10 @@ public final class ElectricalRuntime implements AutoCloseable {
         return Objects.requireNonNull(type, "type").requireDefinition(this);
     }
 
+    void validateParameter(DeviceDefinition definition, int parameter, double value) {
+        engine.validateParameter(definition, parameter, value);
+    }
+
     private DeviceDefinition resolveDefinition(DeviceType<?> type) {
         DeviceDefinition existing = type.existingDefinition(this);
 

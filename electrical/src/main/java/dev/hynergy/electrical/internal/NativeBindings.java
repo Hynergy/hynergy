@@ -4,6 +4,7 @@ import java.lang.foreign.*;
 import java.lang.invoke.MethodHandle;
 
 public final class NativeBindings {
+
     private static final Linker LINKER = Linker.nativeLinker();
     private static final SymbolLookup SYMBOLS = NativeLibrary.load();
 
@@ -88,6 +89,20 @@ public final class NativeBindings {
     }
 
 
+
+    private static final MethodHandle ENGINE_VALIDATE_PARAMETER = downcall(
+            "hynergy_engine_validate_parameter",
+            FunctionDescriptor.of(ValueLayout.JAVA_INT, ValueLayout.ADDRESS,
+                    ValueLayout.JAVA_INT, ValueLayout.JAVA_INT, ValueLayout.JAVA_DOUBLE)
+    );
+
+    public static int validateParameter(MemorySegment engine, int definition, int parameter, double value) {
+        try {
+            return (int) ENGINE_VALIDATE_PARAMETER.invokeExact(engine, definition, parameter, value);
+        } catch (Throwable failure) {
+            throw new IllegalStateException("Failed to call hynergy_engine_validate_parameter", failure);
+        }
+    }
 
     private static final MethodHandle ENGINE_CREATE_WORLD = downcall(
         "hynergy_engine_create_world", FunctionDescriptor.of(

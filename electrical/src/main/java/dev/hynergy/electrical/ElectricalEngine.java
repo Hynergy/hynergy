@@ -79,6 +79,27 @@ final class ElectricalEngine implements AutoCloseable {
         }
     }
 
+    void validateParameter(DeviceDefinition definition, int parameter, double value) {
+        int code = NativeBindings.validateParameter(requireOpen(), definition.id(), parameter, value);
+        switch (code) {
+            case ParameterValidationCode.SUCCESS -> { }
+            case ParameterValidationCode.UNKNOWN_DEFINITION,
+                 ParameterValidationCode.INVALID_PARAMETER,
+                 ParameterValidationCode.CONSTRAINT_VIOLATION -> throw new IllegalArgumentException(
+                    "Invalid device parameter: definition=" + Integer.toUnsignedString(definition.id())
+                            + ", parameter=" + parameter + ", value=" + value + ", code=" + code);
+            default -> throw new IllegalStateException(
+                    "Native parameter validation failed: code=" + Integer.toUnsignedString(code));
+        }
+    }
+
+    private static final class ParameterValidationCode {
+        private static final int SUCCESS = 0;
+        private static final int UNKNOWN_DEFINITION = 2;
+        private static final int INVALID_PARAMETER = 3;
+        private static final int CONSTRAINT_VIOLATION = 4;
+    }
+
     /**
      * Registers a device definition.
      *

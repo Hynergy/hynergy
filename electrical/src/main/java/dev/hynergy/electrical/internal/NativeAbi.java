@@ -2,7 +2,7 @@ package dev.hynergy.electrical.internal;
 
 final class NativeAbi {
     private static final int REQUIRED_VERSION = 6;
-    private static final int REQUIRED_REVISION = 0;
+    private static final int REQUIRED_REVISION = 1;
 
     private NativeAbi() {
     }

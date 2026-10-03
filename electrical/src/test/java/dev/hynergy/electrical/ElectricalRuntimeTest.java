@@ -139,12 +139,12 @@ final class ElectricalRuntimeTest {
             try (ElectricalSystem system = runtime.createSystem(20)) {
                 TestDevice first = system.create(type);
 
-                assertEquals(1, first.id());
+                assertEquals(1, first.id().value());
                 assertThrows(IllegalStateException.class, () -> system.create(type));
 
                 TestDevice second = system.create(type);
 
-                assertEquals(2, second.id());
+                assertEquals(2, second.id().value());
             }
         }
     }

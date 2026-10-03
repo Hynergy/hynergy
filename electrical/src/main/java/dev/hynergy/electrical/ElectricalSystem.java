@@ -216,30 +216,74 @@ public final class ElectricalSystem implements AutoCloseable {
 
         int id = world.addDevice(definition);
         int generation = world.deviceGeneration(id);
+        DeviceId deviceId = new DeviceId(id, generation);
 
-        device.bind(this, id, generation);
+        device.bind(this, deviceId, definition);
+
+        return device;
+    }
+
+    /**
+     * Resolves a live runtime handle for an existing device identity.
+     *
+     * <p>This operation does not add a native device. The supplied type must
+     * be valid for this runtime, and the exact device ID and generation must
+     * still be usable in this electrical world.</p>
+     *
+     * @param id the persistent device identity
+     * @param type the Java device type to construct
+     * @param <T> the device class
+     * @return a newly bound runtime handle for the existing device
+     * @throws NullPointerException if {@code id} or {@code type} is null
+     * @throws IllegalArgumentException if the type has a different native definition
+     * @throws IllegalStateException if the system is closed or unusable, the
+     *     type is not registered for this runtime, or the identity is stale
+     */
+    public <T extends Device> T resolveDevice(DeviceId id, DeviceType<T> type) {
+        requireUsable();
+
+        Objects.requireNonNull(id, "id");
+        Objects.requireNonNull(type, "type");
+
+        DeviceDefinition definition = runtime.requireDefinition(type);
+        if (world.deviceDefinition(id).id() != definition.id()) {
+            throw new IllegalArgumentException("Device type does not match the existing native definition");
+        }
+
+        T device = type.construct();
+        device.requireUnbound();
+        device.bind(this, id, definition);
 
         return device;
     }
 
     void setParameter(Device device, int parameterId, double value) {
-        requireOwned(device);
+        validateParameter(device, parameterId, value);
 
-        world.setDeviceParameter(device.id(), device.generation(), parameterId, value);
+        DeviceId id = device.id();
+        world.setDeviceParameter(id.value(), id.generation(), parameterId, value);
+    }
+
+    void validateParameter(Device device, int parameterId, double value) {
+        requireOwned(device);
+        world.requireDevice(device.id());
+        runtime.validateParameter(device.definition(), parameterId, value);
     }
 
     void attachTerminal(Device device, int terminalId, Wire wire) {
         requireOwned(device);
         requireOwned(wire);
 
-        world.attachTerminal(wire.id(), device.id(), device.generation(), terminalId);
+        DeviceId id = device.id();
+        world.attachTerminal(wire.id(), id.value(), id.generation(), terminalId);
     }
 
     void detachTerminal(Device device, int terminalId, Wire wire) {
         requireOwned(device);
         requireOwned(wire);
 
-        world.detachTerminal(wire.id(), device.id(), device.generation(), terminalId);
+        DeviceId id = device.id();
+        world.detachTerminal(wire.id(), id.value(), id.generation(), terminalId);
     }
 
     ObservationSubscription subscribe(Device device, int observerId, ObservationListener listener) {
@@ -247,14 +291,13 @@ public final class ElectricalSystem implements AutoCloseable {
 
         Objects.requireNonNull(listener, "listener");
 
-        int deviceId = device.id();
-        int deviceGeneration = device.generation();
+        DeviceId deviceId = device.id();
 
-        int subscriptionId = world.subscribeObserver(deviceId, deviceGeneration, observerId);
+        int subscriptionId = world.subscribeObserver(deviceId.value(), deviceId.generation(), observerId);
 
         try {
             ObservationSubscription subscription =
-                    new ObservationSubscription(this, subscriptionId, deviceId, listener);
+                    new ObservationSubscription(this, subscriptionId, deviceId.value(), listener);
 
             subscriptions.add(subscription);
 
@@ -304,12 +347,12 @@ public final class ElectricalSystem implements AutoCloseable {
     void remove(Device device) {
         requireOwned(device);
 
-        int deviceId = device.id();
+        DeviceId deviceId = device.id();
 
-        world.removeDevice(deviceId, device.generation());
+        world.removeDevice(deviceId.value(), deviceId.generation());
 
         try {
-            subscriptions.invalidateDevice(deviceId);
+            subscriptions.invalidateDevice(deviceId.value());
         } catch (RuntimeException | Error failure) {
             poisoned = true;
             throw failure;

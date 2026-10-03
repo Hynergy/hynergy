@@ -2,6 +2,7 @@ package dev.hynergy.electrical;
 
 import dev.hynergy.electrical.internal.NativeBindings;
 import dev.hynergy.electrical.internal.NativeLayouts;
+import it.unimi.dsi.fastutil.ints.Int2ObjectOpenHashMap;
 
 import java.lang.foreign.Arena;
 import java.lang.foreign.MemorySegment;
@@ -14,6 +15,7 @@ final class ElectricalWorld implements AutoCloseable {
 
     private final WorldIdAllocator wireIds;
     private final WorldIdAllocator deviceIds;
+    private final Int2ObjectOpenHashMap<DeviceDefinition> deviceDefinitions = new Int2ObjectOpenHashMap<>();
 
     private final WorldCommandBuffer commandBuffer;
     private final SubscriptionRecordBuffer subscriptionBuffer;
@@ -218,8 +220,10 @@ final class ElectricalWorld implements AutoCloseable {
         int generation = deviceIds.generation(id);
 
         try {
+            deviceDefinitions.put(id, definition);
             commandBuffer.addDevice(id, definition.id());
         } catch (RuntimeException | Error failure) {
+            deviceDefinitions.remove(id);
             cancelPendingAdd(deviceIds, id, generation, failure);
 
             throw failure;
@@ -233,9 +237,23 @@ final class ElectricalWorld implements AutoCloseable {
         wireIds.requireUsable(id.value(), id.generation());
     }
 
+    void requireDevice(DeviceId id) {
+        requireUsable();
+        deviceIds.requireUsable(id.value(), id.generation());
+    }
+
     int wireGeneration(int wireId) {
         requireUsable();
         return wireIds.generation(wireId);
+    }
+
+    DeviceDefinition deviceDefinition(DeviceId id) {
+        requireDevice(id);
+        DeviceDefinition definition = deviceDefinitions.get(id.value());
+        if (definition == null) {
+            throw new IllegalStateException("Live device has no definition");
+        }
+        return definition;
     }
 
     int deviceGeneration(int deviceId) {
@@ -269,6 +287,7 @@ final class ElectricalWorld implements AutoCloseable {
 
             throw failure;
         }
+        deviceDefinitions.remove(deviceId);
     }
 
     void connectWires(WireId wireAId, WireId wireBId) {
