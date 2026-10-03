@@ -248,6 +248,7 @@ public final class ElectricityModule extends HynergyModule {
                         runtime,
                         resourceType,
                         wireComponentType,
+                        deviceComponentType,
                         portModule,
                         electricalPortDomain()
                 )

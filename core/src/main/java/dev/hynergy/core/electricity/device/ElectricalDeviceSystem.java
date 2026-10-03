@@ -20,7 +20,6 @@ import org.joml.Vector3i;
 import org.jspecify.annotations.NonNull;
 import org.jspecify.annotations.Nullable;
 
-import java.util.Arrays;
 import java.util.Objects;
 
 /**
@@ -351,26 +350,6 @@ public final class ElectricalDeviceSystem extends RefSystem<ChunkStore> {
         component.setDeviceId(null);
     }
 
-    static boolean attachIfNew(
-            Device device,
-            int nativeTerminalId,
-            @Nullable Wire wire,
-            AttachmentDedup dedup
-    ) {
-        Objects.requireNonNull(device, "device");
-        Objects.requireNonNull(dedup, "dedup");
-
-        if (wire == null) {
-            return false;
-        }
-        if (!dedup.add(nativeTerminalId, wire.id().packed())) {
-            return false;
-        }
-
-        DeviceAccess.attachTerminal(device, nativeTerminalId, wire);
-        return true;
-    }
-
     private static void rollbackCreatedDevice(DeviceComponent component, Throwable failure) {
         Device device = component.device();
         if (device != null) {
@@ -387,47 +366,10 @@ public final class ElectricalDeviceSystem extends RefSystem<ChunkStore> {
     record BindResult(boolean created, boolean persistenceChanged) {
     }
 
-    static final class AttachmentDedup {
-        private int[] terminalIds = new int[8];
-        private long[] wireIds = new long[8];
-        private int size;
-
-        boolean add(int terminalId, long wireId) {
-            for (int index = 0; index < size; index++) {
-                if (terminalIds[index] == terminalId && wireIds[index] == wireId) {
-                    return false;
-                }
-            }
-
-            ensureCapacity(size + 1);
-            terminalIds[size] = terminalId;
-            wireIds[size] = wireId;
-            size++;
-            return true;
-        }
-
-        void clear() {
-            size = 0;
-        }
-
-        private void ensureCapacity(int required) {
-            if (required <= terminalIds.length) {
-                return;
-            }
-
-            int newCapacity = terminalIds.length << 1;
-            if (newCapacity < required) {
-                newCapacity = required;
-            }
-            terminalIds = Arrays.copyOf(terminalIds, newCapacity);
-            wireIds = Arrays.copyOf(wireIds, newCapacity);
-        }
-    }
-
     private static final class AttachmentScratch
             implements PortConnectionConsumer<ElectricalPortConnection> {
         private final Vector3i sourcePosition = new Vector3i();
-        private final AttachmentDedup dedup = new AttachmentDedup();
+        private final DeviceWireConnections.AttachmentDedup dedup = new DeviceWireConnections.AttachmentDedup();
 
         private boolean inUse;
         private @Nullable Device device;
@@ -504,7 +446,7 @@ public final class ElectricalDeviceSystem extends RefSystem<ChunkStore> {
                 return;
             }
 
-            attachIfNew(device, nativeTerminalId, targetComponent.getWire(), dedup);
+            DeviceWireConnections.attachIfNew(device, nativeTerminalId, targetComponent.getWire(), dedup);
         }
     }
 }

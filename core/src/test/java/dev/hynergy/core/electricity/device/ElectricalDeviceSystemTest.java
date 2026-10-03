@@ -214,11 +214,11 @@ final class ElectricalDeviceSystemTest {
              ElectricalSystem system = runtime.createSystem(20)) {
             TestResistance resistance = system.create(TestResistance.TYPE);
             Wire wire = system.createWire();
-            ElectricalDeviceSystem.AttachmentDedup dedup =
-                    new ElectricalDeviceSystem.AttachmentDedup();
+            DeviceWireConnections.AttachmentDedup dedup =
+                    new DeviceWireConnections.AttachmentDedup();
 
-            assertTrue(ElectricalDeviceSystem.attachIfNew(resistance, 0, wire, dedup));
-            assertFalse(ElectricalDeviceSystem.attachIfNew(resistance, 0, wire, dedup));
+            assertTrue(DeviceWireConnections.attachIfNew(resistance, 0, wire, dedup));
+            assertFalse(DeviceWireConnections.attachIfNew(resistance, 0, wire, dedup));
             assertDoesNotThrow(system::tick);
 
             DeviceAccess.detachTerminal(resistance, 0, wire);
@@ -232,11 +232,11 @@ final class ElectricalDeviceSystemTest {
              ElectricalSystem system = runtime.createSystem(20)) {
             TestResistance resistance = system.create(TestResistance.TYPE);
             Wire wire = system.createWire();
-            ElectricalDeviceSystem.AttachmentDedup dedup =
-                    new ElectricalDeviceSystem.AttachmentDedup();
+            DeviceWireConnections.AttachmentDedup dedup =
+                    new DeviceWireConnections.AttachmentDedup();
 
-            assertFalse(ElectricalDeviceSystem.attachIfNew(resistance, 0, null, dedup));
-            assertTrue(ElectricalDeviceSystem.attachIfNew(resistance, 0, wire, dedup));
+            assertFalse(DeviceWireConnections.attachIfNew(resistance, 0, null, dedup));
+            assertTrue(DeviceWireConnections.attachIfNew(resistance, 0, wire, dedup));
             assertDoesNotThrow(system::tick);
         }
     }
