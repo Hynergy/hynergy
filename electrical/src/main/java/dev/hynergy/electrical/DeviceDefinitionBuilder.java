@@ -78,6 +78,7 @@ public final class DeviceDefinitionBuilder implements AutoCloseable {
     private static final int COMMAND_ADD_ELEMENT = 4;
     private static final int COMMAND_ADD_VOLTAGE_OBSERVER = 5;
     private static final int COMMAND_ADD_CHILD_OBSERVER = 6;
+    private static final int COMMAND_ADD_GROUND_NODE = 7;
 
     private static final int VALUE_LITERAL = 0;
     private static final int VALUE_PARAMETER = 1;
@@ -261,6 +262,27 @@ public final class DeviceDefinitionBuilder implements AutoCloseable {
 
         nodeCount++;
 
+        return nodeId;
+    }
+
+    /**
+     * Adds one internal ideal 0 V reference node.
+     *
+     * <p>This method does not add an external terminal. Distinct ground nodes
+     * do not create topology connections. Reuse a node ID to connect branches
+     * within the definition.</p>
+     *
+     * @return the node ID
+     * @throws IllegalStateException if a child element is open or the builder
+     *                              is closed
+     */
+    public int addGroundNode() {
+        requireTopLevel();
+
+        int nodeId = nextNodeId();
+        long payload = prepareCommand(COMMAND_ADD_GROUND_NODE, 0);
+        commitCommand(payload);
+        nodeCount++;
         return nodeId;
     }
 

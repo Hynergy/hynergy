@@ -63,11 +63,24 @@ impl CompiledObserverOutput {
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub(crate) struct IslandUnknownLayout {
     nodes: SmallVec<[IslandNode; 4]>,
+    reference_policy: IslandReferencePolicy,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+enum IslandReferencePolicy {
+    Automatic,
+    ExplicitGround,
 }
 
 impl IslandUnknownLayout {
-    pub(crate) fn new(nodes: &[IslandNode]) -> Result<Self, UnknownAllocationError> {
-        let dimension = nodes.len().saturating_sub(1);
+    fn new(
+        nodes: &[IslandNode],
+        reference_policy: IslandReferencePolicy,
+    ) -> Result<Self, UnknownAllocationError> {
+        let dimension = match reference_policy {
+            IslandReferencePolicy::Automatic => nodes.len().saturating_sub(1),
+            IslandReferencePolicy::ExplicitGround => nodes.len(),
+        };
 
         UnknownAllocator::new(dimension)?;
 
@@ -83,12 +96,16 @@ impl IslandUnknownLayout {
 
         Ok(Self {
             nodes: SmallVec::from_slice(nodes),
+            reference_policy,
         })
     }
 
     #[inline]
     pub(crate) fn dimension(&self) -> usize {
-        self.nodes.len().saturating_sub(1)
+        match self.reference_policy {
+            IslandReferencePolicy::Automatic => self.nodes.len().saturating_sub(1),
+            IslandReferencePolicy::ExplicitGround => self.nodes.len(),
+        }
     }
 
     #[inline]
@@ -99,12 +116,13 @@ impl IslandUnknownLayout {
             .position(|&candidate| candidate == node)
             .expect("island node must belong to unknown layout");
 
-        if position == 0 {
-            return None;
-        }
+        let index = match self.reference_policy {
+            IslandReferencePolicy::Automatic => position.checked_sub(1)?,
+            IslandReferencePolicy::ExplicitGround => position,
+        };
 
         Some(UnknownIndex::new(
-            u32::try_from(position - 1).expect("island voltage index must fit UnknownIndex"),
+            u32::try_from(index).expect("island voltage index must fit UnknownIndex"),
         ))
     }
 
@@ -418,7 +436,16 @@ pub(crate) fn compile_island_parts(
     nodes: &[IslandNode],
     partitions: &[IslandPartitionSpec<'_>],
 ) -> Result<CompiledIsland, IslandCompileError> {
-    let unknown_layout = IslandUnknownLayout::new(nodes)?;
+    // Only the partitions in this island can select its reference policy.
+    let reference_policy = if partitions
+        .iter()
+        .any(|partition| partition.partition.template().has_explicit_ground())
+    {
+        IslandReferencePolicy::ExplicitGround
+    } else {
+        IslandReferencePolicy::Automatic
+    };
+    let unknown_layout = IslandUnknownLayout::new(nodes, reference_policy)?;
 
     let mut unknown_allocator = UnknownAllocator::new(unknown_layout.dimension())?;
     let mut state_layout = IslandStateLayout::new();
@@ -665,6 +692,35 @@ pub(crate) fn compile_topology_island(
 
 #[cfg(test)]
 mod test {
+    use super::IslandReferencePolicy;
+
+    #[test]
+    fn reference_policy_controls_only_topology_voltage_allocation() {
+        let nodes = [
+            IslandNode::net(NetId::try_from(1).unwrap()),
+            IslandNode::net(NetId::try_from(2).unwrap()),
+        ];
+        for count in 0..=2 {
+            let automatic =
+                IslandUnknownLayout::new(&nodes[..count], IslandReferencePolicy::Automatic)
+                    .unwrap();
+            let explicit =
+                IslandUnknownLayout::new(&nodes[..count], IslandReferencePolicy::ExplicitGround)
+                    .unwrap();
+            assert_eq!(automatic.dimension(), count.saturating_sub(1));
+            assert_eq!(explicit.dimension(), count);
+            for (index, &node) in nodes[..count].iter().enumerate() {
+                assert_eq!(
+                    explicit.node_unknown(node),
+                    Some(UnknownIndex::new(index as u32))
+                );
+                assert_eq!(
+                    automatic.node_unknown(node),
+                    index.checked_sub(1).map(|i| UnknownIndex::new(i as u32))
+                );
+            }
+        }
+    }
     use crate::compile::definition::{
         CompiledDefinition, DefinitionStateId, DefinitionStateInitializer,
         FailedTickStateTransition,
@@ -693,7 +749,8 @@ mod test {
 
         let node_b = IslandNode::net(net_b);
 
-        let layout = IslandUnknownLayout::new(&[node_a, node_b]).unwrap();
+        let layout =
+            IslandUnknownLayout::new(&[node_a, node_b], IslandReferencePolicy::Automatic).unwrap();
 
         assert_eq!(layout.dimension(), 1,);
 
@@ -736,7 +793,8 @@ mod test {
 
         let node_b = IslandNode::net(net_b);
 
-        let layout = IslandUnknownLayout::new(&[node_a, node_b]).unwrap();
+        let layout =
+            IslandUnknownLayout::new(&[node_a, node_b], IslandReferencePolicy::Automatic).unwrap();
 
         let terminals = layout.bind_terminal_nodes(&[node_a, node_b]);
 
@@ -793,7 +851,8 @@ mod test {
 
         let node_b = IslandNode::net(net_b);
 
-        let layout = IslandUnknownLayout::new(&[node_a, node_b]).unwrap();
+        let layout =
+            IslandUnknownLayout::new(&[node_a, node_b], IslandReferencePolicy::Automatic).unwrap();
 
         let mut allocator = UnknownAllocator::new(layout.dimension()).unwrap();
 
@@ -842,7 +901,8 @@ mod test {
 
         let node_b = IslandNode::net(net_b);
 
-        let layout = IslandUnknownLayout::new(&[node_a, node_b]).unwrap();
+        let layout =
+            IslandUnknownLayout::new(&[node_a, node_b], IslandReferencePolicy::Automatic).unwrap();
 
         let mut allocator = UnknownAllocator::new(layout.dimension()).unwrap();
 
@@ -897,7 +957,8 @@ mod test {
 
         let node_b = IslandNode::net(net_b);
 
-        let layout = IslandUnknownLayout::new(&[node_a, node_b]).unwrap();
+        let layout =
+            IslandUnknownLayout::new(&[node_a, node_b], IslandReferencePolicy::Automatic).unwrap();
 
         let mut allocator = UnknownAllocator::new(layout.dimension()).unwrap();
 
@@ -919,7 +980,9 @@ mod test {
 
         let negative = IslandNode::terminal(device, TerminalId::new(1));
 
-        let layout = IslandUnknownLayout::new(&[positive, negative]).unwrap();
+        let layout =
+            IslandUnknownLayout::new(&[positive, negative], IslandReferencePolicy::Automatic)
+                .unwrap();
 
         assert_eq!(layout.dimension(), 1,);
 

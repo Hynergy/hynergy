@@ -1378,6 +1378,342 @@ mod test {
 
     const DEFAULT_TIMESTEP: f64 = 1.0;
 
+    fn grounded_definition(
+        definitions: &DefinitionRegistry,
+        exposed: bool,
+        elements: &[(PrimitiveElementKind, f64)],
+    ) -> hynergy_model::device::definition::DeviceDefinition {
+        let mut builder = DeviceDefinitionBuilder::new(definitions);
+        let output = if exposed {
+            builder.add_terminal()
+        } else {
+            builder.add_node()
+        }
+        .unwrap();
+        let ground = builder.add_ground_node().unwrap();
+        builder.add_voltage_observer(output, ground).unwrap();
+        for &(kind, value) in elements {
+            let element = builder
+                .add_element(Element::new(
+                    kind.into(),
+                    vec![output, ground],
+                    vec![ValueRef::Literal(value)],
+                ))
+                .unwrap();
+            builder
+                .add_child_observer(element, DefinitionObserverId::new(1))
+                .unwrap();
+        }
+        builder.build_definition().unwrap()
+    }
+
+    fn compile_device_partition(
+        definitions: &DefinitionRegistry,
+        network: &Network,
+        device: DeviceId,
+        partition: u16,
+    ) -> crate::compile::island::CompiledIsland {
+        let topology = DerivedTopology::from_network(network, definitions);
+        let island = topology.component_island(
+            network,
+            DeviceComponent::new(device, DevicePartitionId::new(partition)),
+        );
+        compile_topology_island(definitions, network, &topology, island).unwrap()
+    }
+
+    #[test]
+    fn grounded_source_and_resistor_solve_with_exposed_or_hidden_output() {
+        for exposed in [true, false] {
+            let mut definitions = DefinitionRegistry::new();
+            let definition = grounded_definition(
+                &definitions,
+                exposed,
+                &[
+                    (PrimitiveElementKind::VoltageSource, 10.0),
+                    (PrimitiveElementKind::Resistance, 1000.0),
+                ],
+            );
+            let definition = definitions.register(definition).unwrap();
+            let device = DeviceId::try_from(1).unwrap();
+            let mut network = Network::new();
+            network
+                .add_device(&definitions, device, definition)
+                .unwrap();
+            let compiled = compile_device_partition(&definitions, &network, device, 0);
+            assert_eq!(compiled.pattern().dimension(), 2);
+            assert_eq!(compiled.state_count(), 0);
+            let mut runtime = IslandRuntime::new(compiled, &network, DEFAULT_TIMESTEP).unwrap();
+            runtime
+                .solve_tick_with_state_reader(&network, |_| None)
+                .unwrap();
+            for (index, expected) in [(0, 10.0), (1, -0.01), (2, 0.01)] {
+                let actual = runtime
+                    .observer_value(DeviceObserver::new(
+                        device,
+                        DefinitionObserverId::new(index),
+                    ))
+                    .unwrap();
+                assert!(
+                    (actual - expected).abs() < 1.0e-12,
+                    "observer {index}: {actual}"
+                );
+            }
+            if exposed {
+                assert_eq!(
+                    runtime.node_voltage(IslandNode::terminal(device, TerminalId::new(0))),
+                    Some(10.0)
+                );
+            }
+        }
+    }
+
+    #[test]
+    fn distinct_device_grounds_supply_load_through_one_connected_output() {
+        let mut definitions = DefinitionRegistry::new();
+        let source_definition = grounded_definition(
+            &definitions,
+            true,
+            &[(PrimitiveElementKind::VoltageSource, 10.0)],
+        );
+        let source_definition = definitions.register(source_definition).unwrap();
+        let load_definition = grounded_definition(
+            &definitions,
+            true,
+            &[(PrimitiveElementKind::Resistance, 1000.0)],
+        );
+        let load_definition = definitions.register(load_definition).unwrap();
+        let source = DeviceId::try_from(1).unwrap();
+        let load = DeviceId::try_from(2).unwrap();
+        let wire = WireId::try_from(1).unwrap();
+        let mut network = Network::new();
+        network.add_wire(wire).unwrap();
+        for (device, definition) in [(source, source_definition), (load, load_definition)] {
+            network
+                .add_device(&definitions, device, definition)
+                .unwrap();
+            network
+                .attach_terminal(wire, device, TerminalId::new(0))
+                .unwrap();
+        }
+        let compiled = compile_device_partition(&definitions, &network, source, 0);
+        assert_eq!(compiled.pattern().dimension(), 2);
+        let mut runtime = IslandRuntime::new(compiled, &network, DEFAULT_TIMESTEP).unwrap();
+        runtime
+            .solve_tick_with_state_reader(&network, |_| None)
+            .unwrap();
+        for (device, index, expected) in [(load, 0, 10.0), (load, 1, 0.01), (source, 1, -0.01)] {
+            let actual = runtime
+                .observer_value(DeviceObserver::new(
+                    device,
+                    DefinitionObserverId::new(index),
+                ))
+                .unwrap();
+            assert!((actual - expected).abs() < 1.0e-12);
+        }
+    }
+
+    #[test]
+    fn nested_grounded_and_floating_partitions_keep_separate_reference_policies() {
+        let mut definitions = DefinitionRegistry::new();
+        let child = grounded_definition(
+            &definitions,
+            true,
+            &[(PrimitiveElementKind::VoltageSource, 10.0)],
+        );
+        let mut child = definitions.register(child).unwrap();
+        for _ in 0..2 {
+            let mut builder = DeviceDefinitionBuilder::new(&definitions);
+            let output = builder.add_terminal().unwrap();
+            let element = builder
+                .add_element(Element::new(child, vec![output], vec![]))
+                .unwrap();
+            builder
+                .add_child_observer(element, DefinitionObserverId::new(0))
+                .unwrap();
+            child = definitions
+                .register(builder.build_definition().unwrap())
+                .unwrap();
+        }
+        let mut builder = DeviceDefinitionBuilder::new(&definitions);
+        let grounded = builder.add_terminal().unwrap();
+        let a = builder.add_terminal().unwrap();
+        let b = builder.add_terminal().unwrap();
+        let element = builder
+            .add_element(Element::new(child, vec![grounded], vec![]))
+            .unwrap();
+        builder
+            .add_child_observer(element, DefinitionObserverId::new(0))
+            .unwrap();
+        builder
+            .add_element(Element::new(
+                PrimitiveElementKind::VoltageSource.into(),
+                vec![a, b],
+                vec![ValueRef::Literal(7.0)],
+            ))
+            .unwrap();
+        builder
+            .add_element(Element::new(
+                PrimitiveElementKind::Resistance.into(),
+                vec![a, b],
+                vec![ValueRef::Literal(1000.0)],
+            ))
+            .unwrap();
+        builder.add_voltage_observer(a, b).unwrap();
+        let definition = definitions
+            .register(builder.build_definition().unwrap())
+            .unwrap();
+        let device = DeviceId::try_from(1).unwrap();
+        let mut network = Network::new();
+        network
+            .add_device(&definitions, device, definition)
+            .unwrap();
+        let topology = DerivedTopology::from_network(&network, &definitions);
+        let ground_island = topology.component_island(
+            &network,
+            DeviceComponent::new(device, DevicePartitionId::new(0)),
+        );
+        let floating_island = topology.component_island(
+            &network,
+            DeviceComponent::new(device, DevicePartitionId::new(1)),
+        );
+        assert_ne!(ground_island, floating_island);
+        for (partition, index, expected) in [(0, 0, 10.0), (1, 1, 7.0)] {
+            let compiled = compile_device_partition(&definitions, &network, device, partition);
+            assert_eq!(compiled.pattern().dimension(), 2);
+            let mut runtime = IslandRuntime::new(compiled, &network, DEFAULT_TIMESTEP).unwrap();
+            runtime
+                .solve_tick_with_state_reader(&network, |_| None)
+                .unwrap();
+            let voltage = runtime
+                .observer_value(DeviceObserver::new(
+                    device,
+                    DefinitionObserverId::new(index),
+                ))
+                .unwrap();
+            assert!((voltage - expected).abs() < 1.0e-12);
+            if partition == 1 {
+                let positive = runtime
+                    .node_voltage(IslandNode::terminal(device, TerminalId::new(1)))
+                    .unwrap();
+                let negative = runtime
+                    .node_voltage(IslandNode::terminal(device, TerminalId::new(2)))
+                    .unwrap();
+                assert!(positive == 0.0 || negative == 0.0);
+                assert!((positive - negative - 7.0).abs() < 1.0e-12);
+            }
+        }
+    }
+
+    #[test]
+    fn logic_composite_with_hidden_ground_and_supply_drives_finite_load() {
+        for input_voltage in [0.0, 5.0] {
+            let mut definitions = DefinitionRegistry::new();
+            let mut builder = DeviceDefinitionBuilder::new(&definitions);
+            let output = builder.add_terminal().unwrap();
+            let input = builder.add_terminal().unwrap();
+            let vdd = builder.add_node().unwrap();
+            let vss = builder.add_ground_node().unwrap();
+            builder
+                .add_element(Element::new(
+                    PrimitiveElementKind::VoltageSource.into(),
+                    vec![vdd, vss],
+                    vec![ValueRef::Literal(5.0)],
+                ))
+                .unwrap();
+            builder
+                .add_element(Element::new(
+                    PrimitiveElementKind::VoltageSource.into(),
+                    vec![input, vss],
+                    vec![ValueRef::Literal(input_voltage)],
+                ))
+                .unwrap();
+            builder
+                .add_element(Element::new(
+                    PrimitiveElementKind::Not.into(),
+                    vec![output, vdd, vss, input],
+                    vec![
+                        ValueRef::Literal(2.5),
+                        ValueRef::Literal(0.1),
+                        ValueRef::Literal(0.001),
+                    ],
+                ))
+                .unwrap();
+            builder
+                .add_element(Element::new(
+                    PrimitiveElementKind::Resistance.into(),
+                    vec![output, vss],
+                    vec![ValueRef::Literal(1000.0)],
+                ))
+                .unwrap();
+            builder.add_voltage_observer(output, vss).unwrap();
+            let definition = definitions
+                .register(builder.build_definition().unwrap())
+                .unwrap();
+            let device = DeviceId::try_from(1).unwrap();
+            let mut network = Network::new();
+            network
+                .add_device(&definitions, device, definition)
+                .unwrap();
+            let compiled = compile_device_partition(&definitions, &network, device, 0);
+            assert_eq!(compiled.pattern().dimension(), 5);
+            let mut runtime = IslandRuntime::new(compiled, &network, DEFAULT_TIMESTEP).unwrap();
+            runtime
+                .solve_tick_with_state_reader(&network, |_| None)
+                .unwrap();
+            // KCL: Vout = 5 * Gup / (Gup + Gdown + 1/1000).
+            let expected = if input_voltage == 0.0 {
+                0.5 / 0.102
+            } else {
+                0.005 / 0.102
+            };
+            let actual = runtime
+                .observer_value(DeviceObserver::new(device, DefinitionObserverId::new(0)))
+                .unwrap();
+            assert!(
+                (actual - expected).abs() < 1.0e-10,
+                "input {input_voltage}: {actual}"
+            );
+        }
+    }
+
+    #[test]
+    fn explicit_ground_preserves_singular_circuit_failure_without_observations() {
+        for elements in [
+            vec![
+                (PrimitiveElementKind::VoltageSource, 5.0),
+                (PrimitiveElementKind::VoltageSource, 10.0),
+            ],
+            vec![(PrimitiveElementKind::CurrentSource, 0.01)],
+        ] {
+            let mut definitions = DefinitionRegistry::new();
+            let definition = grounded_definition(&definitions, true, &elements);
+            let definition = definitions.register(definition).unwrap();
+            let device = DeviceId::try_from(1).unwrap();
+            let mut network = Network::new();
+            network
+                .add_device(&definitions, device, definition)
+                .unwrap();
+            let compiled = compile_device_partition(&definitions, &network, device, 0);
+            assert_eq!(
+                compiled.pattern().dimension(),
+                elements.len() + usize::from(elements[0].0 == PrimitiveElementKind::VoltageSource)
+            );
+            let mut runtime = IslandRuntime::new(compiled, &network, DEFAULT_TIMESTEP).unwrap();
+            assert!(matches!(
+                runtime.solve_tick_with_state_reader(&network, |_| None),
+                Err(IslandRuntimeError::Mna(MnaError::Singular { .. }))
+            ));
+            assert_eq!(
+                runtime.observer_value(DeviceObserver::new(device, DefinitionObserverId::new(0))),
+                None
+            );
+            assert_eq!(
+                runtime.node_voltage(IslandNode::terminal(device, TerminalId::new(0))),
+                None
+            );
+        }
+    }
+
     #[test]
     fn runtime_retains_compiled_discrete_plan_and_scratch() {
         let definitions = DefinitionRegistry::new();

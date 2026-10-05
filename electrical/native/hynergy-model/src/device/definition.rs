@@ -485,6 +485,7 @@ pub struct DeviceDefinition {
     partition_layout: DevicePartitionLayout,
     state_count: usize,
     observers: Vec<DefinitionObserver>,
+    ground_nodes: Vec<NodeId>,
 }
 
 impl DeviceDefinition {
@@ -502,6 +503,7 @@ impl DeviceDefinition {
             partition_layout,
             state_count: kind.state_count(),
             observers,
+            ground_nodes: Vec::new(),
         }
     }
 
@@ -512,6 +514,7 @@ impl DeviceDefinition {
         partition_layout: DevicePartitionLayout,
         state_count: usize,
         observers: Vec<DefinitionObserver>,
+        ground_nodes: Vec<NodeId>,
     ) -> Self {
         Self {
             body: DeviceBody::Composite(circuit),
@@ -520,6 +523,7 @@ impl DeviceDefinition {
             partition_layout,
             state_count,
             observers,
+            ground_nodes,
         }
     }
 
@@ -531,6 +535,16 @@ impl DeviceDefinition {
     #[inline]
     pub fn terminals(&self) -> &[NodeId] {
         &self.terminals
+    }
+
+    #[inline]
+    pub fn ground_nodes(&self) -> &[NodeId] {
+        &self.ground_nodes
+    }
+
+    #[inline]
+    pub fn is_ground_node(&self, node: NodeId) -> bool {
+        self.ground_nodes.binary_search(&node).is_ok()
     }
 
     #[inline]
