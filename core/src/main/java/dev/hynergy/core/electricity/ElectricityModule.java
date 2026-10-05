@@ -26,6 +26,9 @@ import dev.hynergy.core.port.PortModule;
 import dev.hynergy.core.port.PortStandard;
 import dev.hynergy.electrical.ElectricalRuntime;
 import dev.hynergy.electrical.PrimitiveDeviceTypes;
+import dev.hynergy.electrical.composite.GroundedLogicGates;
+import dev.hynergy.electrical.composite.ResistiveLoad;
+import dev.hynergy.electrical.composite.VoltageSupply;
 import org.joml.Vector3i;
 import org.jspecify.annotations.Nullable;
 
@@ -75,7 +78,7 @@ public final class ElectricityModule extends HynergyModule {
         this.deviceRegistry = new DeviceRegistry(runtime);
 
         registerPortProtocols();
-        devices().register(RESISTANCE_ID, PrimitiveDeviceTypes.RESISTANCE);
+        registerBuiltinDevices(devices());
 
         ComponentType<ChunkStore, WireComponent> wireComponentType =
                 chunkStoreRegistry.registerComponent(
@@ -349,6 +352,35 @@ public final class ElectricityModule extends HynergyModule {
         }
 
         return ElectricalPortConnection.DIRECT;
+    }
+
+    static void registerBuiltinDevices(DeviceRegistry devices) {
+        devices.register(RESISTANCE_ID, PrimitiveDeviceTypes.RESISTANCE);
+        devices.register("hynergy:conductance", PrimitiveDeviceTypes.CONDUCTANCE);
+        devices.register("hynergy:voltage_source", PrimitiveDeviceTypes.VOLTAGE_SOURCE);
+        devices.register("hynergy:current_source", PrimitiveDeviceTypes.CURRENT_SOURCE);
+        devices.register("hynergy:voltage_controlled_current_source", PrimitiveDeviceTypes.VOLTAGE_CONTROLLED_CURRENT_SOURCE);
+        devices.register("hynergy:voltage_controlled_voltage_source", PrimitiveDeviceTypes.VOLTAGE_CONTROLLED_VOLTAGE_SOURCE);
+        devices.register("hynergy:capacitor", PrimitiveDeviceTypes.CAPACITOR);
+        devices.register("hynergy:inductor", PrimitiveDeviceTypes.INDUCTOR);
+        devices.register("hynergy:voltage_controlled_switch", PrimitiveDeviceTypes.VOLTAGE_CONTROLLED_SWITCH);
+        devices.register("hynergy:voltage_controlled_conductance", PrimitiveDeviceTypes.VOLTAGE_CONTROLLED_CONDUCTANCE);
+        devices.register("hynergy:tick_delay", PrimitiveDeviceTypes.TICK_DELAY);
+        devices.register("hynergy:diode", PrimitiveDeviceTypes.DIODE);
+        devices.register("hynergy:not", PrimitiveDeviceTypes.NOT);
+        devices.register("hynergy:and", PrimitiveDeviceTypes.AND);
+        devices.register("hynergy:nand", PrimitiveDeviceTypes.NAND);
+        devices.register("hynergy:or", PrimitiveDeviceTypes.OR);
+        devices.register("hynergy:nor", PrimitiveDeviceTypes.NOR);
+        devices.register("hynergy:schmitt_buffer", PrimitiveDeviceTypes.SCHMITT_BUFFER);
+
+        devices.register("hynergy:voltage_supply", VoltageSupply.TYPE);
+        devices.register("hynergy:resistive_load", ResistiveLoad.RESISTIVE_LOAD);
+        devices.register("hynergy:grounded_and", GroundedLogicGates.GROUNDED_AND);
+        devices.register("hynergy:grounded_or", GroundedLogicGates.GROUNDED_OR);
+        devices.register("hynergy:grounded_nand", GroundedLogicGates.GROUNDED_NAND);
+        devices.register("hynergy:grounded_nor", GroundedLogicGates.GROUNDED_NOR);
+        devices.register("hynergy:grounded_not", GroundedLogicGates.GROUNDED_NOT);
     }
 
     /** Returns the setup-time asset registry. */
