@@ -5,17 +5,17 @@ import com.hypixel.hytale.codec.schema.config.Schema;
 import com.hypixel.hytale.codec.validation.ValidationResults;
 import com.hypixel.hytale.codec.validation.Validator;
 
-final class DeviceDescriptorValidator implements Validator<String> {
-    private final DeviceDescriptorRegistry descriptors;
+final class DeviceTypeValidator implements Validator<String> {
+    private final DeviceRegistry devices;
 
-    DeviceDescriptorValidator(DeviceDescriptorRegistry descriptors) {
-        this.descriptors = descriptors;
+    DeviceTypeValidator(DeviceRegistry devices) {
+        this.devices = devices;
     }
 
     @Override
     public void accept(String id, ValidationResults results) {
-        if (id == null || descriptors.get(id) == null) {
-            results.fail("Unknown device descriptor: " + id);
+        if (id == null || devices.get(id) == null) {
+            results.fail("Unknown device type: " + id);
         }
     }
 

@@ -5,6 +5,25 @@ import java.util.concurrent.atomic.AtomicInteger;
 import static org.junit.jupiter.api.Assertions.*;
 
 final class DeviceTypeMetadataTest {
+    @Test void primitiveDeclaredConstraintsMatchNativeParameterValidation() {
+        try (var runtime = ElectricalRuntime.create()) {
+            for (var type : PrimitiveDeviceTypes.ALL) {
+                var binding = runtime.register(type);
+                for (var parameter : type.parameters()) {
+                    for (double value : new double[]{Double.NaN, Double.NEGATIVE_INFINITY, Double.POSITIVE_INFINITY,
+                            -Double.MAX_VALUE, -1, -0.0, 0, Double.MIN_VALUE, 1, Double.MAX_VALUE}) {
+                        boolean declaredAccepts;
+                        try { parameter.constraints().validate(value); declaredAccepts = true; }
+                        catch (IllegalArgumentException failure) { declaredAccepts = false; }
+                        boolean nativeAccepts;
+                        try { runtime.validateParameter(binding.definition(), binding.parameterIndex(parameter), value); nativeAccepts = true; }
+                        catch (IllegalArgumentException failure) { nativeAccepts = false; }
+                        assertEquals(nativeAccepts, declaredAccepts, "Primitive " + type.primitiveId() + " parameter " + parameter.name() + " value " + value);
+                    }
+                }
+            }
+        }
+    }
     @Test
     void primitiveCatalogMatchesNativeTerminalBoundaries() {
         double[][] values = {
@@ -15,7 +34,7 @@ final class DeviceTypeMetadataTest {
         };
         try (ElectricalEngine engine = ElectricalEngine.create()) {
             for (int definitionId = 1; definitionId <= 18; definitionId++) {
-                DeviceType type = DeviceType.primitive(definitionId);
+                DeviceType type = PrimitiveDeviceTypes.ALL.get(definitionId - 1);
                 try (ElectricalWorld world = engine.createWorld(20)) {
                     int deviceId = world.addDevice(new DeviceDefinition(definitionId));
                     int generation = world.deviceGeneration(deviceId);
@@ -39,7 +58,7 @@ final class DeviceTypeMetadataTest {
         try (ElectricalEngine engine = ElectricalEngine.create();
              ElectricalWorld world = engine.createWorld(20)) {
             for (int definitionId = 1; definitionId <= 18; definitionId++) {
-                DeviceType type = DeviceType.primitive(definitionId);
+                DeviceType type = PrimitiveDeviceTypes.ALL.get(definitionId - 1);
                 DeviceDefinition definition = new DeviceDefinition(definitionId);
                 if (type.parameterCount() > 0) {
                     assertDoesNotThrow(() -> engine.validateParameter(definition, type.parameterCount() - 1, 1.0));
@@ -56,62 +75,40 @@ final class DeviceTypeMetadataTest {
         }
     }
 
-    @Test
-    void registrationCapturesOnlyExternalMembersAndExecutesBuilderOnce() {
-        AtomicInteger builds = new AtomicInteger();
-        DeviceType type = DeviceType.create(builder -> {
+    @Test void compositeMetadataIsImmutableAcrossRuntimes() {
+        var builds = new AtomicInteger();
+        var type = DeviceType.define(b -> {
             builds.incrementAndGet();
-            int terminal = builder.addTerminal();
-            int ground = builder.addGroundNode();
-            int parameter = builder.addParameter(DeviceDefinitionBuilder.Bound.inclusive(10.0), null, true);
-            builder.beginElement(PrimitiveDeviceTypes.RESISTANCE)
-                    .elementTerminal(terminal).elementTerminal(ground)
-                    .elementParameter(parameter).endElement();
-            builder.addVoltageObserver(terminal, ground);
-            builder.addChildObserver(0, 1);
+            var terminal = b.terminal(0, "positive"); var ground = b.ground();
+            var parameter = b.parameter(0, "resistance", new ParameterConstraints(
+                ParameterConstraints.Bound.inclusive(10), null, true, false, null, null));
+            var child = b.element(PrimitiveDeviceTypes.RESISTANCE, e -> {
+                e.connect(PrimitiveDeviceTypes.RESISTANCE.terminal(0), terminal);
+                e.connect(PrimitiveDeviceTypes.RESISTANCE.terminal(1), ground);
+                e.bind(PrimitiveDeviceTypes.RESISTANCE.parameter(0), parameter);
+            });
+            b.voltageObserver(0, "voltage", terminal, ground);
+            b.childObserver(1, "current", child, PrimitiveDeviceTypes.RESISTANCE.observer(1));
         });
-        assertThrows(IllegalStateException.class, type::metadata);
-        try (ElectricalRuntime runtime = ElectricalRuntime.create()) {
-            runtime.register(type);
-            runtime.register(type);
-            assertEquals(1, builds.get());
-            assertEquals(1, type.terminalCount());
-            assertEquals(1, type.parameterCount());
-            assertEquals(2, type.observerCount());
-            assertThrows(IllegalArgumentException.class, () -> type.validateParameter(0, 9.0));
-            assertDoesNotThrow(() -> type.validateParameter(0, 10.0));
-            try (ElectricalSystem system = runtime.createSystem(20)) {
-                Device device = system.create(type);
-                Wire wire = system.createWire();
-                assertThrows(IllegalArgumentException.class, () -> device.attachTerminal(1, wire));
-                assertThrows(IllegalStateException.class, () -> device.observe(2, (status, value) -> {}));
-                device.setParameter(0, 10.0);
-                device.attachTerminal(0, wire);
-                assertDoesNotThrow(system::tick);
-            }
+        assertEquals(1, type.parameterCount()); assertEquals(1, type.terminalCount()); assertEquals(2, type.observerCount());
+        RegisteredDeviceType old;
+        try (var runtime = ElectricalRuntime.create()) {
+            old = runtime.register(type);
+            assertSame(old, runtime.register(type));
+            assertThrows(IllegalArgumentException.class, () -> old.validateParameter(type.parameter(0), 9));
+            old.validateParameter(type.parameter(0), 10);
         }
-        assertThrows(IllegalStateException.class, type::metadata);
-        assertThrows(IllegalStateException.class, () -> type.validateParameter(0, 10.0));
-        try (ElectricalRuntime runtime = ElectricalRuntime.create()) {
-            runtime.register(type);
-            assertEquals(2, builds.get());
-            assertEquals(1, type.terminalCount());
+        assertThrows(IllegalStateException.class, () -> old.validateParameter(type.parameter(0), 10));
+        assertEquals(1, type.terminalCount());
+        try (var runtime = ElectricalRuntime.create()) {
+            runtime.register(type).validateParameter(type.parameter(0), 10);
+            assertEquals(1, builds.get());
         }
     }
-
-    @Test
-    void primitiveMetadataRetainsItsShapeAcrossRuntimeLifetimes() {
-        DeviceType type = PrimitiveDeviceTypes.RESISTANCE;
-        assertEquals(2, type.terminalCount());
-        assertEquals(1, type.parameterCount());
-        assertEquals(2, type.observerCount());
-        try (ElectricalRuntime runtime = ElectricalRuntime.create()) {
-            runtime.register(type);
-            assertThrows(IllegalArgumentException.class, () -> type.validateParameter(0, 0.0));
-            assertDoesNotThrow(() -> type.validateParameter(0, 10.0));
-        }
-        assertEquals(2, type.terminalCount());
-        assertThrows(IllegalStateException.class, () -> type.validateParameter(0, 10.0));
-        assertThrows(IllegalArgumentException.class, () -> DeviceType.primitive(999));
+    @Test void primitiveMetadataAndConstraintsExistWithoutRegistration() {
+        var type = PrimitiveDeviceTypes.RESISTANCE;
+        assertEquals(2, type.terminalCount()); assertEquals(1, type.parameterCount()); assertEquals(2, type.observerCount());
+        assertThrows(IllegalArgumentException.class, () -> type.parameter(0).constraints().validate(0));
+        type.parameter(0).constraints().validate(10);
     }
 }

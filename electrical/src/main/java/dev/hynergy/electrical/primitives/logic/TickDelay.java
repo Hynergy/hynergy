@@ -17,14 +17,14 @@ public final class TickDelay {
      */
     public static final DeviceType TYPE = PrimitiveDeviceTypes.TICK_DELAY;
 
-    private static final int TERMINAL_INPUT_POSITIVE = 0;
-    private static final int TERMINAL_INPUT_NEGATIVE = 1;
-    private static final int TERMINAL_OUTPUT_POSITIVE = 2;
-    private static final int TERMINAL_OUTPUT_NEGATIVE = 3;
+    public static final DeviceTerminal INPUT_POSITIVE = TYPE.terminal(0);
+    public static final DeviceTerminal INPUT_NEGATIVE = TYPE.terminal(1);
+    public static final DeviceTerminal OUTPUT_POSITIVE = TYPE.terminal(2);
+    public static final DeviceTerminal OUTPUT_NEGATIVE = TYPE.terminal(3);
 
-    private static final int OBSERVER_INPUT_VOLTAGE = 0;
-    private static final int OBSERVER_OUTPUT_VOLTAGE = 1;
-    private static final int OBSERVER_OUTPUT_CURRENT = 2;
+    public static final DeviceObserver INPUT_VOLTAGE = TYPE.observer(0);
+    public static final DeviceObserver OUTPUT_VOLTAGE = TYPE.observer(1);
+    public static final DeviceObserver OUTPUT_CURRENT = TYPE.observer(2);
 
     private final Device device;
 
@@ -71,7 +71,7 @@ public final class TickDelay {
      * @param wire the wire
      */
     public void attachInputPositive(Wire wire) {
-        device.attachTerminal(TERMINAL_INPUT_POSITIVE, wire);
+        device.attachTerminal(INPUT_POSITIVE, wire);
     }
 
     /**
@@ -80,7 +80,7 @@ public final class TickDelay {
      * @param wire the wire
      */
     public void detachInputPositive(Wire wire) {
-        device.detachTerminal(TERMINAL_INPUT_POSITIVE, wire);
+        device.detachTerminal(INPUT_POSITIVE, wire);
     }
 
     /**
@@ -89,7 +89,7 @@ public final class TickDelay {
      * @param wire the wire
      */
     public void attachInputNegative(Wire wire) {
-        device.attachTerminal(TERMINAL_INPUT_NEGATIVE, wire);
+        device.attachTerminal(INPUT_NEGATIVE, wire);
     }
 
     /**
@@ -98,7 +98,7 @@ public final class TickDelay {
      * @param wire the wire
      */
     public void detachInputNegative(Wire wire) {
-        device.detachTerminal(TERMINAL_INPUT_NEGATIVE, wire);
+        device.detachTerminal(INPUT_NEGATIVE, wire);
     }
 
     /**
@@ -107,7 +107,7 @@ public final class TickDelay {
      * @param wire the wire
      */
     public void attachOutputPositive(Wire wire) {
-        device.attachTerminal(TERMINAL_OUTPUT_POSITIVE, wire);
+        device.attachTerminal(OUTPUT_POSITIVE, wire);
     }
 
     /**
@@ -116,7 +116,7 @@ public final class TickDelay {
      * @param wire the wire
      */
     public void detachOutputPositive(Wire wire) {
-        device.detachTerminal(TERMINAL_OUTPUT_POSITIVE, wire);
+        device.detachTerminal(OUTPUT_POSITIVE, wire);
     }
 
     /**
@@ -125,7 +125,7 @@ public final class TickDelay {
      * @param wire the wire
      */
     public void attachOutputNegative(Wire wire) {
-        device.attachTerminal(TERMINAL_OUTPUT_NEGATIVE, wire);
+        device.attachTerminal(OUTPUT_NEGATIVE, wire);
     }
 
     /**
@@ -134,7 +134,7 @@ public final class TickDelay {
      * @param wire the wire
      */
     public void detachOutputNegative(Wire wire) {
-        device.detachTerminal(TERMINAL_OUTPUT_NEGATIVE, wire);
+        device.detachTerminal(OUTPUT_NEGATIVE, wire);
     }
 
     /**
@@ -150,7 +150,7 @@ public final class TickDelay {
     public ObservationSubscription observeInputVoltage(
         ObservationListener listener
     ) {
-        return device.observe(OBSERVER_INPUT_VOLTAGE, listener);
+        return device.observe(INPUT_VOLTAGE, listener);
     }
 
     /**
@@ -166,7 +166,7 @@ public final class TickDelay {
     public ObservationSubscription observeOutputVoltage(
         ObservationListener listener
     ) {
-        return device.observe(OBSERVER_OUTPUT_VOLTAGE, listener);
+        return device.observe(OUTPUT_VOLTAGE, listener);
     }
 
     /**
@@ -182,6 +182,6 @@ public final class TickDelay {
     public ObservationSubscription observeOutputCurrent(
         ObservationListener listener
     ) {
-        return device.observe(OBSERVER_OUTPUT_CURRENT, listener);
+        return device.observe(OUTPUT_CURRENT, listener);
     }
 }

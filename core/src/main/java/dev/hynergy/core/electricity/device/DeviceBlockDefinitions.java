@@ -30,13 +30,13 @@ public final class DeviceBlockDefinitions {
     private final ArrayList<Binding> bindings = new ArrayList<>();
 
     public DeviceBlockDefinitions(
-            DeviceDescriptorRegistry descriptors,
+            DeviceRegistry devices,
             PortModule portModule,
             PortStandard<ElectricalPortProfile, ElectricalPortConnection> conductorStandard,
             ComponentType<ChunkStore, DeviceComponent> deviceComponentType
     ) {
         this.deviceComponentType = Objects.requireNonNull(deviceComponentType, "deviceComponentType");
-        this.publisher = new Publisher(descriptors, portModule, conductorStandard);
+        this.publisher = new Publisher(devices, portModule, conductorStandard);
     }
 
     /**
@@ -131,7 +131,7 @@ public final class DeviceBlockDefinitions {
             }
         }
 
-        private final DeviceDescriptorRegistry descriptors;
+        private final DeviceRegistry devices;
         private final PortStandard<ElectricalPortProfile, ElectricalPortConnection> conductorStandard;
         private final Sink sink;
 
@@ -141,32 +141,32 @@ public final class DeviceBlockDefinitions {
         private final ArrayList<PreparedBinding> preparedBindings = new ArrayList<>();
 
         Publisher(
-                DeviceDescriptorRegistry descriptors,
+                DeviceRegistry devices,
                 PortModule portModule,
                 PortStandard<ElectricalPortProfile, ElectricalPortConnection> conductorStandard
         ) {
             this(
-                    descriptors,
+                    devices,
                     conductorStandard,
                     new RuntimeSink(portModule)
             );
         }
 
         Publisher(
-                DeviceDescriptorRegistry descriptors,
+                DeviceRegistry devices,
                 PortStandard<ElectricalPortProfile, ElectricalPortConnection> conductorStandard,
                 Sink sink
         ) {
-            this.descriptors = Objects.requireNonNull(descriptors, "descriptors");
+            this.devices = Objects.requireNonNull(devices, "devices");
             this.conductorStandard = Objects.requireNonNull(conductorStandard, "conductorStandard");
             this.sink = Objects.requireNonNull(sink, "sink");
         }
 
         synchronized void rebuild(Iterable<Binding> bindings) {
             Objects.requireNonNull(bindings, "bindings");
-            if (!descriptors.isFrozen()) {
+            if (!devices.isFrozen()) {
                 throw new IllegalStateException(
-                        "Device descriptor registry must be frozen before runtime publication"
+                        "Device registry must be frozen before runtime publication"
                 );
             }
 
@@ -179,7 +179,7 @@ public final class DeviceBlockDefinitions {
                 DeviceConfig config = binding.config();
                 CompiledDeviceConfig compiled = compiledDefinitions.get(config);
                 if (compiled == null) {
-                    compiled = config.compile(descriptors, conductorStandard);
+                    compiled = config.compile(devices, conductorStandard);
                     compiledDefinitions.put(config, compiled);
                 }
                 preparedBindings.add(new PreparedBinding(binding.blockTypeIndex(), compiled));

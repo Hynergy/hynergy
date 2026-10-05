@@ -17,20 +17,20 @@ public final class And {
      */
     public static final DeviceType TYPE = PrimitiveDeviceTypes.AND;
 
-    private static final int TERMINAL_OUTPUT = 0;
-    private static final int TERMINAL_VDD = 1;
-    private static final int TERMINAL_VSS = 2;
-    private static final int TERMINAL_INPUT_A = 3;
-    private static final int TERMINAL_INPUT_B = 4;
+    public static final DeviceTerminal OUTPUT = TYPE.terminal(0);
+    public static final DeviceTerminal VDD = TYPE.terminal(1);
+    public static final DeviceTerminal VSS = TYPE.terminal(2);
+    public static final DeviceTerminal INPUT_A = TYPE.terminal(3);
+    public static final DeviceTerminal INPUT_B = TYPE.terminal(4);
 
-    private static final int PARAMETER_THRESHOLD_RELATIVE_TO_VSS = 0;
-    private static final int PARAMETER_MAXIMUM_CONDUCTANCE = 1;
-    private static final int PARAMETER_MINIMUM_CONDUCTANCE = 2;
+    public static final DeviceParameter THRESHOLD_RELATIVE_TO_VSS = TYPE.parameter(0);
+    public static final DeviceParameter MAXIMUM_CONDUCTANCE = TYPE.parameter(1);
+    public static final DeviceParameter MINIMUM_CONDUCTANCE = TYPE.parameter(2);
 
-    private static final int OBSERVER_OUTPUT_VOLTAGE = 0;
-    private static final int OBSERVER_INPUT_A_VOLTAGE = 1;
-    private static final int OBSERVER_INPUT_B_VOLTAGE = 2;
-    private static final int OBSERVER_SUPPLY_CURRENT = 3;
+    public static final DeviceObserver OUTPUT_VOLTAGE = TYPE.observer(0);
+    public static final DeviceObserver INPUT_A_VOLTAGE = TYPE.observer(1);
+    public static final DeviceObserver INPUT_B_VOLTAGE = TYPE.observer(2);
+    public static final DeviceObserver SUPPLY_CURRENT = TYPE.observer(3);
 
     private final Device device;
 
@@ -96,7 +96,7 @@ public final class And {
      *     must be finite
      */
     public void setThresholdRelativeToVss(double thresholdRelativeToVss) {
-        device.setParameter(PARAMETER_THRESHOLD_RELATIVE_TO_VSS, thresholdRelativeToVss);
+        device.setParameter(THRESHOLD_RELATIVE_TO_VSS, thresholdRelativeToVss);
     }
 
     /**
@@ -107,7 +107,7 @@ public final class And {
      *     conductance
      */
     public void setMaximumConductance(double maximumConductance) {
-        device.setParameter(PARAMETER_MAXIMUM_CONDUCTANCE, maximumConductance);
+        device.setParameter(MAXIMUM_CONDUCTANCE, maximumConductance);
     }
 
     /**
@@ -117,7 +117,7 @@ public final class And {
      *     finite, non-negative, and less than the current maximum conductance
      */
     public void setMinimumConductance(double minimumConductance) {
-        device.setParameter(PARAMETER_MINIMUM_CONDUCTANCE, minimumConductance);
+        device.setParameter(MINIMUM_CONDUCTANCE, minimumConductance);
     }
 
     /**
@@ -126,7 +126,7 @@ public final class And {
      * @param wire the wire
      */
     public void attachOutput(Wire wire) {
-        device.attachTerminal(TERMINAL_OUTPUT, wire);
+        device.attachTerminal(OUTPUT, wire);
     }
 
     /**
@@ -135,7 +135,7 @@ public final class And {
      * @param wire the wire
      */
     public void detachOutput(Wire wire) {
-        device.detachTerminal(TERMINAL_OUTPUT, wire);
+        device.detachTerminal(OUTPUT, wire);
     }
 
     /**
@@ -144,7 +144,7 @@ public final class And {
      * @param wire the wire
      */
     public void attachVdd(Wire wire) {
-        device.attachTerminal(TERMINAL_VDD, wire);
+        device.attachTerminal(VDD, wire);
     }
 
     /**
@@ -153,7 +153,7 @@ public final class And {
      * @param wire the wire
      */
     public void detachVdd(Wire wire) {
-        device.detachTerminal(TERMINAL_VDD, wire);
+        device.detachTerminal(VDD, wire);
     }
 
     /**
@@ -162,7 +162,7 @@ public final class And {
      * @param wire the wire
      */
     public void attachVss(Wire wire) {
-        device.attachTerminal(TERMINAL_VSS, wire);
+        device.attachTerminal(VSS, wire);
     }
 
     /**
@@ -171,7 +171,7 @@ public final class And {
      * @param wire the wire
      */
     public void detachVss(Wire wire) {
-        device.detachTerminal(TERMINAL_VSS, wire);
+        device.detachTerminal(VSS, wire);
     }
 
     /**
@@ -180,7 +180,7 @@ public final class And {
      * @param wire the wire
      */
     public void attachInputA(Wire wire) {
-        device.attachTerminal(TERMINAL_INPUT_A, wire);
+        device.attachTerminal(INPUT_A, wire);
     }
 
     /**
@@ -189,7 +189,7 @@ public final class And {
      * @param wire the wire
      */
     public void detachInputA(Wire wire) {
-        device.detachTerminal(TERMINAL_INPUT_A, wire);
+        device.detachTerminal(INPUT_A, wire);
     }
 
     /**
@@ -198,7 +198,7 @@ public final class And {
      * @param wire the wire
      */
     public void attachInputB(Wire wire) {
-        device.attachTerminal(TERMINAL_INPUT_B, wire);
+        device.attachTerminal(INPUT_B, wire);
     }
 
     /**
@@ -207,7 +207,7 @@ public final class And {
      * @param wire the wire
      */
     public void detachInputB(Wire wire) {
-        device.detachTerminal(TERMINAL_INPUT_B, wire);
+        device.detachTerminal(INPUT_B, wire);
     }
 
     /**
@@ -220,7 +220,7 @@ public final class And {
     public ObservationSubscription observeOutputVoltage(
         ObservationListener listener
     ) {
-        return device.observe(OBSERVER_OUTPUT_VOLTAGE, listener);
+        return device.observe(OUTPUT_VOLTAGE, listener);
     }
 
     /**
@@ -233,7 +233,7 @@ public final class And {
     public ObservationSubscription observeInputVoltageA(
         ObservationListener listener
     ) {
-        return device.observe(OBSERVER_INPUT_A_VOLTAGE, listener);
+        return device.observe(INPUT_A_VOLTAGE, listener);
     }
 
     /**
@@ -246,7 +246,7 @@ public final class And {
     public ObservationSubscription observeInputVoltageB(
         ObservationListener listener
     ) {
-        return device.observe(OBSERVER_INPUT_B_VOLTAGE, listener);
+        return device.observe(INPUT_B_VOLTAGE, listener);
     }
 
     /**
@@ -260,6 +260,6 @@ public final class And {
     public ObservationSubscription observeSupplyCurrent(
         ObservationListener listener
     ) {
-        return device.observe(OBSERVER_SUPPLY_CURRENT, listener);
+        return device.observe(SUPPLY_CURRENT, listener);
     }
 }

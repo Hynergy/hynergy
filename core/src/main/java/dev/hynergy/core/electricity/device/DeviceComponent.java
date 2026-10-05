@@ -98,7 +98,7 @@ public final class DeviceComponent implements Component<ChunkStore> {
             );
         }
 
-        device.setParameter(parameter.nativeId(), value);
+        device.setParameter(parameter.parameter(), value);
 
         boolean changed;
         if (Double.doubleToLongBits(value) == Double.doubleToLongBits(parameter.defaultValue())) {
@@ -120,11 +120,7 @@ public final class DeviceComponent implements Component<ChunkStore> {
     public ObservationSubscription observe(int stableObserverId, ObservationListener listener) {
         CompiledDeviceConfig compiled = requireCompiledConfig();
         Device device = requireDevice();
-        int nativeObserverId = compiled.nativeObserverId(stableObserverId);
-        if (nativeObserverId == MemberMapping.UNMAPPED) {
-            throw new IllegalArgumentException("Unknown or retired stable observer ID: " + stableObserverId);
-        }
-        return device.observe(nativeObserverId, listener);
+        return device.observe(compiled.registration().type().observer(stableObserverId), listener);
     }
 
     @Override

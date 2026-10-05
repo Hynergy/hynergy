@@ -34,7 +34,7 @@ final class DeviceBlockDefinitionsTest {
 
     @Test
     void rebuildCompilesSharedConfigOnceAndKeepsRuntimeAndPortDefinitionsAligned() {
-        DeviceDescriptorRegistry descriptors = descriptors();
+        DeviceRegistry descriptors = descriptors();
         descriptors.freeze();
         PortModule ports = new PortModule();
         PortStandard<ElectricalPortProfile, ElectricalPortConnection> conductor = conductorStandard(ports);
@@ -67,7 +67,7 @@ final class DeviceBlockDefinitionsTest {
 
     @Test
     void rebuildPublishesAllReplacementsBeforeClearingAnyStaleIndexes() {
-        DeviceDescriptorRegistry descriptors = descriptors();
+        DeviceRegistry descriptors = descriptors();
         descriptors.freeze();
         PortModule ports = new PortModule();
         PortStandard<ElectricalPortProfile, ElectricalPortConnection> conductor = conductorStandard(ports);
@@ -92,7 +92,7 @@ final class DeviceBlockDefinitionsTest {
 
     @Test
     void publishingRequiresFrozenDescriptors() {
-        DeviceDescriptorRegistry descriptors = descriptors();
+        DeviceRegistry descriptors = descriptors();
         PortModule ports = new PortModule();
         PortStandard<ElectricalPortProfile, ElectricalPortConnection> conductor = conductorStandard(ports);
         DeviceBlockDefinitions.Publisher publisher = new DeviceBlockDefinitions.Publisher(
@@ -111,7 +111,7 @@ final class DeviceBlockDefinitionsTest {
 
     @Test
     void nativeInvalidDefaultLeavesPublishedConfigurationsAndPortsIntact() {
-        DeviceDescriptorRegistry descriptors = descriptors();
+        DeviceRegistry descriptors = descriptors();
         descriptors.freeze();
         PortModule ports = new PortModule();
         var publisher = new DeviceBlockDefinitions.Publisher(descriptors, ports, conductorStandard(ports));
@@ -131,14 +131,11 @@ final class DeviceBlockDefinitionsTest {
         assertEquals(220.0, publisher.get(70).parameter(0).defaultValue());
     }
 
-    private static DeviceDescriptorRegistry descriptors() {
-        DeviceDescriptorRegistry descriptors = new DeviceDescriptorRegistry();
+    private DeviceRegistry descriptors() {
+        DeviceRegistry descriptors = new DeviceRegistry(runtime);
         descriptors.register(
                 "test:resistance",
-                Resistance.TYPE,
-                new MemberMapping(0),
-                new MemberMapping(0, 1),
-                new MemberMapping(0, 1)
+                Resistance.TYPE
         );
         return descriptors;
     }

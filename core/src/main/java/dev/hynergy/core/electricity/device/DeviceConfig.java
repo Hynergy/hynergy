@@ -26,8 +26,8 @@ import java.util.Objects;
 /**
  * Asset configuration for one generic electrical device block definition.
  *
- * <p>Only stable IDs are serialized. Native parameter and terminal indexes are
- * resolved through the selected {@link DeviceDescriptor} during compilation.</p>
+ * <p>Only stable IDs are serialized. Typed members are
+ * resolved through the selected {@link DeviceRegistration} during compilation.</p>
  */
 public final class DeviceConfig implements JsonAssetWithMap<String, DefaultAssetMap<String, DeviceConfig>> {
     public static final String DATA_SET = "DeviceConfigs";
@@ -36,11 +36,11 @@ public final class DeviceConfig implements JsonAssetWithMap<String, DefaultAsset
     private static final DevicePortConfig[] EMPTY_PORTS = new DevicePortConfig[0];
 
     /**
-     * Creates the asset codec for the module's descriptor registry.
-     * Register descriptors during plugin setup, before Hytale loads assets.
+     * Creates the asset codec for the module's device registry.
+     * Register devices during plugin setup, before Hytale loads assets.
      */
-    public static AssetBuilderCodec<String, DeviceConfig> createCodec(DeviceDescriptorRegistry descriptors) {
-        Objects.requireNonNull(descriptors, "descriptors");
+    public static AssetBuilderCodec<String, DeviceConfig> createCodec(DeviceRegistry devices) {
+        Objects.requireNonNull(devices, "devices");
         return AssetBuilderCodec.builder(
                                         DeviceConfig.class,
                                         DeviceConfig::new,
@@ -56,9 +56,9 @@ public final class DeviceConfig implements JsonAssetWithMap<String, DefaultAsset
                                         config -> config.type
                                 )
                                 .addValidator(Validators.nonEmptyString())
-                                .addValidator(new DeviceDescriptorValidator(descriptors))
-                                .metadata(new UIEditor(new UIEditor.Dropdown(DeviceDescriptorRegistry.DATA_SET)))
-                                .documentation("Stable registered electrical device descriptor ID.")
+                                .addValidator(new DeviceTypeValidator(devices))
+                                .metadata(new UIEditor(new UIEditor.Dropdown(DeviceRegistry.DATA_SET)))
+                                .documentation("Stable registered electrical device type ID.")
                                 .add()
                                 .append(
                                         new KeyedCodec<>(
@@ -110,29 +110,29 @@ public final class DeviceConfig implements JsonAssetWithMap<String, DefaultAsset
     }
 
     /**
-     * Compiles stable asset member IDs to immutable runtime-native indexes.
+     * Compiles stable asset member IDs to immutable typed bindings.
      *
      * <p>This is a cold asset/rebuild path. Definition-specific native parameter
      * constraints remain owned by the electrical engine and are not duplicated
      * here.</p>
      */
     public CompiledDeviceConfig compile(
-            DeviceDescriptorRegistry descriptors,
+            DeviceRegistry devices,
             PortStandard<ElectricalPortProfile, ElectricalPortConnection> conductorStandard
     ) {
-        Objects.requireNonNull(descriptors, "descriptors");
+        Objects.requireNonNull(devices, "devices");
         Objects.requireNonNull(conductorStandard, "conductorStandard");
 
         String type = this.type;
         if (type == null || type.isBlank()) {
-            throw invalid("Type must name a registered device descriptor");
+            throw invalid("Type must name a registered device type");
         }
 
-        DeviceDescriptor descriptor;
+        DeviceRegistration registration;
         try {
-            descriptor = descriptors.require(type);
+            registration = devices.require(type);
         } catch (IllegalArgumentException failure) {
-            throw invalid("Unknown device descriptor: " + type, failure);
+            throw invalid("Unknown device type: " + type, failure);
         }
 
         DeviceParameterConfig[] parameterConfigs = parameters == null ? EMPTY_PARAMETERS : parameters;
@@ -151,10 +151,9 @@ public final class DeviceConfig implements JsonAssetWithMap<String, DefaultAsset
             }
             requireUniqueParameter(stableParameterIds, index, stableId);
 
-            int nativeId = descriptor.parameters().nativeIndex(stableId);
-            if (nativeId == MemberMapping.UNMAPPED) {
-                throw invalid("Parameter stable ID is not mapped by descriptor " + type + ": " + stableId);
-            }
+            dev.hynergy.electrical.DeviceParameter member;
+            try { member = registration.type().parameter(stableId); }
+            catch (IllegalArgumentException failure) { throw invalid("Unknown parameter stable ID: " + stableId, failure); }
 
             double defaultValue = parameter.getDefaultValue();
             if (!Double.isFinite(defaultValue)) {
@@ -163,11 +162,11 @@ public final class DeviceConfig implements JsonAssetWithMap<String, DefaultAsset
 
             stableParameterIds[index] = stableId;
             try {
-                descriptor.type().validateParameter(nativeId, defaultValue);
+                registration.binding().validateParameter(member, defaultValue);
             } catch (IllegalArgumentException failure) {
                 throw invalid("Invalid parameter Default for stable ID " + stableId, failure);
             }
-            parameterBindings.add(new CompiledDeviceConfig.ParameterBinding(stableId, nativeId, defaultValue));
+            parameterBindings.add(new CompiledDeviceConfig.ParameterBinding(member, defaultValue));
         }
 
         DevicePortConfig[] portConfigs = ports == null ? EMPTY_PORTS : ports;
@@ -192,10 +191,9 @@ public final class DeviceConfig implements JsonAssetWithMap<String, DefaultAsset
                 throw invalid("Terminal stable ID must be non-negative: " + stableTerminalId);
             }
 
-            int nativeTerminalId = descriptor.terminals().nativeIndex(stableTerminalId);
-            if (nativeTerminalId == MemberMapping.UNMAPPED) {
-                throw invalid("Terminal stable ID is not mapped by descriptor " + type + ": " + stableTerminalId);
-            }
+            dev.hynergy.electrical.DeviceTerminal member;
+            try { member = registration.type().terminal(stableTerminalId); }
+            catch (IllegalArgumentException failure) { throw invalid("Unknown terminal stable ID: " + stableTerminalId, failure); }
 
             Vector3i normal = port.getNormal();
             if (normal == null || !DevicePortConfig.isCardinal(normal)) {
@@ -208,7 +206,7 @@ public final class DeviceConfig implements JsonAssetWithMap<String, DefaultAsset
                     : new PortOffset(anchor.x, anchor.y, anchor.z);
 
             portIds[index] = portId;
-            portBindings.add(new CompiledDeviceConfig.PortBinding(portId, nativeTerminalId));
+            portBindings.add(new CompiledDeviceConfig.PortBinding(portId, member));
             portDefinitions[index] = new PortDefinition<>(
                     portId,
                     offset,
@@ -219,7 +217,7 @@ public final class DeviceConfig implements JsonAssetWithMap<String, DefaultAsset
         }
 
         return new CompiledDeviceConfig(
-                descriptor,
+                registration,
                 parameterBindings,
                 portBindings,
                 BlockPortDefinition.of(portDefinitions)

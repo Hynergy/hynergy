@@ -1,158 +1,88 @@
 package dev.hynergy.electrical;
 
 import org.junit.jupiter.api.Test;
-
-import java.util.concurrent.atomic.AtomicReference;
-
 import static org.junit.jupiter.api.Assertions.*;
 
-final class ElectricalRuntimeTest {
-    private static final int RESISTANCE_DEFINITION_ID = 1;
-
-    @Test
-    void registrationResolvesDependenciesAndCachesDefinitions() {
-        DeviceType resistance = resistanceType();
-        DeviceType child = resistorComposite(resistance);
-        DeviceType parent = forwardingComposite(child);
-
-        try (ElectricalRuntime runtime = ElectricalRuntime.create()) {
-            DeviceDefinition parentDefinition = runtime.register(parent);
-            DeviceDefinition childDefinition = runtime.requireDefinition(child);
-
-            assertNotEquals(0, parentDefinition.id());
-            assertNotEquals(0, childDefinition.id());
-            assertNotEquals(parentDefinition.id(), childDefinition.id());
-            assertSame(parentDefinition, runtime.register(parent));
+class ElectricalRuntimeTest {
+    @Test void requestCloseRejectsRegistrationAndCreationUntilActiveSystemsClose() {
+        var type = resistorComposite(PrimitiveDeviceTypes.RESISTANCE);
+        var runtime = ElectricalRuntime.create();
+        var binding = runtime.register(type);
+        var system = runtime.createSystem(20);
+        try {
+            runtime.requestClose();
+            assertThrows(IllegalStateException.class, () -> runtime.register(type));
+            assertThrows(IllegalStateException.class, () -> runtime.register(PrimitiveDeviceTypes.RESISTANCE));
+            assertThrows(IllegalStateException.class, () -> runtime.createSystem(20));
+            assertThrows(IllegalStateException.class, runtime::close);
+            assertDoesNotThrow(() -> system.create(type));
+            assertDoesNotThrow(system::tick);
+            system.close();
+            assertThrows(IllegalStateException.class, () -> runtime.register(type));
+            assertThrows(IllegalStateException.class, () -> runtime.createSystem(20));
+            assertSame(type, binding.type());
+            assertEquals(2, type.terminalCount());
+            assertDoesNotThrow(runtime::requestClose);
+        } finally { system.close(); runtime.close(); }
+    }
+    static DeviceType resistorComposite(DeviceType resistance) {
+        return DeviceType.define(b -> {
+            var p = b.terminal(0, "positive"); var n = b.terminal(1, "negative");
+            b.element(resistance, e -> {
+                e.connect(resistance.terminal(0), p); e.connect(resistance.terminal(1), n);
+                e.literal(resistance.parameter(0), 1000);
+            });
+        });
+    }
+    static DeviceType forwardingComposite(DeviceType child) {
+        return DeviceType.define(b -> {
+            var p = b.terminal(0, "positive"); var n = b.terminal(1, "negative");
+            b.element(child, e -> { e.connect(child.terminal(0), p); e.connect(child.terminal(1), n); });
+        });
+    }
+    @Test void registrationResolvesCustomChildBeforeParent() {
+        var child = resistorComposite(PrimitiveDeviceTypes.RESISTANCE);
+        var parent = forwardingComposite(child);
+        try (var runtime = ElectricalRuntime.create()) {
+            var binding = runtime.register(parent);
+            assertNotEquals(binding.definition().id(), runtime.requireDefinition(child).id());
+            assertSame(binding, runtime.register(parent));
         }
     }
-
-    @Test
-    void registrationRejectsRecursiveDependenciesAndRemainsUsable() {
-        AtomicReference<DeviceType> firstReference = new AtomicReference<>();
-        AtomicReference<DeviceType> secondReference = new AtomicReference<>();
-
-        DeviceType first =
-            DeviceType.create(builder -> builder.beginElement(secondReference.get()));
-        DeviceType second =
-            DeviceType.create(builder -> builder.beginElement(firstReference.get()));
-
-        firstReference.set(first);
-        secondReference.set(second);
-
-        DeviceType valid = resistorComposite(resistanceType());
-
-        try (ElectricalRuntime runtime = ElectricalRuntime.create()) {
-            assertThrows(IllegalStateException.class, () -> runtime.register(first));
-
-            assertDoesNotThrow(() -> runtime.register(valid));
+    @Test void failedRootRegistrationKeepsSuccessfulDependencies() {
+        var child = DeviceTypeCompilationTest.resistor();
+        var parent = DeviceTypeCompilationTest.failingParent(child);
+        try (var runtime = ElectricalRuntime.create()) {
+            assertThrows(IllegalArgumentException.class, () -> runtime.register(parent));
+            assertSame(runtime.requireBinding(child), runtime.register(child));
         }
     }
-
-    @Test
-    void failedRootRegistrationKeepsSuccessfulDependencies() {
-        DeviceType child = resistorComposite(resistanceType());
-        DeviceType invalidParent =
-            DeviceType.create(builder -> builder.beginElement(child).endElement());
-
-        try (ElectricalRuntime runtime = ElectricalRuntime.create()) {
-            assertThrows(IllegalArgumentException.class, () -> runtime.register(invalidParent));
-
-            DeviceDefinition childDefinition = runtime.requireDefinition(child);
-
-            assertSame(childDefinition, runtime.register(child));
-        }
-    }
-
-    @Test
-    void unregisteredTypesCannotBeAddedWhileSystemsAreActive() {
-        DeviceType type = resistorComposite(resistanceType());
-
-        try (ElectricalRuntime runtime = ElectricalRuntime.create()) {
-            ElectricalSystem system = runtime.createSystem(20);
-
-            try (system) {
+    @Test void unregisteredTypesCannotBeAddedWhileSystemsAreActive() {
+        var type = resistorComposite(PrimitiveDeviceTypes.RESISTANCE);
+        try (var runtime = ElectricalRuntime.create()) {
+            try (var system = runtime.createSystem(20)) {
                 assertThrows(IllegalStateException.class, () -> runtime.register(type));
+                assertThrows(IllegalStateException.class, () -> system.create(type));
             }
-
             assertDoesNotThrow(() -> runtime.register(type));
         }
     }
-
-    @Test
-    void registeredDefinitionIsClearedWhenRuntimeCloses() {
-        DeviceType type = resistorComposite(resistanceType());
-
-        DeviceDefinition firstDefinition;
-
-        try (ElectricalRuntime runtime = ElectricalRuntime.create()) {
-            firstDefinition = runtime.register(type);
-        }
-
-        try (ElectricalRuntime runtime = ElectricalRuntime.create()) {
-            DeviceDefinition secondDefinition = runtime.register(type);
-
-            assertNotSame(firstDefinition, secondDefinition);
+    @Test void declarationCanBeReusedAfterRuntimeCloses() {
+        var type = resistorComposite(PrimitiveDeviceTypes.RESISTANCE);
+        RegisteredDeviceType old;
+        try (var runtime = ElectricalRuntime.create()) { old = runtime.register(type); }
+        assertEquals(2, type.terminalCount());
+        try (var runtime = ElectricalRuntime.create()) {
+            var binding = runtime.register(type);
+            assertNotSame(old, binding);
+            try (var system = runtime.createSystem(20)) { assertNotNull(system.create(type)); }
         }
     }
-
-
-    @Test
-    void staleRuntimeCleanupDoesNotClearNewRuntimeBinding() {
-        DeviceType type = resistorComposite(resistanceType());
-
-        ElectricalRuntime firstRuntime = ElectricalRuntime.create();
-
-        firstRuntime.register(type);
-        firstRuntime.close();
-
-        try (ElectricalRuntime secondRuntime = ElectricalRuntime.create()) {
-            DeviceDefinition definition = secondRuntime.register(type);
-
-            type.unbind(firstRuntime);
-
-            assertSame(definition, secondRuntime.requireDefinition(type));
+    @Test void primitiveTypeKeepsItsDefinitionId() {
+        try (var runtime = ElectricalRuntime.create()) {
+            var binding = runtime.register(PrimitiveDeviceTypes.RESISTANCE);
+            assertEquals(1, binding.definition().id());
+            assertSame(binding, runtime.register(PrimitiveDeviceTypes.RESISTANCE));
         }
-    }
-
-    @Test
-    void primitiveTypesHaveFixedDefinitions() {
-        DeviceType resistance = resistanceType();
-
-        try (ElectricalRuntime runtime = ElectricalRuntime.create()) {
-            DeviceDefinition definition = runtime.register(resistance);
-
-            assertEquals(RESISTANCE_DEFINITION_ID, definition.id());
-            assertSame(definition, runtime.register(resistance));
-        }
-    }
-
-    private static DeviceType resistanceType() {
-        return DeviceType.primitive(RESISTANCE_DEFINITION_ID);
-    }
-
-    private static DeviceType resistorComposite(
-        DeviceType resistance
-    ) {
-        return DeviceType.create(builder -> {
-        int firstTerminal = builder.addTerminal();
-        int secondTerminal = builder.addTerminal();
-
-        builder.beginElement(resistance)
-            .elementTerminal(firstTerminal)
-            .elementTerminal(secondTerminal)
-            .elementLiteral(1_000.0)
-            .endElement();
-        });
-    }
-
-    private static DeviceType forwardingComposite(
-        DeviceType child
-    ) {
-        return DeviceType.create(builder -> {
-        int firstTerminal = builder.addTerminal();
-        int secondTerminal = builder.addTerminal();
-
-        builder.beginElement(child).elementTerminal(firstTerminal).elementTerminal(secondTerminal).endElement();
-        });
     }
 }

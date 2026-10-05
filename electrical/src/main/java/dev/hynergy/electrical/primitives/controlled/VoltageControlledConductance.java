@@ -19,18 +19,18 @@ public final class VoltageControlledConductance {
     public static final DeviceType TYPE =
         PrimitiveDeviceTypes.VOLTAGE_CONTROLLED_CONDUCTANCE;
 
-    private static final int TERMINAL_OUTPUT_POSITIVE = 0;
-    private static final int TERMINAL_OUTPUT_NEGATIVE = 1;
-    private static final int TERMINAL_CONTROL = 2;
+    public static final DeviceTerminal OUTPUT_POSITIVE = TYPE.terminal(0);
+    public static final DeviceTerminal OUTPUT_NEGATIVE = TYPE.terminal(1);
+    public static final DeviceTerminal CONTROL = TYPE.terminal(2);
 
-    private static final int PARAMETER_THRESHOLD_VOLTAGE = 0;
-    private static final int PARAMETER_TRANSITION_VOLTAGE = 1;
-    private static final int PARAMETER_MINIMUM_CONDUCTANCE = 2;
-    private static final int PARAMETER_MAXIMUM_CONDUCTANCE = 3;
+    public static final DeviceParameter THRESHOLD_VOLTAGE = TYPE.parameter(0);
+    public static final DeviceParameter TRANSITION_VOLTAGE = TYPE.parameter(1);
+    public static final DeviceParameter MINIMUM_CONDUCTANCE = TYPE.parameter(2);
+    public static final DeviceParameter MAXIMUM_CONDUCTANCE = TYPE.parameter(3);
 
-    private static final int OBSERVER_OUTPUT_VOLTAGE = 0;
-    private static final int OBSERVER_CONTROL_VOLTAGE = 1;
-    private static final int OBSERVER_OUTPUT_CURRENT = 2;
+    public static final DeviceObserver OUTPUT_VOLTAGE = TYPE.observer(0);
+    public static final DeviceObserver CONTROL_VOLTAGE = TYPE.observer(1);
+    public static final DeviceObserver OUTPUT_CURRENT = TYPE.observer(2);
 
     private final Device device;
 
@@ -100,7 +100,7 @@ public final class VoltageControlledConductance {
      *     be finite
      */
     public void setThresholdVoltage(double thresholdVoltage) {
-        device.setParameter(PARAMETER_THRESHOLD_VOLTAGE, thresholdVoltage);
+        device.setParameter(THRESHOLD_VOLTAGE, thresholdVoltage);
     }
 
     /**
@@ -110,7 +110,7 @@ public final class VoltageControlledConductance {
      *     must be finite and greater than zero
      */
     public void setTransitionVoltage(double transitionVoltage) {
-        device.setParameter(PARAMETER_TRANSITION_VOLTAGE, transitionVoltage);
+        device.setParameter(TRANSITION_VOLTAGE, transitionVoltage);
     }
 
     /**
@@ -120,7 +120,7 @@ public final class VoltageControlledConductance {
      *     finite, non-negative, and less than the current maximum conductance
      */
     public void setMinimumConductance(double minimumConductance) {
-        device.setParameter(PARAMETER_MINIMUM_CONDUCTANCE, minimumConductance);
+        device.setParameter(MINIMUM_CONDUCTANCE, minimumConductance);
     }
 
     /**
@@ -131,7 +131,7 @@ public final class VoltageControlledConductance {
      *     conductance
      */
     public void setMaximumConductance(double maximumConductance) {
-        device.setParameter(PARAMETER_MAXIMUM_CONDUCTANCE, maximumConductance);
+        device.setParameter(MAXIMUM_CONDUCTANCE, maximumConductance);
     }
 
     /**
@@ -140,7 +140,7 @@ public final class VoltageControlledConductance {
      * @param wire the wire
      */
     public void attachOutputPositive(Wire wire) {
-        device.attachTerminal(TERMINAL_OUTPUT_POSITIVE, wire);
+        device.attachTerminal(OUTPUT_POSITIVE, wire);
     }
 
     /**
@@ -149,7 +149,7 @@ public final class VoltageControlledConductance {
      * @param wire the wire
      */
     public void detachOutputPositive(Wire wire) {
-        device.detachTerminal(TERMINAL_OUTPUT_POSITIVE, wire);
+        device.detachTerminal(OUTPUT_POSITIVE, wire);
     }
 
     /**
@@ -158,7 +158,7 @@ public final class VoltageControlledConductance {
      * @param wire the wire
      */
     public void attachOutputNegative(Wire wire) {
-        device.attachTerminal(TERMINAL_OUTPUT_NEGATIVE, wire);
+        device.attachTerminal(OUTPUT_NEGATIVE, wire);
     }
 
     /**
@@ -167,7 +167,7 @@ public final class VoltageControlledConductance {
      * @param wire the wire
      */
     public void detachOutputNegative(Wire wire) {
-        device.detachTerminal(TERMINAL_OUTPUT_NEGATIVE, wire);
+        device.detachTerminal(OUTPUT_NEGATIVE, wire);
     }
 
     /**
@@ -179,7 +179,7 @@ public final class VoltageControlledConductance {
      * @param wire the wire
      */
     public void attachControl(Wire wire) {
-        device.attachTerminal(TERMINAL_CONTROL, wire);
+        device.attachTerminal(CONTROL, wire);
     }
 
     /**
@@ -188,7 +188,7 @@ public final class VoltageControlledConductance {
      * @param wire the wire
      */
     public void detachControl(Wire wire) {
-        device.detachTerminal(TERMINAL_CONTROL, wire);
+        device.detachTerminal(CONTROL, wire);
     }
 
     /**
@@ -204,7 +204,7 @@ public final class VoltageControlledConductance {
     public ObservationSubscription observeOutputVoltage(
         ObservationListener listener
     ) {
-        return device.observe(OBSERVER_OUTPUT_VOLTAGE, listener);
+        return device.observe(OUTPUT_VOLTAGE, listener);
     }
 
     /**
@@ -220,7 +220,7 @@ public final class VoltageControlledConductance {
     public ObservationSubscription observeControlVoltage(
         ObservationListener listener
     ) {
-        return device.observe(OBSERVER_CONTROL_VOLTAGE, listener);
+        return device.observe(CONTROL_VOLTAGE, listener);
     }
 
     /**
@@ -236,6 +236,6 @@ public final class VoltageControlledConductance {
     public ObservationSubscription observeOutputCurrent(
         ObservationListener listener
     ) {
-        return device.observe(OBSERVER_OUTPUT_CURRENT, listener);
+        return device.observe(OUTPUT_CURRENT, listener);
     }
 }

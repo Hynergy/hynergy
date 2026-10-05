@@ -17,19 +17,19 @@ public final class SchmittBuffer {
      */
     public static final DeviceType TYPE = PrimitiveDeviceTypes.SCHMITT_BUFFER;
 
-    private static final int TERMINAL_OUTPUT = 0;
-    private static final int TERMINAL_VDD = 1;
-    private static final int TERMINAL_VSS = 2;
-    private static final int TERMINAL_INPUT = 3;
+    public static final DeviceTerminal OUTPUT = TYPE.terminal(0);
+    public static final DeviceTerminal VDD = TYPE.terminal(1);
+    public static final DeviceTerminal VSS = TYPE.terminal(2);
+    public static final DeviceTerminal INPUT = TYPE.terminal(3);
 
-    private static final int PARAMETER_THRESHOLD_RELATIVE_TO_VSS = 0;
-    private static final int PARAMETER_HYSTERESIS_WIDTH = 1;
-    private static final int PARAMETER_MAXIMUM_CONDUCTANCE = 2;
-    private static final int PARAMETER_MINIMUM_CONDUCTANCE = 3;
+    public static final DeviceParameter THRESHOLD_RELATIVE_TO_VSS = TYPE.parameter(0);
+    public static final DeviceParameter HYSTERESIS_WIDTH = TYPE.parameter(1);
+    public static final DeviceParameter MAXIMUM_CONDUCTANCE = TYPE.parameter(2);
+    public static final DeviceParameter MINIMUM_CONDUCTANCE = TYPE.parameter(3);
 
-    private static final int OBSERVER_OUTPUT_VOLTAGE = 0;
-    private static final int OBSERVER_INPUT_VOLTAGE = 1;
-    private static final int OBSERVER_SUPPLY_CURRENT = 2;
+    public static final DeviceObserver OUTPUT_VOLTAGE = TYPE.observer(0);
+    public static final DeviceObserver INPUT_VOLTAGE = TYPE.observer(1);
+    public static final DeviceObserver SUPPLY_CURRENT = TYPE.observer(2);
 
     private final Device device;
 
@@ -99,7 +99,7 @@ public final class SchmittBuffer {
      *     must be finite
      */
     public void setThresholdRelativeToVss(double thresholdRelativeToVss) {
-        device.setParameter(PARAMETER_THRESHOLD_RELATIVE_TO_VSS, thresholdRelativeToVss);
+        device.setParameter(THRESHOLD_RELATIVE_TO_VSS, thresholdRelativeToVss);
     }
 
     /**
@@ -109,7 +109,7 @@ public final class SchmittBuffer {
      *     finite and non-negative
      */
     public void setHysteresisWidth(double hysteresisWidth) {
-        device.setParameter(PARAMETER_HYSTERESIS_WIDTH, hysteresisWidth);
+        device.setParameter(HYSTERESIS_WIDTH, hysteresisWidth);
     }
 
     /**
@@ -120,7 +120,7 @@ public final class SchmittBuffer {
      *     conductance
      */
     public void setMaximumConductance(double maximumConductance) {
-        device.setParameter(PARAMETER_MAXIMUM_CONDUCTANCE, maximumConductance);
+        device.setParameter(MAXIMUM_CONDUCTANCE, maximumConductance);
     }
 
     /**
@@ -130,7 +130,7 @@ public final class SchmittBuffer {
      *     finite, non-negative, and less than the current maximum conductance
      */
     public void setMinimumConductance(double minimumConductance) {
-        device.setParameter(PARAMETER_MINIMUM_CONDUCTANCE, minimumConductance);
+        device.setParameter(MINIMUM_CONDUCTANCE, minimumConductance);
     }
 
     /**
@@ -139,7 +139,7 @@ public final class SchmittBuffer {
      * @param wire the wire
      */
     public void attachOutput(Wire wire) {
-        device.attachTerminal(TERMINAL_OUTPUT, wire);
+        device.attachTerminal(OUTPUT, wire);
     }
 
     /**
@@ -148,7 +148,7 @@ public final class SchmittBuffer {
      * @param wire the wire
      */
     public void detachOutput(Wire wire) {
-        device.detachTerminal(TERMINAL_OUTPUT, wire);
+        device.detachTerminal(OUTPUT, wire);
     }
 
     /**
@@ -157,7 +157,7 @@ public final class SchmittBuffer {
      * @param wire the wire
      */
     public void attachVdd(Wire wire) {
-        device.attachTerminal(TERMINAL_VDD, wire);
+        device.attachTerminal(VDD, wire);
     }
 
     /**
@@ -166,7 +166,7 @@ public final class SchmittBuffer {
      * @param wire the wire
      */
     public void detachVdd(Wire wire) {
-        device.detachTerminal(TERMINAL_VDD, wire);
+        device.detachTerminal(VDD, wire);
     }
 
     /**
@@ -175,7 +175,7 @@ public final class SchmittBuffer {
      * @param wire the wire
      */
     public void attachVss(Wire wire) {
-        device.attachTerminal(TERMINAL_VSS, wire);
+        device.attachTerminal(VSS, wire);
     }
 
     /**
@@ -184,7 +184,7 @@ public final class SchmittBuffer {
      * @param wire the wire
      */
     public void detachVss(Wire wire) {
-        device.detachTerminal(TERMINAL_VSS, wire);
+        device.detachTerminal(VSS, wire);
     }
 
     /**
@@ -193,7 +193,7 @@ public final class SchmittBuffer {
      * @param wire the wire
      */
     public void attachInput(Wire wire) {
-        device.attachTerminal(TERMINAL_INPUT, wire);
+        device.attachTerminal(INPUT, wire);
     }
 
     /**
@@ -202,7 +202,7 @@ public final class SchmittBuffer {
      * @param wire the wire
      */
     public void detachInput(Wire wire) {
-        device.detachTerminal(TERMINAL_INPUT, wire);
+        device.detachTerminal(INPUT, wire);
     }
 
     /**
@@ -215,7 +215,7 @@ public final class SchmittBuffer {
     public ObservationSubscription observeOutputVoltage(
         ObservationListener listener
     ) {
-        return device.observe(OBSERVER_OUTPUT_VOLTAGE, listener);
+        return device.observe(OUTPUT_VOLTAGE, listener);
     }
 
     /**
@@ -228,7 +228,7 @@ public final class SchmittBuffer {
     public ObservationSubscription observeInputVoltage(
         ObservationListener listener
     ) {
-        return device.observe(OBSERVER_INPUT_VOLTAGE, listener);
+        return device.observe(INPUT_VOLTAGE, listener);
     }
 
     /**
@@ -242,6 +242,6 @@ public final class SchmittBuffer {
     public ObservationSubscription observeSupplyCurrent(
         ObservationListener listener
     ) {
-        return device.observe(OBSERVER_SUPPLY_CURRENT, listener);
+        return device.observe(SUPPLY_CURRENT, listener);
     }
 }

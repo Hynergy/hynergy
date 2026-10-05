@@ -17,16 +17,16 @@ public final class VoltageControlledCurrentSource {
     public static final DeviceType TYPE =
         PrimitiveDeviceTypes.VOLTAGE_CONTROLLED_CURRENT_SOURCE;
 
-    private static final int TERMINAL_OUTPUT_POSITIVE = 0;
-    private static final int TERMINAL_OUTPUT_NEGATIVE = 1;
-    private static final int TERMINAL_CONTROL_POSITIVE = 2;
-    private static final int TERMINAL_CONTROL_NEGATIVE = 3;
+    public static final DeviceTerminal OUTPUT_POSITIVE = TYPE.terminal(0);
+    public static final DeviceTerminal OUTPUT_NEGATIVE = TYPE.terminal(1);
+    public static final DeviceTerminal CONTROL_POSITIVE = TYPE.terminal(2);
+    public static final DeviceTerminal CONTROL_NEGATIVE = TYPE.terminal(3);
 
-    private static final int PARAMETER_TRANSCONDUCTANCE = 0;
+    public static final DeviceParameter TRANSCONDUCTANCE = TYPE.parameter(0);
 
-    private static final int OBSERVER_OUTPUT_VOLTAGE = 0;
-    private static final int OBSERVER_CONTROL_VOLTAGE = 1;
-    private static final int OBSERVER_OUTPUT_CURRENT = 2;
+    public static final DeviceObserver OUTPUT_VOLTAGE = TYPE.observer(0);
+    public static final DeviceObserver CONTROL_VOLTAGE = TYPE.observer(1);
+    public static final DeviceObserver OUTPUT_CURRENT = TYPE.observer(2);
 
     private final Device device;
 
@@ -80,7 +80,7 @@ public final class VoltageControlledCurrentSource {
      *     be finite
      */
     public void setTransconductance(double transconductance) {
-        device.setParameter(PARAMETER_TRANSCONDUCTANCE, transconductance);
+        device.setParameter(TRANSCONDUCTANCE, transconductance);
     }
 
     /**
@@ -89,7 +89,7 @@ public final class VoltageControlledCurrentSource {
      * @param wire the wire
      */
     public void attachOutputPositive(Wire wire) {
-        device.attachTerminal(TERMINAL_OUTPUT_POSITIVE, wire);
+        device.attachTerminal(OUTPUT_POSITIVE, wire);
     }
 
     /**
@@ -98,7 +98,7 @@ public final class VoltageControlledCurrentSource {
      * @param wire the wire
      */
     public void detachOutputPositive(Wire wire) {
-        device.detachTerminal(TERMINAL_OUTPUT_POSITIVE, wire);
+        device.detachTerminal(OUTPUT_POSITIVE, wire);
     }
 
     /**
@@ -107,7 +107,7 @@ public final class VoltageControlledCurrentSource {
      * @param wire the wire
      */
     public void attachOutputNegative(Wire wire) {
-        device.attachTerminal(TERMINAL_OUTPUT_NEGATIVE, wire);
+        device.attachTerminal(OUTPUT_NEGATIVE, wire);
     }
 
     /**
@@ -116,7 +116,7 @@ public final class VoltageControlledCurrentSource {
      * @param wire the wire
      */
     public void detachOutputNegative(Wire wire) {
-        device.detachTerminal(TERMINAL_OUTPUT_NEGATIVE, wire);
+        device.detachTerminal(OUTPUT_NEGATIVE, wire);
     }
 
     /**
@@ -125,7 +125,7 @@ public final class VoltageControlledCurrentSource {
      * @param wire the wire
      */
     public void attachControlPositive(Wire wire) {
-        device.attachTerminal(TERMINAL_CONTROL_POSITIVE, wire);
+        device.attachTerminal(CONTROL_POSITIVE, wire);
     }
 
     /**
@@ -134,7 +134,7 @@ public final class VoltageControlledCurrentSource {
      * @param wire the wire
      */
     public void detachControlPositive(Wire wire) {
-        device.detachTerminal(TERMINAL_CONTROL_POSITIVE, wire);
+        device.detachTerminal(CONTROL_POSITIVE, wire);
     }
 
     /**
@@ -143,7 +143,7 @@ public final class VoltageControlledCurrentSource {
      * @param wire the wire
      */
     public void attachControlNegative(Wire wire) {
-        device.attachTerminal(TERMINAL_CONTROL_NEGATIVE, wire);
+        device.attachTerminal(CONTROL_NEGATIVE, wire);
     }
 
     /**
@@ -152,7 +152,7 @@ public final class VoltageControlledCurrentSource {
      * @param wire the wire
      */
     public void detachControlNegative(Wire wire) {
-        device.detachTerminal(TERMINAL_CONTROL_NEGATIVE, wire);
+        device.detachTerminal(CONTROL_NEGATIVE, wire);
     }
 
     /**
@@ -168,7 +168,7 @@ public final class VoltageControlledCurrentSource {
     public ObservationSubscription observeOutputVoltage(
         ObservationListener listener
     ) {
-        return device.observe(OBSERVER_OUTPUT_VOLTAGE, listener);
+        return device.observe(OUTPUT_VOLTAGE, listener);
     }
 
     /**
@@ -184,7 +184,7 @@ public final class VoltageControlledCurrentSource {
     public ObservationSubscription observeControlVoltage(
         ObservationListener listener
     ) {
-        return device.observe(OBSERVER_CONTROL_VOLTAGE, listener);
+        return device.observe(CONTROL_VOLTAGE, listener);
     }
 
     /**
@@ -200,6 +200,6 @@ public final class VoltageControlledCurrentSource {
     public ObservationSubscription observeOutputCurrent(
         ObservationListener listener
     ) {
-        return device.observe(OBSERVER_OUTPUT_CURRENT, listener);
+        return device.observe(OUTPUT_CURRENT, listener);
     }
 }

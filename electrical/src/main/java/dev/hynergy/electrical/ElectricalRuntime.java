@@ -19,7 +19,8 @@ import java.util.Objects;
 public final class ElectricalRuntime implements AutoCloseable {
     private final ElectricalEngine engine;
 
-    private final ArrayList<DeviceType> boundTypes = new ArrayList<>();
+    private final IdentityHashMap<DeviceType, RegisteredDeviceType> bindings = new IdentityHashMap<>();
+    private final ArrayList<String> dependencyPath = new ArrayList<>();
     private final IdentityHashMap<DeviceType, Boolean> registeringTypes = new IdentityHashMap<>();
 
     private boolean closeRequested;
@@ -28,6 +29,7 @@ public final class ElectricalRuntime implements AutoCloseable {
 
     private ElectricalRuntime(ElectricalEngine engine) {
         this.engine = engine;
+        for (var type : PrimitiveDeviceTypes.ALL) bindings.put(type, new RegisteredDeviceType(this, type, new DeviceDefinition(type.primitiveId())));
     }
 
     /**
@@ -60,29 +62,12 @@ public final class ElectricalRuntime implements AutoCloseable {
      *     been requested, if an electrical system is active, or if registration
      *     fails
      */
-    public synchronized DeviceDefinition register(
-        DeviceType type
-    ) {
-        requireOpen();
-        requireActive();
-
-        Objects.requireNonNull(type, "type");
-
-        DeviceDefinition existing = type.existingDefinition(this);
-
-        if (existing != null) {
-            if (!type.registeredWith(this)) {
-                type.bind(this, existing, type.metadata());
-                boundTypes.add(type);
-            }
-            return existing;
-        }
-
-        if (systemCount != 0) {
-            throw new IllegalStateException("Device types cannot be registered while electrical systems are active");
-        }
-
-        return resolveDefinition(type);
+    public synchronized RegisteredDeviceType register(DeviceType type) {
+        requireOpen(); requireActive(); Objects.requireNonNull(type, "type");
+        var existing = bindings.get(type);
+        if (existing != null) return existing;
+        if (systemCount != 0) throw new IllegalStateException("Device registration requires no active systems");
+        return resolveBinding(type);
     }
 
     /**
@@ -125,42 +110,46 @@ public final class ElectricalRuntime implements AutoCloseable {
         }
     }
 
-    DeviceDefinition requireDefinition(DeviceType type) {
-        return Objects.requireNonNull(type, "type").requireDefinition(this);
+    synchronized RegisteredDeviceType requireBinding(DeviceType type) {
+        requireOpen();
+        var binding = bindings.get(Objects.requireNonNull(type, "type"));
+        if (binding == null) throw new IllegalStateException("Device type is not registered for this electrical runtime");
+        return binding;
+    }
+    DeviceDefinition requireDefinition(DeviceType type) { return requireBinding(type).definition(); }
+    synchronized void validateParameter(DeviceDefinition definition, int parameter, double value) {
+        requireOpen(); engine.validateParameter(definition, parameter, value);
+    }
+    private RegisteredDeviceType resolveBinding(DeviceType type) {
+        return resolveBinding(type, "root");
     }
 
-    void validateParameter(DeviceDefinition definition, int parameter, double value) {
-        engine.validateParameter(definition, parameter, value);
-    }
-
-    private DeviceDefinition resolveDefinition(DeviceType type) {
-        DeviceDefinition existing = type.existingDefinition(this);
-
-        if (existing != null) {
-            return existing;
-        }
-
-        if (registeringTypes.put(type, Boolean.TRUE) != null) {
-            throw new IllegalStateException("Recursive device type dependency");
-        }
-
-        try (DeviceDefinitionBuilder builder = new DeviceDefinitionBuilder(this::resolveDefinition)) {
-            type.buildDefinition(builder);
-
-            DeviceDefinition definition = engine.registerDefinition(builder);
-
-            boundTypes.add(type);
-
-            try {
-                type.bind(this, definition, builder.metadata());
-            } catch (RuntimeException | Error failure) {
-                boundTypes.removeLast();
-                throw failure;
+    private RegisteredDeviceType resolveBinding(DeviceType type, String step) {
+        var existing = bindings.get(type);
+        if (existing != null) return existing;
+        if (registeringTypes.put(type, Boolean.TRUE) != null)
+            throw new IllegalStateException("Recursive device dependency path: " + String.join(" -> ", dependencyPath) + " -> " + step);
+        dependencyPath.add(step);
+        try {
+            var elements = type.declaration().elements();
+            for (int index = 0; index < elements.size(); index++) {
+                resolveBinding(elements.get(index).reference().type, "element[" + index + "]");
             }
-
-            return definition;
+            final DeviceDefinition definition;
+            try {
+                definition = DeviceTypeCompiler.compile(type, engine, this::resolveBinding);
+            } catch (IllegalArgumentException failure) {
+                throw new IllegalArgumentException("Device registration failed at " + String.join(" -> ", dependencyPath)
+                        + ": " + failure.getMessage(), failure);
+            } catch (IllegalStateException failure) {
+                throw new IllegalStateException("Device registration failed at " + String.join(" -> ", dependencyPath)
+                        + ": " + failure.getMessage(), failure);
+            }
+            var binding = new RegisteredDeviceType(this, type, definition);
+            bindings.put(type, binding);
+            return binding;
         } finally {
-            registeringTypes.remove(type);
+            dependencyPath.removeLast(); registeringTypes.remove(type);
         }
     }
 
@@ -217,11 +206,7 @@ public final class ElectricalRuntime implements AutoCloseable {
 
         engine.close();
 
-        for (int index = boundTypes.size() - 1; index >= 0; index--) {
-            boundTypes.get(index).unbind(this);
-        }
-
-        boundTypes.clear();
+        bindings.clear();
         closed = true;
     }
 

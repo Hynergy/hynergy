@@ -18,14 +18,14 @@ public final class Diode {
      */
     public static final DeviceType TYPE = PrimitiveDeviceTypes.DIODE;
 
-    private static final int TERMINAL_ANODE = 0;
-    private static final int TERMINAL_CATHODE = 1;
+    public static final DeviceTerminal ANODE = TYPE.terminal(0);
+    public static final DeviceTerminal CATHODE = TYPE.terminal(1);
 
-    private static final int PARAMETER_MAXIMUM_CONDUCTANCE = 0;
-    private static final int PARAMETER_MINIMUM_CONDUCTANCE = 1;
+    public static final DeviceParameter MAXIMUM_CONDUCTANCE = TYPE.parameter(0);
+    public static final DeviceParameter MINIMUM_CONDUCTANCE = TYPE.parameter(1);
 
-    private static final int OBSERVER_VOLTAGE = 0;
-    private static final int OBSERVER_CURRENT = 1;
+    public static final DeviceObserver VOLTAGE = TYPE.observer(0);
+    public static final DeviceObserver CURRENT = TYPE.observer(1);
 
     private final Device device;
 
@@ -84,7 +84,7 @@ public final class Diode {
      *     conductance
      */
     public void setMaximumConductance(double maximumConductance) {
-        device.setParameter(PARAMETER_MAXIMUM_CONDUCTANCE, maximumConductance);
+        device.setParameter(MAXIMUM_CONDUCTANCE, maximumConductance);
     }
 
     /**
@@ -94,7 +94,7 @@ public final class Diode {
      *     finite, non-negative, and less than the current maximum conductance
      */
     public void setMinimumConductance(double minimumConductance) {
-        device.setParameter(PARAMETER_MINIMUM_CONDUCTANCE, minimumConductance);
+        device.setParameter(MINIMUM_CONDUCTANCE, minimumConductance);
     }
 
     /**
@@ -103,7 +103,7 @@ public final class Diode {
      * @param wire the wire
      */
     public void attachAnode(Wire wire) {
-        device.attachTerminal(TERMINAL_ANODE, wire);
+        device.attachTerminal(ANODE, wire);
     }
 
     /**
@@ -112,7 +112,7 @@ public final class Diode {
      * @param wire the wire
      */
     public void attachCathode(Wire wire) {
-        device.attachTerminal(TERMINAL_CATHODE, wire);
+        device.attachTerminal(CATHODE, wire);
     }
 
     /**
@@ -121,7 +121,7 @@ public final class Diode {
      * @param wire the wire
      */
     public void detachAnode(Wire wire) {
-        device.detachTerminal(TERMINAL_ANODE, wire);
+        device.detachTerminal(ANODE, wire);
     }
 
     /**
@@ -130,7 +130,7 @@ public final class Diode {
      * @param wire the wire
      */
     public void detachCathode(Wire wire) {
-        device.detachTerminal(TERMINAL_CATHODE, wire);
+        device.detachTerminal(CATHODE, wire);
     }
 
     /**
@@ -145,7 +145,7 @@ public final class Diode {
     public ObservationSubscription observeVoltage(
         ObservationListener listener
     ) {
-        return device.observe(OBSERVER_VOLTAGE, listener);
+        return device.observe(VOLTAGE, listener);
     }
 
     /**
@@ -160,6 +160,6 @@ public final class Diode {
     public ObservationSubscription observeCurrent(
         ObservationListener listener
     ) {
-        return device.observe(OBSERVER_CURRENT, listener);
+        return device.observe(CURRENT, listener);
     }
 }

@@ -9,24 +9,50 @@ import java.util.ArrayList;
 import static org.junit.jupiter.api.Assertions.*;
 
 final class DeviceMemberAccessTest {
+    @Test void foreignMembersWithMatchingStableIdsCannotChangeLiveCircuit() {
+        var other = DeviceType.define(b -> {
+            var p = b.terminal(0, "positive"); var n = b.terminal(1, "negative");
+            b.parameter(0, "resistance", ParameterConstraints.positiveFinite());
+            b.voltageObserver(1, "current", p, n);
+        });
+        try (var runtime = ElectricalRuntime.create(); var system = runtime.createSystem(20)) {
+            var source = VoltageSource.create(system, 5);
+            var resistor = Resistance.create(system, 10);
+            var p = system.createWire(); var n = system.createWire();
+            source.attachPositive(p); source.attachNegative(n); resistor.attachPositive(p); resistor.attachNegative(n);
+            var currents = new ArrayList<Double>();
+            var subscription = resistor.observeCurrent((status, value) -> currents.add(value));
+            system.tick(); assertEquals(0.5, currents.getLast(), 1e-9);
+            var device = resistor.device();
+            assertThrows(IllegalArgumentException.class, () -> device.setParameter(other.parameter(0), 20));
+            assertThrows(IllegalArgumentException.class, () -> device.validateParameter(other.parameter(0), 20));
+            assertThrows(IllegalArgumentException.class, () -> device.detachTerminal(other.terminal(1), n));
+            assertThrows(IllegalArgumentException.class, () -> device.attachTerminal(other.terminal(0), n));
+            assertThrows(IllegalArgumentException.class, () -> device.observe(other.observer(1), (status, value) -> fail()));
+            system.tick(); assertEquals(0.5, currents.getLast(), 1e-9);
+            assertTrue(subscription.isActive());
+        }
+    }
     @Test
     void customDefinitionBoundsAreValidatedBeforeItsDeviceIsApplied() {
-        DeviceType type = DeviceType.create(builder -> {
-            int positive = builder.addTerminal();
-            int negative = builder.addTerminal();
-            int parameter = builder.addParameter(DeviceDefinitionBuilder.Bound.inclusive(10.0),
-                    DeviceDefinitionBuilder.Bound.exclusive(100.0), true);
-            builder.beginElement(Resistance.TYPE)
-                    .elementTerminal(positive).elementTerminal(negative)
-                    .elementParameter(parameter).endElement();
+        DeviceType type = DeviceType.define(builder -> {
+            var positive = builder.terminal(0, "positive");
+            var negative = builder.terminal(1, "negative");
+            var parameter = builder.parameter(0, "resistance", new ParameterConstraints(
+                ParameterConstraints.Bound.inclusive(10.0), ParameterConstraints.Bound.exclusive(100.0), true, false, null, null));
+            builder.element(Resistance.TYPE, e -> {
+                e.connect(Resistance.TYPE.terminal(0), positive);
+                e.connect(Resistance.TYPE.terminal(1), negative);
+                e.bind(Resistance.TYPE.parameter(0), parameter);
+            });
         });
         try (ElectricalRuntime runtime = ElectricalRuntime.create()) {
             runtime.register(type);
             try (ElectricalSystem system = runtime.createSystem(20)) {
                 Device device = system.create(type);
-                device.setParameter(0, 10.0);
-                assertThrows(IllegalArgumentException.class, () -> device.setParameter(0, 9.0));
-                assertThrows(IllegalArgumentException.class, () -> device.setParameter(0, 100.0));
+                device.setParameter(type.parameter(0), 10.0);
+                assertThrows(IllegalArgumentException.class, () -> device.setParameter(type.parameter(0), 9.0));
+                assertThrows(IllegalArgumentException.class, () -> device.setParameter(type.parameter(0), 100.0));
                 assertDoesNotThrow(system::tick);
             }
         }
@@ -42,18 +68,18 @@ final class DeviceMemberAccessTest {
             Wire negative = system.createWire();
             source.attachPositive(positive);
             source.attachNegative(negative);
-            resistance.attachTerminal(0, positive);
-            resistance.attachTerminal(1, negative);
+            resistance.attachTerminal(Resistance.TYPE.terminal(0), positive);
+            resistance.attachTerminal(Resistance.TYPE.terminal(1), negative);
             ArrayList<Double> currents = new ArrayList<>();
-            resistance.observe(1, (status, value) -> currents.add(value));
+            resistance.observe(Resistance.TYPE.observer(1), (status, value) -> currents.add(value));
 
-            assertThrows(IllegalArgumentException.class, () -> resistance.setParameter(0, 0.0));
-            assertThrows(IllegalArgumentException.class, () -> resistance.setParameter(1, 10.0));
+            assertThrows(IllegalArgumentException.class, () -> resistance.setParameter(Resistance.TYPE.parameter(0), 0.0));
+            assertThrows(IllegalArgumentException.class, () -> resistance.setParameter(Resistance.TYPE.parameter(1), 10.0));
             assertDoesNotThrow(system::tick);
             assertEquals(0.5, currents.getLast(), 1e-9);
 
-            resistance.setParameter(0, 20.0);
-            assertThrows(IllegalArgumentException.class, () -> resistance.setParameter(0, -1.0));
+            resistance.setParameter(Resistance.TYPE.parameter(0), 20.0);
+            assertThrows(IllegalArgumentException.class, () -> resistance.setParameter(Resistance.TYPE.parameter(0), -1.0));
             assertDoesNotThrow(system::tick);
             assertEquals(0.25, currents.getLast(), 1e-9);
         }
@@ -67,7 +93,7 @@ final class DeviceMemberAccessTest {
             VoltageSource source = VoltageSource.create(system, 5.0);
             Device resistance = system.create(Resistance.TYPE);
 
-            resistance.setParameter(0, 10.0);
+            resistance.setParameter(Resistance.TYPE.parameter(0), 10.0);
 
             Wire positive = system.createWire();
             Wire negative = system.createWire();
@@ -75,13 +101,13 @@ final class DeviceMemberAccessTest {
             source.attachPositive(positive);
             source.attachNegative(negative);
 
-            resistance.attachTerminal(0, positive);
-            resistance.attachTerminal(1, negative);
+            resistance.attachTerminal(Resistance.TYPE.terminal(0), positive);
+            resistance.attachTerminal(Resistance.TYPE.terminal(1), negative);
 
             ArrayList<ObservationStatus> statuses = new ArrayList<>();
             ArrayList<Double> currents = new ArrayList<>();
 
-            ObservationSubscription subscription = resistance.observe(1,
+            ObservationSubscription subscription = resistance.observe(Resistance.TYPE.observer(1),
                     (status, value) -> {
                         statuses.add(status);
                         currents.add(value);
@@ -96,8 +122,8 @@ final class DeviceMemberAccessTest {
             assertEquals(ObservationStatus.AVAILABLE, statuses.getFirst());
             assertEquals(0.5, currents.getFirst(), 1e-9);
 
-            resistance.detachTerminal(1, negative);
-            resistance.attachTerminal(1, negative);
+            resistance.detachTerminal(Resistance.TYPE.terminal(1), negative);
+            resistance.attachTerminal(Resistance.TYPE.terminal(1), negative);
 
             assertDoesNotThrow(system::tick);
         }
@@ -113,14 +139,14 @@ final class DeviceMemberAccessTest {
 
             assertThrows(
                     IllegalArgumentException.class,
-                    () -> resistance.attachTerminal(0, foreignWire)
+                    () -> resistance.attachTerminal(Resistance.TYPE.terminal(0), foreignWire)
             );
 
             resistance.destroy();
 
             assertThrows(
                     IllegalStateException.class,
-                    () -> resistance.setParameter(0, 20.0)
+                    () -> resistance.setParameter(Resistance.TYPE.parameter(0), 20.0)
             );
         }
     }
@@ -131,7 +157,7 @@ final class DeviceMemberAccessTest {
 
         assertThrows(
                 IllegalStateException.class,
-                () -> device.setParameter(0, 1.0)
+                () -> device.setParameter(Resistance.RESISTANCE, 1.0)
         );
     }
 

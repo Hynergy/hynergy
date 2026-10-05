@@ -81,18 +81,20 @@ final class DeviceDefinitionTest {
     @Test
     void groundedJavaCompositePublishesNativeVoltageAndCurrents() {
         for (boolean exposed : new boolean[]{true, false}) {
-            DeviceType type = DeviceType.create(builder -> {
-                int output = exposed ? builder.addTerminal() : builder.addNode();
-                int ground = builder.addGroundNode();
-                builder.addVoltageObserver(output, ground);
-                builder.beginElement(VoltageSource.TYPE)
-                       .elementTerminal(output).elementTerminal(ground)
-                       .elementLiteral(10.0).endElement();
-                builder.addChildObserver(0, 1);
-                builder.beginElement(Resistance.TYPE)
-                       .elementTerminal(output).elementTerminal(ground)
-                       .elementLiteral(1000.0).endElement();
-                builder.addChildObserver(1, 1);
+            DeviceType type = DeviceType.define(builder -> {
+                var output = exposed ? builder.terminal(0, "output") : builder.node();
+                var ground = builder.ground();
+                builder.voltageObserver(0, "voltage", output, ground);
+                var source = builder.element(VoltageSource.TYPE, e -> {
+                    e.connect(VoltageSource.TYPE.terminal(0), output); e.connect(VoltageSource.TYPE.terminal(1), ground);
+                    e.literal(VoltageSource.TYPE.parameter(0), 10);
+                });
+                builder.childObserver(1, "source_current", source, VoltageSource.TYPE.observer(1));
+                var load = builder.element(Resistance.TYPE, e -> {
+                    e.connect(Resistance.TYPE.terminal(0), output); e.connect(Resistance.TYPE.terminal(1), ground);
+                    e.literal(Resistance.TYPE.parameter(0), 1000);
+                });
+                builder.childObserver(2, "load_current", load, Resistance.TYPE.observer(1));
             });
             try (ElectricalRuntime runtime = ElectricalRuntime.create()) {
                 runtime.register(type);
@@ -101,15 +103,15 @@ final class DeviceDefinitionTest {
                     ArrayList<Double> voltage = new ArrayList<>();
                     ArrayList<Double> sourceCurrent = new ArrayList<>();
                     ArrayList<Double> loadCurrent = new ArrayList<>();
-                    device.observe(0, (status, value) -> {
+                    device.observe(type.observer(0), (status, value) -> {
                         assertEquals(ObservationStatus.AVAILABLE, status);
                         voltage.add(value);
                     });
-                    device.observe(1, (status, value) -> {
+                    device.observe(type.observer(1), (status, value) -> {
                         assertEquals(ObservationStatus.AVAILABLE, status);
                         sourceCurrent.add(value);
                     });
-                    device.observe(2, (status, value) -> {
+                    device.observe(type.observer(2), (status, value) -> {
                         assertEquals(ObservationStatus.AVAILABLE, status);
                         loadCurrent.add(value);
                     });

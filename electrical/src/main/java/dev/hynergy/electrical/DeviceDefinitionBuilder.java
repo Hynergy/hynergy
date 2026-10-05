@@ -7,29 +7,9 @@ import java.lang.foreign.MemorySegment;
 import java.lang.foreign.ValueLayout;
 import java.nio.ByteOrder;
 import java.util.Objects;
-import java.util.function.Consumer;
-import java.util.function.Function;
 
-/**
- * Builds a composite electrical device definition.
- *
- * <p>Plugin code receives this builder from the definition callback of
- * {@link DeviceType#create(Consumer)}.</p>
- *
- * <p>The runtime owns the builder that it supplies to the callback.
- * Do not close that builder. Do not keep a reference to it after the
- * callback returns.</p>
- *
- * <p>Add terminals, internal nodes, parameters, child elements, and
- * observers to the definition. IDs are zero-based. The builder assigns
- * IDs in the order in which objects are added.</p>
- *
- * <p>For each child element, add all terminal mappings before you add
- * parameter values.</p>
- *
- * <p>This class is not thread-safe.</p>
- */
-public final class DeviceDefinitionBuilder implements AutoCloseable {
+/** Internal HYDF command encoder. */
+final class DeviceDefinitionBuilder implements AutoCloseable {
 
     /**
      * Specifies one parameter bound.
@@ -105,7 +85,6 @@ public final class DeviceDefinitionBuilder implements AutoCloseable {
     private static final ValueLayout.OfDouble F64 =
         ValueLayout.JAVA_DOUBLE_UNALIGNED.withOrder(ByteOrder.LITTLE_ENDIAN);
 
-    private final @Nullable Function<DeviceType, DeviceDefinition> definitionResolver;
 
     private @Nullable Arena arena;
     private MemorySegment buffer;
@@ -133,7 +112,7 @@ public final class DeviceDefinitionBuilder implements AutoCloseable {
      * Creates a builder with the default initial buffer capacity.
      */
     DeviceDefinitionBuilder() {
-        this(DEFAULT_INITIAL_CAPACITY, null);
+        this(DEFAULT_INITIAL_CAPACITY);
     }
 
     /**
@@ -148,20 +127,6 @@ public final class DeviceDefinitionBuilder implements AutoCloseable {
      *     HYDF header
      */
     DeviceDefinitionBuilder(int initialCapacity) {
-        this(initialCapacity, null);
-    }
-
-    DeviceDefinitionBuilder(
-        Function<DeviceType, DeviceDefinition> definitionResolver
-    ) {
-        this(DEFAULT_INITIAL_CAPACITY, Objects.requireNonNull(definitionResolver, "definitionResolver"));
-    }
-
-    private DeviceDefinitionBuilder(
-        int initialCapacity,
-        @Nullable Function<DeviceType, DeviceDefinition> definitionResolver
-    ) {
-        this.definitionResolver = definitionResolver;
 
         if (initialCapacity < HEADER_SIZE) {
             throw new IllegalArgumentException("Initial capacity must be at least " + HEADER_SIZE + " bytes");
@@ -341,49 +306,6 @@ public final class DeviceDefinitionBuilder implements AutoCloseable {
         @Nullable Bound reciprocalUpper
     ) {
         return addParameter(lower, upper, nonZero, true, reciprocalLower, reciprocalUpper);
-    }
-
-    /**
-     * Starts one child element.
-     *
-     * <p>The runtime resolves and registers the child device type if
-     * necessary.</p>
-     *
-     * <p>Add one terminal mapping for each terminal in the child definition.
-     * Use the terminal order of the child definition. Then add one value for
-     * each child parameter. Use the parameter order of the child definition.
-     * Call {@link #endElement()} when the child element is complete.</p>
-     *
-     * @param type the child device type
-     *
-     * @return this builder
-     *
-     * @throws NullPointerException if {@code type} is null
-     * @throws IllegalStateException if another child element is open, if the
-     *     builder is closed, or if the child type cannot be resolved
-     */
-    public DeviceDefinitionBuilder beginElement(
-        DeviceType type
-    ) {
-        requireTopLevel();
-        Objects.requireNonNull(type, "type");
-
-        Function<DeviceType, DeviceDefinition> definitionResolver = this.definitionResolver;
-
-        DeviceDefinition definition;
-
-        if (definitionResolver != null) {
-            definition = Objects.requireNonNull(definitionResolver.apply(type), "Device type resolver returned null");
-        } else {
-            definition = type.currentDefinition();
-
-            if (definition == null) {
-                throw new IllegalStateException(
-                    "Device type is not registered and this builder cannot resolve device types");
-            }
-        }
-
-        return beginElement(definition);
     }
 
     /**

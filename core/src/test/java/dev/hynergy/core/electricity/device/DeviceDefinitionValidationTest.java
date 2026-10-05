@@ -10,30 +10,11 @@ import static org.junit.jupiter.api.Assertions.*;
 
 final class DeviceDefinitionValidationTest {
     @Test
-    void invalidMappingsAreRejectedWithoutPublishingTheDescriptor() {
-        DeviceDescriptorRegistry registry = new DeviceDescriptorRegistry();
-        MemberMapping empty = new MemberMapping();
-        assertThrows(IllegalArgumentException.class, () -> registry.register("test:parameter",
-                PrimitiveDeviceTypes.RESISTANCE, new MemberMapping(1), empty, empty));
-        assertThrows(IllegalArgumentException.class, () -> registry.register("test:terminal",
-                PrimitiveDeviceTypes.RESISTANCE, empty, new MemberMapping(2), empty));
-        assertThrows(IllegalArgumentException.class, () -> registry.register("test:observer",
-                PrimitiveDeviceTypes.RESISTANCE, empty, empty, new MemberMapping(2)));
-        assertNull(registry.get("test:parameter"));
-        assertNull(registry.get("test:terminal"));
-        assertNull(registry.get("test:observer"));
-        assertDoesNotThrow(() -> registry.register("test:parameter", PrimitiveDeviceTypes.RESISTANCE,
-                new MemberMapping(-1, 0), new MemberMapping(-1, 0, 1), new MemberMapping(1, 0)));
-    }
-
-    @Test
     void compilationRejectsNativeInvalidDefaultsBeforeCreatingDevices() {
         try (ElectricalRuntime runtime = ElectricalRuntime.create()) {
             runtime.register(PrimitiveDeviceTypes.RESISTANCE);
-            DeviceDescriptorRegistry registry = new DeviceDescriptorRegistry();
-            MemberMapping empty = new MemberMapping();
-            registry.register("test:resistance", PrimitiveDeviceTypes.RESISTANCE,
-                    new MemberMapping(0), empty, empty);
+            DeviceRegistry registry = new DeviceRegistry(runtime);
+            registry.register("test:resistance", PrimitiveDeviceTypes.RESISTANCE);
             registry.freeze();
             PortModule ports = new PortModule();
             var domain = ports.<ElectricalPortConnection>registerDomain("test:electrical");

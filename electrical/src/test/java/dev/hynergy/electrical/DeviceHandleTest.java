@@ -17,7 +17,7 @@ final class DeviceHandleTest {
             assertSame(PrimitiveDeviceTypes.RESISTANCE, Resistance.TYPE);
             assertEquals(Device.class, handle.getClass());
             handle.requireDefinition(PrimitiveDeviceTypes.RESISTANCE);
-            handle.setParameter(0, 20.0);
+            handle.setParameter(Resistance.TYPE.parameter(0), 20.0);
             assertThrows(IllegalArgumentException.class,
                     () -> handle.requireDefinition(PrimitiveDeviceTypes.VOLTAGE_SOURCE));
             handle.destroy();
@@ -27,17 +27,19 @@ final class DeviceHandleTest {
 
     @Test
     void customDefinitionCreatesIndependentHandlesWithoutJavaConstructors() {
-        DeviceType type = DeviceType.create(builder -> {
-            int positive = builder.addTerminal();
-            int negative = builder.addTerminal();
-            int resistance = builder.addParameter(DeviceDefinitionBuilder.Bound.inclusive(10.0),
-                    DeviceDefinitionBuilder.Bound.exclusive(100.0), true);
-            builder.beginElement(Resistance.TYPE)
-                    .elementTerminal(positive).elementTerminal(negative)
-                    .elementParameter(resistance).endElement();
+        DeviceType type = DeviceType.define(builder -> {
+            var positive = builder.terminal(0, "positive");
+            var negative = builder.terminal(1, "negative");
+            var parameter = builder.parameter(0, "resistance", new ParameterConstraints(
+                ParameterConstraints.Bound.inclusive(10.0), ParameterConstraints.Bound.exclusive(100.0), true, false, null, null));
+            builder.element(Resistance.TYPE, e -> {
+                e.connect(Resistance.TYPE.terminal(0), positive);
+                e.connect(Resistance.TYPE.terminal(1), negative);
+                e.bind(Resistance.TYPE.parameter(0), parameter);
+            });
         });
         try (ElectricalRuntime runtime = ElectricalRuntime.create()) {
-            DeviceDefinition definition = runtime.register(type);
+            RegisteredDeviceType definition = runtime.register(type);
             assertSame(definition, runtime.register(type));
             try (ElectricalSystem system = runtime.createSystem(20)) {
                 Device first = system.create(type);
@@ -45,10 +47,10 @@ final class DeviceHandleTest {
                 assertEquals(Device.class, first.getClass());
                 assertNotSame(first, second);
                 assertEquals(first.id().value() + 1, second.id().value());
-                first.setParameter(0, 10.0);
-                second.setParameter(0, 20.0);
-                assertThrows(IllegalArgumentException.class, () -> first.setParameter(0, 9.0));
-                assertThrows(IllegalArgumentException.class, () -> second.setParameter(0, 100.0));
+                first.setParameter(type.parameter(0), 10.0);
+                second.setParameter(type.parameter(0), 20.0);
+                assertThrows(IllegalArgumentException.class, () -> first.setParameter(type.parameter(0), 9.0));
+                assertThrows(IllegalArgumentException.class, () -> second.setParameter(type.parameter(0), 100.0));
                 assertDoesNotThrow(system::tick);
             }
         }
@@ -77,15 +79,15 @@ final class DeviceHandleTest {
             ObservationSubscription subscription = resistance.observeCurrent((status, value) -> currents.add(value));
             system.tick();
             assertEquals(0.5, currents.getLast(), 1e-9);
-            handle.validateParameter(0, 20.0);
+            handle.validateParameter(Resistance.TYPE.parameter(0), 20.0);
             system.tick();
             assertEquals(0.5, currents.getLast(), 1e-9);
-            handle.setParameter(0, 20.0);
+            handle.setParameter(Resistance.TYPE.parameter(0), 20.0);
             system.tick();
             assertEquals(0.25, currents.getLast(), 1e-9);
             resistance.destroy();
             assertFalse(subscription.isActive());
-            assertThrows(IllegalStateException.class, () -> handle.setParameter(0, 30.0));
+            assertThrows(IllegalStateException.class, () -> handle.setParameter(Resistance.TYPE.parameter(0), 30.0));
         }
     }
 }

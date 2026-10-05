@@ -3,7 +3,6 @@ package dev.hynergy.core.electricity.device;
 import dev.hynergy.core.electricity.ElectricalCodecs;
 import dev.hynergy.core.port.BlockPortDefinition;
 import dev.hynergy.electrical.*;
-import dev.hynergy.electrical.primitives.passive.Resistance;
 import dev.hynergy.electrical.primitives.sources.VoltageSource;
 import org.bson.BsonValue;
 import org.junit.jupiter.api.Test;
@@ -11,15 +10,21 @@ import org.junit.jupiter.api.Test;
 import static org.junit.jupiter.api.Assertions.*;
 
 final class DeviceComponentTest {
+    private static final DeviceType TYPE = DeviceTestTypes.resistor(4, 0, 1, 6);
+
+    private static ElectricalSystem prepareSystem(ElectricalRuntime runtime) {
+        runtime.register(TYPE);
+        return runtime.createSystem(20);
+    }
+
     @Test
     void signedZeroOverrideIsPreservedUntilTheExactDefaultIsRestored() {
         try (ElectricalRuntime runtime = ElectricalRuntime.create();
-             ElectricalSystem system = runtime.createSystem(20)) {
-            DeviceDescriptor descriptor = new DeviceDescriptor("test:voltage", VoltageSource.TYPE,
-                    new MemberMapping(0), new MemberMapping(0, 1), new MemberMapping(0, 1));
+             ElectricalSystem system = prepareSystem(runtime)) {
+            var descriptor = new DeviceRegistry(runtime).register("test:voltage", VoltageSource.TYPE);
             CompiledDeviceConfig compiled = new CompiledDeviceConfig(descriptor,
-                java.util.List.of(new CompiledDeviceConfig.ParameterBinding(0, 0, 0.0)),
-                java.util.List.of(), BlockPortDefinition.of());
+                    java.util.List.of(new CompiledDeviceConfig.ParameterBinding(VoltageSource.VOLTAGE, 0.0)),
+                    java.util.List.of(), BlockPortDefinition.of());
             DeviceComponent component = new DeviceComponent("test:voltage");
             java.util.ArrayList<Long> saved = new java.util.ArrayList<>();
             ElectricalDeviceSystem.bindDevice(component, compiled, system,
@@ -36,10 +41,10 @@ final class DeviceComponentTest {
     @Test
     void acceptedOverrideChangesMarkSavingButRejectedAndUnchangedValuesDoNot() {
         try (ElectricalRuntime runtime = ElectricalRuntime.create();
-             ElectricalSystem system = runtime.createSystem(20)) {
+             ElectricalSystem system = prepareSystem(runtime)) {
             DeviceComponent component = new DeviceComponent("test:device");
             java.util.ArrayList<Double> savedOverrides = new java.util.ArrayList<>();
-            ElectricalDeviceSystem.bindDevice(component, compiled(4, 100.0, 6), system,
+            ElectricalDeviceSystem.bindDevice(component, compiled(runtime, 4, 100.0, 6), system,
                     () -> savedOverrides.add(component.overrides().getOrDefault(4, 100.0)));
 
             component.setParameter(4, 470.0);
@@ -56,7 +61,7 @@ final class DeviceComponentTest {
             ElectricalDeviceSystem.unloadDevice(component);
             assertThrows(IllegalStateException.class, () -> component.setParameter(4, 220.0));
             java.util.ArrayList<Double> reloadedSaves = new java.util.ArrayList<>();
-            ElectricalDeviceSystem.bindDevice(component, compiled(4, 100.0, 6), system,
+            ElectricalDeviceSystem.bindDevice(component, compiled(runtime, 4, 100.0, 6), system,
                     () -> reloadedSaves.add(component.overrides().getOrDefault(4, 100.0)));
             component.setParameter(4, 220.0);
             assertEquals(java.util.List.of(220.0), reloadedSaves);
@@ -68,9 +73,9 @@ final class DeviceComponentTest {
     @Test
     void rejectedNativeConstraintLeavesOverrideAndWorldUsable() {
         try (ElectricalRuntime runtime = ElectricalRuntime.create();
-             ElectricalSystem system = runtime.createSystem(20)) {
+             ElectricalSystem system = prepareSystem(runtime)) {
             DeviceComponent component = new DeviceComponent("test:device");
-            ElectricalDeviceSystem.bindDevice(component, compiled(4, 100.0, 6), system, () -> {
+            ElectricalDeviceSystem.bindDevice(component, compiled(runtime, 4, 100.0, 6), system, () -> {
             });
             component.setParameter(4, 470.0);
 
@@ -93,9 +98,9 @@ final class DeviceComponentTest {
     @Test
     void componentSerializationRoundTripPreservesPersistentStateOnly() {
         try (ElectricalRuntime runtime = ElectricalRuntime.create();
-             ElectricalSystem system = runtime.createSystem(20)) {
-            CompiledDeviceConfig compiled = compiled(4, 100.0, 6);
-            Device resistance = system.create(Resistance.TYPE);
+             ElectricalSystem system = prepareSystem(runtime)) {
+            CompiledDeviceConfig compiled = compiled(runtime, 4, 100.0, 6);
+            Device resistance = system.create(TYPE);
             DeviceComponent component = new DeviceComponent("test:device");
             component.setDeviceId(resistance.id());
             component.overrides().set(4, 470.0);
@@ -118,9 +123,9 @@ final class DeviceComponentTest {
     @Test
     void gameplayCloneKeepsConfigAndIndependentOverridesButClearsIdentityAndRuntime() {
         try (ElectricalRuntime runtime = ElectricalRuntime.create();
-             ElectricalSystem system = runtime.createSystem(20)) {
-            CompiledDeviceConfig compiled = compiled(4, 100.0, 6);
-            Device resistance = system.create(Resistance.TYPE);
+             ElectricalSystem system = prepareSystem(runtime)) {
+            CompiledDeviceConfig compiled = compiled(runtime, 4, 100.0, 6);
+            Device resistance = system.create(TYPE);
             DeviceComponent component = new DeviceComponent("test:device");
             component.setDeviceId(resistance.id());
             component.overrides().set(4, 470.0);
@@ -143,9 +148,9 @@ final class DeviceComponentTest {
     @Test
     void serializableClonePreservesIdentityAndIndependentOverridesButClearsRuntime() {
         try (ElectricalRuntime runtime = ElectricalRuntime.create();
-             ElectricalSystem system = runtime.createSystem(20)) {
-            CompiledDeviceConfig compiled = compiled(4, 100.0, 6);
-            Device resistance = system.create(Resistance.TYPE);
+             ElectricalSystem system = prepareSystem(runtime)) {
+            CompiledDeviceConfig compiled = compiled(runtime, 4, 100.0, 6);
+            Device resistance = system.create(TYPE);
             DeviceComponent component = new DeviceComponent("test:device");
             component.setDeviceId(resistance.id());
             component.overrides().set(4, 470.0);
@@ -168,9 +173,9 @@ final class DeviceComponentTest {
     @Test
     void stableParameterApiMapsToNativeIndexAndRemovesRedundantDefaultOverride() {
         try (ElectricalRuntime runtime = ElectricalRuntime.create();
-             ElectricalSystem system = runtime.createSystem(20)) {
-            CompiledDeviceConfig compiled = compiled(4, 100.0, 6);
-            Device resistance = system.create(Resistance.TYPE);
+             ElectricalSystem system = prepareSystem(runtime)) {
+            CompiledDeviceConfig compiled = compiled(runtime, 4, 100.0, 6);
+            Device resistance = system.create(TYPE);
             DeviceComponent component = new DeviceComponent("test:device");
             component.bindRuntime(resistance, compiled, () -> {
             });
@@ -191,9 +196,9 @@ final class DeviceComponentTest {
     @Test
     void stableObserverApiMapsStableIdAndDoesNotRetainSubscription() {
         try (ElectricalRuntime runtime = ElectricalRuntime.create();
-             ElectricalSystem system = runtime.createSystem(20)) {
-            CompiledDeviceConfig compiled = compiled(4, 100.0, 6);
-            Device resistance = system.create(Resistance.TYPE);
+             ElectricalSystem system = prepareSystem(runtime)) {
+            CompiledDeviceConfig compiled = compiled(runtime, 4, 100.0, 6);
+            Device resistance = system.create(TYPE);
             DeviceComponent component = new DeviceComponent("test:device");
             component.bindRuntime(resistance, compiled, () -> {
             });
@@ -209,7 +214,6 @@ final class DeviceComponentTest {
 
     @Test
     void unknownStableIdsAndUnboundAccessFailBeforeNativeUse() {
-        CompiledDeviceConfig compiled = compiled(4, 100.0, 6);
         DeviceComponent unbound = new DeviceComponent("test:device");
 
         assertThrows(IllegalStateException.class, () -> unbound.setParameter(4, 220.0));
@@ -217,8 +221,9 @@ final class DeviceComponentTest {
         }));
 
         try (ElectricalRuntime runtime = ElectricalRuntime.create();
-             ElectricalSystem system = runtime.createSystem(20)) {
-            Device resistance = system.create(Resistance.TYPE);
+             ElectricalSystem system = prepareSystem(runtime)) {
+            CompiledDeviceConfig compiled = compiled(runtime, 4, 100.0, 6);
+            Device resistance = system.create(TYPE);
             DeviceComponent component = new DeviceComponent("test:device");
             component.bindRuntime(resistance, compiled, () -> {
             });
@@ -230,29 +235,10 @@ final class DeviceComponentTest {
         }
     }
 
-    private static CompiledDeviceConfig compiled(
-            int stableParameterId,
-            double defaultValue,
-            int stableObserverId
-    ) {
-        int[] parameterMapping = new int[stableParameterId + 1];
-        java.util.Arrays.fill(parameterMapping, MemberMapping.UNMAPPED);
-        parameterMapping[stableParameterId] = 0;
-
-        int[] observerMapping = new int[stableObserverId + 1];
-        java.util.Arrays.fill(observerMapping, MemberMapping.UNMAPPED);
-        observerMapping[stableObserverId] = 0;
-
-        DeviceDescriptor descriptor = new DeviceDescriptor(
-                "test:resistance",
-                Resistance.TYPE,
-                new MemberMapping(parameterMapping),
-                new MemberMapping(0, 1),
-                new MemberMapping(observerMapping)
-        );
-
-        return new CompiledDeviceConfig(descriptor,
-                java.util.List.of(new CompiledDeviceConfig.ParameterBinding(stableParameterId, 0, defaultValue)),
+    private static CompiledDeviceConfig compiled(ElectricalRuntime runtime, int stableParameterId, double defaultValue, int stableObserverId) {
+        var registration = new DeviceRegistry(runtime).register("test:device", TYPE);
+        return new CompiledDeviceConfig(registration,
+                java.util.List.of(new CompiledDeviceConfig.ParameterBinding(TYPE.parameter(stableParameterId), defaultValue)),
                 java.util.List.of(), BlockPortDefinition.of());
     }
 }

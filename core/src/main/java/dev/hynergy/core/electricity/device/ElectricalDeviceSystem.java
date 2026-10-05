@@ -209,7 +209,7 @@ public final class ElectricalDeviceSystem extends RefSystem<ChunkStore> {
 
         try {
             for (var port : compiled.ports()) {
-                scratch.nativeTerminalId = port.nativeTerminalId();
+                scratch.terminal = port.terminal();
                 portModule.discovery().discover(
                         worldView,
                         scratch.sourcePosition.x,
@@ -243,8 +243,8 @@ public final class ElectricalDeviceSystem extends RefSystem<ChunkStore> {
         DeviceId persistedId = component.getDeviceId();
         boolean created = persistedId == null;
         Device device = created
-                ? system.create(compiled.descriptor().type())
-                : system.resolveDevice(persistedId, compiled.descriptor().type());
+                ? system.create(compiled.registration().type())
+                : system.resolveDevice(persistedId, compiled.registration().type());
 
         boolean migrated;
         try {
@@ -279,23 +279,23 @@ public final class ElectricalDeviceSystem extends RefSystem<ChunkStore> {
         for (var parameter : compiled.parameters()) {
             int stableId = parameter.stableId();
             double value = overrides.getOrDefault(stableId, parameter.defaultValue());
-            device.validateParameter(parameter.nativeId(), value);
+            device.validateParameter(parameter.parameter(), value);
         }
         for (int index = 0; index < overrides.size(); index++) {
             int stableId = overrides.stableIdAt(index);
             if (compiled.parameter(stableId) != null) {
                 continue;
             }
-            int nativeId = compiled.nativeParameterId(stableId);
-            if (nativeId != MemberMapping.UNMAPPED) {
-                device.validateParameter(nativeId, overrides.valueAt(index));
+            var parameter = compiled.declaredParameter(stableId);
+            if (parameter != null) {
+                device.validateParameter(parameter, overrides.valueAt(index));
             }
         }
 
         for (var parameter : compiled.parameters()) {
             int stableId = parameter.stableId();
             double value = overrides.getOrDefault(stableId, parameter.defaultValue());
-            device.setParameter(parameter.nativeId(), value);
+            device.setParameter(parameter.parameter(), value);
         }
 
         for (int index = 0; index < overrides.size(); index++) {
@@ -304,16 +304,16 @@ public final class ElectricalDeviceSystem extends RefSystem<ChunkStore> {
                 continue;
             }
 
-            int nativeId = compiled.nativeParameterId(stableId);
-            if (nativeId != MemberMapping.UNMAPPED) {
-                device.setParameter(nativeId, overrides.valueAt(index));
+            var parameter = compiled.declaredParameter(stableId);
+            if (parameter != null) {
+                device.setParameter(parameter, overrides.valueAt(index));
             }
         }
 
         boolean migrated = false;
         for (int index = overrides.size() - 1; index >= 0; index--) {
             int stableId = overrides.stableIdAt(index);
-            if (compiled.nativeParameterId(stableId) == MemberMapping.UNMAPPED) {
+            if (compiled.declaredParameter(stableId) == null) {
                 overrides.remove(stableId);
                 migrated = true;
             }
@@ -342,7 +342,7 @@ public final class ElectricalDeviceSystem extends RefSystem<ChunkStore> {
                         "A compiled device definition is required to resolve a persisted device before removal"
                 );
             }
-            device = system.resolveDevice(id, compiled.descriptor().type());
+            device = system.resolveDevice(id, compiled.registration().type());
         }
 
         if (device != null) {
@@ -379,7 +379,7 @@ public final class ElectricalDeviceSystem extends RefSystem<ChunkStore> {
         private @Nullable ChunkStore chunkStore;
         private @Nullable CommandBuffer<ChunkStore> commandBuffer;
         private @Nullable ComponentType<ChunkStore, WireComponent> wireComponentType;
-        private int nativeTerminalId;
+        private dev.hynergy.electrical.@Nullable DeviceTerminal terminal;
 
         void begin(
                 Device device,
@@ -449,7 +449,7 @@ public final class ElectricalDeviceSystem extends RefSystem<ChunkStore> {
                 return;
             }
 
-            DeviceWireConnections.attachIfNew(device, nativeTerminalId, targetComponent.getWire(), dedup);
+            DeviceWireConnections.attachIfNew(device, Objects.requireNonNull(terminal), targetComponent.getWire(), dedup);
         }
     }
 }

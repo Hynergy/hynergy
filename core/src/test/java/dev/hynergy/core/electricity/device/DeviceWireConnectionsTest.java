@@ -15,6 +15,10 @@ import java.util.ArrayList;
 import static org.junit.jupiter.api.Assertions.*;
 
 final class DeviceWireConnectionsTest {
+    private static final DeviceType TYPE = DeviceTestTypes.resistor(4, 4, 1, 1);
+    private static ElectricalSystem prepareSystem(ElectricalRuntime runtime) {
+        runtime.register(TYPE); return runtime.createSystem(20);
+    }
     @Test
     void deviceFirstDiscoveryMapsTargetPortToNativeTerminal() {
         try (Fixture fixture = new Fixture()) {
@@ -29,7 +33,7 @@ final class DeviceWireConnectionsTest {
         try (Fixture fixture = new Fixture(false)) {
             var dedup = new DeviceWireConnections.AttachmentDedup();
             for (int index = 0; index < fixture.compiled.ports().size(); index++) {
-                int terminal = fixture.compiled.ports().get(index).nativeTerminalId();
+                var terminal = fixture.compiled.ports().get(index).terminal();
                 fixture.ports.discovery().discover(fixture, 0, 0, 0, fixture.compiled.ports().get(index).portId(),
                         fixture.domain, (x, y, z, portId, connection, sourceFirst) ->
                                 DeviceWireConnections.attachIfNew(fixture.resistance, terminal,
@@ -48,10 +52,10 @@ final class DeviceWireConnectionsTest {
 
             fixture.positive.destroy();
             Wire replacement = fixture.system.createWire();
-            fixture.source.attachTerminal(0, replacement);
+            fixture.source.attachTerminal(VoltageSource.TYPE.terminal(0), replacement);
             fixture.discoverWire(replacement, -1);
             fixture.assertCurrent(0.5);
-            fixture.source.setParameter(0, 8.0);
+            fixture.source.setParameter(VoltageSource.VOLTAGE, 8.0);
             fixture.assertCurrent(0.8);
         }
     }
@@ -66,7 +70,7 @@ final class DeviceWireConnectionsTest {
             assertTrue(DeviceWireConnections.attachPortIfNew(fixture.component, 3, fixture.negative, dedup));
             fixture.assertCurrent(0.5);
 
-            fixture.resistance.detachTerminal(0, fixture.positive);
+            fixture.resistance.detachTerminal(TYPE.terminal(4), fixture.positive);
             fixture.assertCurrent(0.0);
         }
     }
@@ -79,7 +83,7 @@ final class DeviceWireConnectionsTest {
             });
             Device secondResistance = second.device();
             ArrayList<Double> currents = new ArrayList<>();
-            secondResistance.observe(1, (status, value) -> currents.add(value));
+            secondResistance.observe(TYPE.observer(1), (status, value) -> currents.add(value));
             var dedup = new DeviceWireConnections.AttachmentDedup();
             for (DeviceComponent component : new DeviceComponent[]{fixture.component, second}) {
                 assertTrue(DeviceWireConnections.attachPortIfNew(component, 7, fixture.positive, dedup));
@@ -122,7 +126,7 @@ final class DeviceWireConnectionsTest {
                     }
             ).created());
             assertEquals(retained, fixture.component.getDeviceId());
-            fixture.source.setParameter(0, 8.0);
+            fixture.source.setParameter(VoltageSource.VOLTAGE, 8.0);
             fixture.assertCurrent(0.8);
         }
     }
@@ -135,14 +139,14 @@ final class DeviceWireConnectionsTest {
             fixture.assertCurrent(0.5);
             Wire restored = fixture.system.resolveWire(fixture.positive.id());
             assertEquals(fixture.positive.id(), restored.id());
-            fixture.source.setParameter(0, 8.0);
+            fixture.source.setParameter(VoltageSource.VOLTAGE, 8.0);
             fixture.assertCurrent(0.8);
         }
     }
 
     private static final class Fixture implements AutoCloseable, PortWorldView {
         private final ElectricalRuntime runtime = ElectricalRuntime.create();
-        private final ElectricalSystem system = runtime.createSystem(20);
+        private final ElectricalSystem system = prepareSystem(runtime);
         private final PortModule ports = new PortModule();
         private final PortDomain<ElectricalPortConnection> domain = ports.registerDomain("test:electrical");
         private final CompiledDeviceConfig compiled;
@@ -165,10 +169,8 @@ final class DeviceWireConnectionsTest {
                             first.normalX() == -second.normalX() ? ElectricalPortConnection.DIRECT : null);
             PortModuleTestAccess.freeze(ports);
             runtime.register(Resistance.TYPE);
-            var descriptors = new DeviceDescriptorRegistry();
-            descriptors.register("test:resistance", Resistance.TYPE,
-                    new MemberMapping(-1, -1, -1, -1, 0),
-                    new MemberMapping(-1, 1, -1, -1, 0), new MemberMapping(0, 1));
+            var descriptors = new DeviceRegistry(runtime);
+            descriptors.register("test:resistance", TYPE);
             compiled = new DeviceConfig("test:resistance", "test:resistance",
                     new DeviceParameterConfig[]{new DeviceParameterConfig(4, 10.0)},
                     new DevicePortConfig[]{
@@ -191,10 +193,10 @@ final class DeviceWireConnectionsTest {
                 });
             }
             resistance = component.device();
-            source.setParameter(0, 5.0);
-            source.attachTerminal(0, positive);
-            source.attachTerminal(1, negative);
-            resistance.observe(1, (status, value) -> {
+            source.setParameter(VoltageSource.VOLTAGE, 5.0);
+            source.attachTerminal(VoltageSource.TYPE.terminal(0), positive);
+            source.attachTerminal(VoltageSource.TYPE.terminal(1), negative);
+            resistance.observe(TYPE.observer(1), (status, value) -> {
                 assertEquals(ObservationStatus.AVAILABLE, status);
                 currents.add(value);
             });

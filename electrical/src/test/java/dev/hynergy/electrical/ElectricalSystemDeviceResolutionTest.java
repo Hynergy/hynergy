@@ -6,6 +6,18 @@ import org.junit.jupiter.api.Test;
 import static org.junit.jupiter.api.Assertions.*;
 
 final class ElectricalSystemDeviceResolutionTest {
+    @Test void closedSystemAndRuntimeRejectResolutionAndRetainedHandleAccess() {
+        var runtime = ElectricalRuntime.create();
+        var system = runtime.createSystem(20);
+        try {
+            var original = Resistance.create(system, 10);
+            var id = original.id();
+            system.close(); runtime.close();
+            assertThrows(IllegalStateException.class, () -> system.resolveDevice(id, Resistance.TYPE));
+            assertThrows(IllegalStateException.class, () -> original.device().setParameter(Resistance.RESISTANCE, 20));
+            assertEquals(1, Resistance.TYPE.parameterCount());
+        } finally { system.close(); runtime.close(); }
+    }
     @Test
     void resolutionCannotSelectDifferentConstraintsForAnExistingDevice() {
         try (ElectricalRuntime runtime = ElectricalRuntime.create();
@@ -19,8 +31,8 @@ final class ElectricalSystemDeviceResolutionTest {
                     () -> system.resolveDevice(original.id(),
                             dev.hynergy.electrical.primitives.sources.VoltageSource.TYPE));
             Device restored = system.resolveDevice(original.id(), Resistance.TYPE);
-            assertThrows(IllegalArgumentException.class, () -> restored.setParameter(0, 0.0));
-            restored.setParameter(0, 20.0);
+            assertThrows(IllegalArgumentException.class, () -> restored.setParameter(Resistance.TYPE.parameter(0), 0.0));
+            restored.setParameter(Resistance.TYPE.parameter(0), 20.0);
             assertDoesNotThrow(system::tick);
         }
     }
@@ -46,7 +58,7 @@ final class ElectricalSystemDeviceResolutionTest {
 
             assertThrows(
                     IllegalStateException.class,
-                    () -> resolved.setParameter(0, 30.0)
+                    () -> resolved.setParameter(Resistance.TYPE.parameter(0), 30.0)
             );
         }
     }

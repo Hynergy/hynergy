@@ -14,13 +14,13 @@ public final class Resistance {
      */
     public static final DeviceType TYPE = PrimitiveDeviceTypes.RESISTANCE;
 
-    private static final int TERMINAL_POSITIVE = 0;
-    private static final int TERMINAL_NEGATIVE = 1;
+    public static final DeviceTerminal POSITIVE = TYPE.terminal(0);
+    public static final DeviceTerminal NEGATIVE = TYPE.terminal(1);
 
-    private static final int PARAMETER_RESISTANCE = 0;
+    public static final DeviceParameter RESISTANCE = TYPE.parameter(0);
 
-    private static final int OBSERVER_VOLTAGE = 0;
-    private static final int OBSERVER_CURRENT = 1;
+    public static final DeviceObserver VOLTAGE = TYPE.observer(0);
+    public static final DeviceObserver CURRENT = TYPE.observer(1);
 
     private final Device device;
 
@@ -72,7 +72,7 @@ public final class Resistance {
      * @param resistance the resistance, in ohms; the value must be finite and greater than zero
      */
     public void setResistance(double resistance) {
-        device.setParameter(PARAMETER_RESISTANCE, resistance);
+        device.setParameter(RESISTANCE, resistance);
     }
 
     /**
@@ -81,7 +81,7 @@ public final class Resistance {
      * @param wire the wire
      */
     public void attachPositive(Wire wire) {
-        device.attachTerminal(TERMINAL_POSITIVE, wire);
+        device.attachTerminal(POSITIVE, wire);
     }
 
     /**
@@ -90,7 +90,7 @@ public final class Resistance {
      * @param wire the wire
      */
     public void attachNegative(Wire wire) {
-        device.attachTerminal(TERMINAL_NEGATIVE, wire);
+        device.attachTerminal(NEGATIVE, wire);
     }
 
     /**
@@ -99,7 +99,7 @@ public final class Resistance {
      * @param wire the wire
      */
     public void detachPositive(Wire wire) {
-        device.detachTerminal(TERMINAL_POSITIVE, wire);
+        device.detachTerminal(POSITIVE, wire);
     }
 
     /**
@@ -108,7 +108,7 @@ public final class Resistance {
      * @param wire the wire
      */
     public void detachNegative(Wire wire) {
-        device.detachTerminal(TERMINAL_NEGATIVE, wire);
+        device.detachTerminal(NEGATIVE, wire);
     }
 
     /**
@@ -123,7 +123,7 @@ public final class Resistance {
     public ObservationSubscription observeVoltage(
         ObservationListener listener
     ) {
-        return device.observe(OBSERVER_VOLTAGE, listener);
+        return device.observe(VOLTAGE, listener);
     }
 
     /**
@@ -138,6 +138,6 @@ public final class Resistance {
     public ObservationSubscription observeCurrent(
         ObservationListener listener
     ) {
-        return device.observe(OBSERVER_CURRENT, listener);
+        return device.observe(CURRENT, listener);
     }
 }

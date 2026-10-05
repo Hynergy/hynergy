@@ -33,7 +33,7 @@ public final class DeviceWireConnections {
         }
         for (var port : compiled.ports()) {
             if (port.portId() == portId) {
-                return attachIfNew(device, port.nativeTerminalId(), wire, dedup);
+                return attachIfNew(device, port.terminal(), wire, dedup);
             }
         }
         return false;
@@ -41,16 +41,16 @@ public final class DeviceWireConnections {
 
     static boolean attachIfNew(
             Device device,
-            int nativeTerminalId,
+            dev.hynergy.electrical.DeviceTerminal terminal,
             @Nullable Wire wire,
             AttachmentDedup dedup
     ) {
         Objects.requireNonNull(device, "device");
         Objects.requireNonNull(dedup, "dedup");
-        if (wire == null || !dedup.add(device.id().packed(), nativeTerminalId, wire.id().packed())) {
+        if (wire == null || !dedup.add(device.id().packed(), terminal.id(), wire.id().packed())) {
             return false;
         }
-        device.attachTerminal(nativeTerminalId, wire);
+        device.attachTerminal(terminal, wire);
         return true;
     }
 

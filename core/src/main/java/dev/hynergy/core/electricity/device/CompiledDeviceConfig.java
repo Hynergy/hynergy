@@ -1,53 +1,71 @@
 package dev.hynergy.core.electricity.device;
 
 import dev.hynergy.core.port.BlockPortDefinition;
+import dev.hynergy.electrical.DeviceParameter;
+import dev.hynergy.electrical.DeviceTerminal;
 import org.jspecify.annotations.Nullable;
+
 import java.util.List;
 import java.util.Objects;
 
 /**
- * Immutable, resolved asset configuration shared by runtime devices.
- * Stable parameter IDs remain available for persisted overrides.
+ * Immutable asset configuration. Persistence uses the declaration's stable member IDs.
  */
 public final class CompiledDeviceConfig {
-    private final DeviceDescriptor descriptor;
+    private final DeviceRegistration registration;
     private final List<ParameterBinding> parameters;
     private final List<PortBinding> ports;
     private final BlockPortDefinition portDefinition;
 
-    CompiledDeviceConfig(DeviceDescriptor descriptor, List<ParameterBinding> parameters,
+    CompiledDeviceConfig(DeviceRegistration registration, List<ParameterBinding> parameters,
                          List<PortBinding> ports, BlockPortDefinition portDefinition) {
-        this.descriptor = Objects.requireNonNull(descriptor, "descriptor");
+        this.registration = Objects.requireNonNull(registration, "registration");
         this.parameters = List.copyOf(parameters);
         this.ports = List.copyOf(ports);
         this.portDefinition = Objects.requireNonNull(portDefinition, "portDefinition");
-        if (ports.size() != portDefinition.size()) {
+        if (ports.size() != portDefinition.size())
             throw new IllegalArgumentException("Compiled ports must match the block port definition");
+    }
+
+    public record ParameterBinding(DeviceParameter parameter, double defaultValue) {
+        public ParameterBinding {
+            Objects.requireNonNull(parameter, "parameter");
+        }
+
+        public int stableId() {
+            return parameter.id();
         }
     }
 
-    public record ParameterBinding(int stableId, int nativeId, double defaultValue) { }
-    public record PortBinding(int portId, int nativeTerminalId) { }
+    public record PortBinding(int portId, DeviceTerminal terminal) {
+        public PortBinding {
+            Objects.requireNonNull(terminal, "terminal");
+        }
+    }
 
-    public DeviceDescriptor descriptor() { return descriptor; }
-    public List<ParameterBinding> parameters() { return parameters; }
-    public List<PortBinding> ports() { return ports; }
-    public BlockPortDefinition portDefinition() { return portDefinition; }
+    public DeviceRegistration registration() {
+        return registration;
+    }
+
+    public List<ParameterBinding> parameters() {
+        return parameters;
+    }
+
+    public List<PortBinding> ports() {
+        return ports;
+    }
+
+    public BlockPortDefinition portDefinition() {
+        return portDefinition;
+    }
 
     public @Nullable ParameterBinding parameter(int stableId) {
-        for (ParameterBinding parameter : parameters) {
-            if (parameter.stableId() == stableId) {
-                return parameter;
-            }
-        }
+        for (var binding : parameters) if (binding.stableId() == stableId) return binding;
         return null;
     }
 
-    public int nativeParameterId(int stableId) {
-        return descriptor.parameters().nativeIndex(stableId);
-    }
-
-    public int nativeObserverId(int stableId) {
-        return descriptor.observers().nativeIndex(stableId);
+    public @Nullable DeviceParameter declaredParameter(int stableId) {
+        for (var parameter : registration.type().parameters()) if (parameter.id() == stableId) return parameter;
+        return null;
     }
 }

@@ -11,9 +11,12 @@ import org.junit.jupiter.api.Test;
 import static org.junit.jupiter.api.Assertions.*;
 
 final class DeviceConfigCodecTest {
+    private dev.hynergy.electrical.ElectricalRuntime runtime;
+    @org.junit.jupiter.api.BeforeEach void setupRuntime() { runtime = dev.hynergy.electrical.ElectricalRuntime.create(); }
+    @org.junit.jupiter.api.AfterEach void closeRuntime() { runtime.close(); }
     @Test
     void decodingRejectsUnknownTypesEvenWithoutADeviceBlock() {
-        var codec = DeviceConfig.createCodec(new DeviceDescriptorRegistry());
+        var codec = DeviceConfig.createCodec(new DeviceRegistry(runtime));
         assertThrows(CodecValidationException.class, () -> codec.decode(
                 BsonDocument.parse("{\"Type\":\"test:unknown\"}"), new ExtraInfo()
         ));
@@ -21,10 +24,9 @@ final class DeviceConfigCodecTest {
 
     @Test
     void codecUsesRegistrationsMadeAfterConstructionAndAfterFreeze() {
-        DeviceDescriptorRegistry registry = new DeviceDescriptorRegistry();
+        DeviceRegistry registry = new DeviceRegistry(runtime);
         var codec = DeviceConfig.createCodec(registry);
-        MemberMapping empty = new MemberMapping();
-        registry.register("test:resistance", Resistance.TYPE, empty, empty, empty);
+        registry.register("test:resistance", Resistance.TYPE);
 
         BsonDocument json = BsonDocument.parse("{\"Type\":\"test:resistance\"}");
         assertEquals("test:resistance", codec.decode(json, new ExtraInfo()).getType());
@@ -37,7 +39,7 @@ final class DeviceConfigCodecTest {
 
     @Test
     void typeSchemaUsesTheDeviceTypesDropdown() {
-        var schema = DeviceConfig.createCodec(new DeviceDescriptorRegistry()).toSchema(new SchemaContext());
+        var schema = DeviceConfig.createCodec(new DeviceRegistry(runtime)).toSchema(new SchemaContext());
         var editor = schema.getProperties().get("Type").getHytale().getUiEditorComponent();
         assertInstanceOf(UIEditor.Dropdown.class, editor);
         var json = UIEditor.Dropdown.CODEC.encode((UIEditor.Dropdown) editor).asDocument();
@@ -46,11 +48,10 @@ final class DeviceConfigCodecTest {
 
     @Test
     void codecValidationUsesOnlyItsOwnRegistry() {
-        DeviceDescriptorRegistry registry = new DeviceDescriptorRegistry();
-        MemberMapping empty = new MemberMapping();
-        registry.register("test:resistance", Resistance.TYPE, empty, empty, empty);
+        DeviceRegistry registry = new DeviceRegistry(runtime);
+        registry.register("test:resistance", Resistance.TYPE);
         var firstCodec = DeviceConfig.createCodec(registry);
-        var secondCodec = DeviceConfig.createCodec(new DeviceDescriptorRegistry());
+        var secondCodec = DeviceConfig.createCodec(new DeviceRegistry(runtime));
         BsonDocument json = BsonDocument.parse("{\"Type\":\"test:resistance\"}");
 
         assertEquals("test:resistance", firstCodec.decode(json, new ExtraInfo()).getType());

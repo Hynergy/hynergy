@@ -10,8 +10,6 @@ import dev.hynergy.electrical.primitives.sources.VoltageControlledVoltageSource;
 import dev.hynergy.electrical.primitives.sources.VoltageSource;
 import org.junit.jupiter.api.Test;
 
-import java.util.Objects;
-
 import static org.junit.jupiter.api.Assertions.assertEquals;
 
 final class PrimitiveDeviceTypeTest {
@@ -39,9 +37,8 @@ final class PrimitiveDeviceTypeTest {
     }
 
     private static void assertDefinitionId(int expectedId, DeviceType type) {
-        DeviceDefinition definition =
-            Objects.requireNonNull(type.currentDefinition(), "Primitive definition is missing");
-
-        assertEquals(expectedId, definition.id());
+        try (var runtime = ElectricalRuntime.create()) {
+            assertEquals(expectedId, runtime.register(type).definition().id());
+        }
     }
 }

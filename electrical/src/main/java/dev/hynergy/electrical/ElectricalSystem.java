@@ -215,7 +215,7 @@ public final class ElectricalSystem implements AutoCloseable {
         int generation = world.deviceGeneration(id);
         DeviceId deviceId = new DeviceId(id, generation);
 
-        device.bind(this, deviceId, definition, type.metadata());
+        device.bind(this, deviceId, definition, runtime.requireBinding(type));
 
         return device;
     }
@@ -247,7 +247,7 @@ public final class ElectricalSystem implements AutoCloseable {
         }
 
         Device device = new Device();
-        device.bind(this, id, definition, type.metadata());
+        device.bind(this, id, definition, runtime.requireBinding(type));
 
         return device;
     }
@@ -272,6 +272,7 @@ public final class ElectricalSystem implements AutoCloseable {
         requireOwned(device);
         world.requireDevice(device.id());
         device.metadata().requireParameter(parameterId);
+        device.binding().type().parameters().get(parameterId).constraints().validate(value);
         runtime.validateParameter(device.definition(), parameterId, value);
     }
 

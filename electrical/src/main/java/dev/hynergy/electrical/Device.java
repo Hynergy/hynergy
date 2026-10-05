@@ -1,181 +1,51 @@
 package dev.hynergy.electrical;
 
 import org.jspecify.annotations.Nullable;
-
 import java.util.Objects;
 
-/**
- * A runtime handle for an electrical device.
- *
- * <p>The electrical system owns the identity, native definition, and lifecycle.
- * Member IDs are native definition-order indexes, not persistent stable IDs.</p>
- *
- * <p>Gameplay integrations must set parameters through their persistent
- * component so that overrides and dirty marking are retained.</p>
- */
+/** A live device handle. Typed members must belong to its exact declaration. */
 @SuppressWarnings("resource")
 public final class Device {
     private @Nullable ElectricalSystem system;
-
     private @Nullable DeviceId deviceId;
-    private @Nullable DeviceDefinition definition;
-    private DeviceType.@Nullable Metadata metadata;
-
-    /**
-     * Creates an unbound device.
-     *
-     * <p>The electrical system binds the device after construction.</p>
-     */
-    Device() {
-    }
-
-    /**
-     * Creates an observation subscription for this device.
-     *
-     * <p>The observer ID is the zero-based order in which the device
-     * definition adds its observers.</p>
-     *
-     * @param observerId the observer ID
-     * @param listener the observation listener
-     *
-     * @return the observation subscription
-     *
-     * @throws NullPointerException if {@code listener} is null
-     * @throws IllegalStateException if the device is not bound or its system
-     *     is not usable
-     */
-    public final ObservationSubscription observe(int observerId, ObservationListener listener) {
-        return requireBound().subscribe(this, observerId, listener);
-    }
-
-    final void bind(ElectricalSystem system, DeviceId deviceId, DeviceDefinition definition, DeviceType.Metadata metadata) {
+    private @Nullable RegisteredDeviceType binding;
+    Device() { }
+    void bind(ElectricalSystem system, DeviceId deviceId, DeviceDefinition definition, RegisteredDeviceType binding) {
         requireUnbound();
-
-        Objects.requireNonNull(system, "system");
-        Objects.requireNonNull(deviceId, "deviceId");
-        Objects.requireNonNull(definition, "definition");
-
-        this.system = system;
-        this.deviceId = deviceId;
-        this.definition = definition;
-        this.metadata = Objects.requireNonNull(metadata, "metadata");
+        this.system = Objects.requireNonNull(system, "system");
+        this.deviceId = Objects.requireNonNull(deviceId, "deviceId");
+        this.binding = Objects.requireNonNull(binding, "binding");
     }
-
-    /**
-     * Checks that this live handle uses the supplied native definition.
-     *
-     * @throws IllegalArgumentException if the definitions differ
-     * @throws IllegalStateException if the handle is stale or the type is unregistered
-     */
-    public final void requireDefinition(DeviceType type) {
-        requireBound().requireDefinition(this, type);
+    RegisteredDeviceType binding() { return Objects.requireNonNull(binding, "binding"); }
+    DeviceDefinition definition() { return binding().definition(); }
+    DeviceType.Metadata metadata() { return binding().type().metadata(); }
+    boolean belongsTo(ElectricalSystem system) { return this.system == system; }
+    public DeviceId id() {
+        if (deviceId == null) throw new IllegalStateException("Electrical device is not bound");
+        return deviceId;
     }
-
-    final DeviceType.Metadata metadata() {
-        return Objects.requireNonNull(metadata, "metadata");
+    public void requireDefinition(DeviceType type) { requireBound().requireDefinition(this, type); }
+    public void setParameter(DeviceParameter parameter, double value) {
+        requireBound().setParameter(this, binding().parameterIndex(parameter), value);
     }
-
-    final DeviceDefinition definition() {
-        requireBound();
-        return Objects.requireNonNull(definition, "definition");
+    public void validateParameter(DeviceParameter parameter, double value) {
+        requireBound().validateParameter(this, binding().parameterIndex(parameter), value);
     }
-
-    /** Checks native parameter constraints without queuing a mutation. */
-    public final void validateParameter(int parameterId, double value) {
-        requireBound().validateParameter(this, parameterId, value);
+    public void attachTerminal(DeviceTerminal terminal, Wire wire) {
+        requireBound().attachTerminal(this, binding().terminalIndex(terminal), wire);
     }
-
-    final boolean belongsTo(ElectricalSystem system) {
-        return this.system == system;
+    public void detachTerminal(DeviceTerminal terminal, Wire wire) {
+        requireBound().detachTerminal(this, binding().terminalIndex(terminal), wire);
     }
-
-    /**
-     * Returns the persistent identity of this device.
-     *
-     * @return the device ID
-     * @throws IllegalStateException if the device is not bound
-     */
-    public final DeviceId id() {
-        requireBound();
-        return Objects.requireNonNull(deviceId, "Bound device identity is missing");
+    public ObservationSubscription observe(DeviceObserver observer, ObservationListener listener) {
+        return requireBound().subscribe(this, binding().observerIndex(observer), listener);
     }
-
-    /**
-     * Sets one parameter of this device.
-     *
-     * <p>The parameter ID is the zero-based order in which the device
-     * definition adds its parameters.</p>
-     *
-     * <p>If this method is called from an observation callback, the change
-     * applies to the next tick.</p>
-     *
-     * @param parameterId the parameter ID
-     * @param value the parameter value
-     * @throws IllegalArgumentException if the index or value violates the native definition
-     *
-     * @throws IllegalStateException if the device or its system is not usable
-     */
-    public final void setParameter(int parameterId, double value) {
-        requireBound().setParameter(this, parameterId, value);
+    public void destroy() { requireBound().remove(this); }
+    void requireUnbound() {
+        if (system != null) throw new IllegalStateException("Electrical device is already bound");
     }
-
-    /**
-     * Attaches one device terminal to a wire.
-     *
-     * <p>The terminal ID is the zero-based order in which the device
-     * definition adds its terminals. The wire must belong to the same
-     * electrical system as this device.</p>
-     *
-     * @param terminalId the terminal ID
-     * @param wire the wire
-     *
-     * @throws IllegalArgumentException if the wire belongs to another system
-     * @throws IllegalStateException if the device or its system is not usable
-     */
-    public final void attachTerminal(int terminalId, Wire wire) {
-        requireBound().attachTerminal(this, terminalId, wire);
-    }
-
-    /**
-     * Detaches one device terminal from a wire.
-     *
-     * <p>The wire must belong to the same electrical system as this device.</p>
-     *
-     * @param terminalId the terminal ID
-     * @param wire the wire
-     *
-     * @throws IllegalArgumentException if the wire belongs to another system
-     * @throws IllegalStateException if the device or its system is not usable
-     */
-    public final void detachTerminal(int terminalId, Wire wire) {
-        requireBound().detachTerminal(this, terminalId, wire);
-    }
-
-    /**
-     * Removes this device from its electrical system.
-     *
-     * <p>This operation makes all observation subscriptions for this device
-     * inactive. Do not use this device after this method completes.</p>
-     *
-     * @throws IllegalStateException if the device or its system is not usable
-     */
-    public final void destroy() {
-        requireBound().remove(this);
-    }
-
-    final void requireUnbound() {
-        if (system != null) {
-            throw new IllegalStateException("Electrical device is already bound");
-        }
-    }
-
     private ElectricalSystem requireBound() {
-        ElectricalSystem system = this.system;
-
-        if (system == null) {
-            throw new IllegalStateException("Electrical device is not bound");
-        }
-
+        if (system == null) throw new IllegalStateException("Electrical device is not bound");
         return system;
     }
 }
