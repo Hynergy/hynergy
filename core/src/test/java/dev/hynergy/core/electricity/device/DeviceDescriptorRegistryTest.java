@@ -1,5 +1,6 @@
 package dev.hynergy.core.electricity.device;
 
+import com.hypixel.hytale.builtin.asseteditor.event.AssetEditorRequestDataSetEvent;
 import dev.hynergy.electrical.primitives.passive.Resistance;
 import dev.hynergy.electrical.primitives.sources.VoltageSource;
 import org.junit.jupiter.api.Test;
@@ -7,6 +8,37 @@ import org.junit.jupiter.api.Test;
 import static org.junit.jupiter.api.Assertions.*;
 
 final class DeviceDescriptorRegistryTest {
+    @Test
+    void dataSetContainsSortedIdsAndReturnsIndependentResults() {
+        DeviceDescriptorRegistry registry = new DeviceDescriptorRegistry();
+        MemberMapping empty = new MemberMapping();
+        registry.register("test:z", Resistance.TYPE, empty, empty, empty);
+        registry.register("test:a", VoltageSource.TYPE, empty, empty, empty);
+
+        var event = new AssetEditorRequestDataSetEvent(
+                null, "DeviceTypes", null
+        );
+        registry.populateDataSet(event);
+        assertArrayEquals(new String[]{"test:a", "test:z"}, event.getResults());
+        event.getResults()[0] = "modified";
+        registry.freeze();
+        registry.populateDataSet(event);
+        assertArrayEquals(new String[]{"test:a", "test:z"}, event.getResults());
+    }
+
+    @Test
+    void dataSetIncludesRegistrationsMadeAfterAnEarlierRequest() {
+        DeviceDescriptorRegistry registry = new DeviceDescriptorRegistry();
+        var event = new AssetEditorRequestDataSetEvent(null, "DeviceTypes", null);
+        registry.populateDataSet(event);
+        assertArrayEquals(new String[0], event.getResults());
+
+        MemberMapping empty = new MemberMapping();
+        registry.register("test:resistance", Resistance.TYPE, empty, empty, empty);
+        registry.populateDataSet(event);
+        assertArrayEquals(new String[]{"test:resistance"}, event.getResults());
+    }
+
     @Test
     void registrationPreservesTypedDescriptorAndMappings() {
         DeviceDescriptorRegistry registry = new DeviceDescriptorRegistry();

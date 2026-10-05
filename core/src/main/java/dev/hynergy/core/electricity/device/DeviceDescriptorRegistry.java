@@ -1,5 +1,6 @@
 package dev.hynergy.core.electricity.device;
 
+import com.hypixel.hytale.builtin.asseteditor.event.AssetEditorRequestDataSetEvent;
 import dev.hynergy.electrical.Device;
 import dev.hynergy.electrical.DeviceType;
 import lombok.Getter;
@@ -15,6 +16,8 @@ import java.util.Objects;
  * <p>Registration is disabled permanently after {@link #freeze()}.</p>
  */
 public final class DeviceDescriptorRegistry {
+    public static final String DATA_SET = "DeviceTypes";
+
     private final Map<String, DeviceDescriptor<?>> descriptors = new HashMap<>();
     @Getter private boolean frozen;
 
@@ -48,6 +51,11 @@ public final class DeviceDescriptorRegistry {
     public @Nullable DeviceDescriptor<?> get(String id) {
         Objects.requireNonNull(id, "id");
         return descriptors.get(id);
+    }
+
+    /** Returns the registered IDs in stable order for the asset editor. */
+    public void populateDataSet(AssetEditorRequestDataSetEvent event) {
+        event.setResults(descriptors.keySet().stream().sorted().toArray(String[]::new));
     }
 
     /**

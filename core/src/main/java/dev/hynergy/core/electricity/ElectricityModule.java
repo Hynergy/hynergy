@@ -138,7 +138,7 @@ public final class ElectricityModule extends HynergyModule {
                                         new DefaultAssetMap<>()
                                 )
                                 .setPath("Hynergy/Electricity/Devices")
-                                .setCodec(DeviceConfig.CODEC)
+                                .setCodec(DeviceConfig.createCodec(deviceDescriptors))
                                 .setKeyFunction(DeviceConfig::getId)
                                 .build()
         );
@@ -153,6 +153,12 @@ public final class ElectricityModule extends HynergyModule {
                 AssetEditorRequestDataSetEvent.class,
                 DeviceConfig.DATA_SET,
                 DeviceConfig::populateDataSet
+        );
+
+        eventRegistry.register(
+                AssetEditorRequestDataSetEvent.class,
+                DeviceDescriptorRegistry.DATA_SET,
+                deviceDescriptors::populateDataSet
         );
 
         eventRegistry.register(
@@ -361,6 +367,10 @@ public final class ElectricityModule extends HynergyModule {
         return ElectricalPortConnection.DIRECT;
     }
 
+    /**
+     * Registers a descriptor and its runtime type.
+     * Call during plugin setup, before Hytale loads device assets.
+     */
     public <T extends Device> DeviceDescriptor<T> registerDevice(
             String id,
             DeviceType<T> type,

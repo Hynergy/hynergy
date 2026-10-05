@@ -11,6 +11,7 @@ import com.hypixel.hytale.builtin.asseteditor.event.AssetEditorRequestDataSetEve
 import com.hypixel.hytale.codec.Codec;
 import com.hypixel.hytale.codec.KeyedCodec;
 import com.hypixel.hytale.codec.codecs.array.ArrayCodec;
+import com.hypixel.hytale.codec.schema.metadata.ui.UIEditor;
 import com.hypixel.hytale.codec.validation.ValidatorCache;
 import com.hypixel.hytale.codec.validation.Validators;
 import dev.hynergy.core.electricity.ElectricalPortConnection;
@@ -33,8 +34,13 @@ public final class DeviceConfig implements JsonAssetWithMap<String, DefaultAsset
     private static final DeviceParameterConfig[] EMPTY_PARAMETERS = new DeviceParameterConfig[0];
     private static final DevicePortConfig[] EMPTY_PORTS = new DevicePortConfig[0];
 
-    public static final AssetBuilderCodec<String, DeviceConfig> CODEC =
-            AssetBuilderCodec.builder(
+    /**
+     * Creates the asset codec for the module's descriptor registry.
+     * Register descriptors during plugin setup, before Hytale loads assets.
+     */
+    public static AssetBuilderCodec<String, DeviceConfig> createCodec(DeviceDescriptorRegistry descriptors) {
+        Objects.requireNonNull(descriptors, "descriptors");
+        return AssetBuilderCodec.builder(
                                      DeviceConfig.class,
                                      DeviceConfig::new,
                                      Codec.STRING,
@@ -49,6 +55,8 @@ public final class DeviceConfig implements JsonAssetWithMap<String, DefaultAsset
                                      config -> config.type
                              )
                              .addValidator(Validators.nonEmptyString())
+                             .addValidator(new DeviceDescriptorValidator(descriptors))
+                             .metadata(new UIEditor(new UIEditor.Dropdown(DeviceDescriptorRegistry.DATA_SET)))
                              .documentation("Stable registered electrical device descriptor ID.")
                              .add()
                              .append(
@@ -72,6 +80,7 @@ public final class DeviceConfig implements JsonAssetWithMap<String, DefaultAsset
                              .documentation("Physical electrical ports exposed by this device block. May be empty.")
                              .add()
                              .build();
+    }
 
     public static final ValidatorCache<String> VALIDATOR_CACHE =
             new ValidatorCache<>(new AssetKeyValidator<>(DeviceConfig::getAssetStore));
