@@ -5,8 +5,12 @@ import dev.hynergy.core.electricity.ElectricalPortProfile;
 import dev.hynergy.core.port.PortDomain;
 import dev.hynergy.core.port.PortModule;
 import dev.hynergy.core.port.PortStandard;
+import dev.hynergy.electrical.ElectricalRuntime;
+import dev.hynergy.electrical.PrimitiveDeviceTypes;
 import dev.hynergy.electrical.primitives.passive.Resistance;
 import org.joml.Vector3i;
+import org.junit.jupiter.api.AfterEach;
+import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 
 import java.util.ArrayList;
@@ -15,16 +19,27 @@ import java.util.List;
 import static org.junit.jupiter.api.Assertions.*;
 
 final class DeviceBlockDefinitionsTest {
+    private ElectricalRuntime runtime;
+
+    @BeforeEach
+    void registerDefinition() {
+        runtime = ElectricalRuntime.create();
+        runtime.register(PrimitiveDeviceTypes.RESISTANCE);
+    }
+
+    @AfterEach
+    void closeRuntime() {
+        runtime.close();
+    }
+
     @Test
     void rebuildCompilesSharedConfigOnceAndKeepsRuntimeAndPortDefinitionsAligned() {
         DeviceDescriptorRegistry descriptors = descriptors();
         descriptors.freeze();
-        RuntimeDeviceDefinitions runtimeDefinitions = new RuntimeDeviceDefinitions();
         PortModule ports = new PortModule();
         PortStandard<ElectricalPortProfile, ElectricalPortConnection> conductor = conductorStandard(ports);
         DeviceBlockDefinitions.Publisher publisher = new DeviceBlockDefinitions.Publisher(
                 descriptors,
-                runtimeDefinitions,
                 ports,
                 conductor
         );
@@ -32,22 +47,22 @@ final class DeviceBlockDefinitionsTest {
 
         publisher.rebuild(List.of(
                 new DeviceBlockDefinitions.Binding(2, shared),
-                new DeviceBlockDefinitions.Binding(7, shared)
+                new DeviceBlockDefinitions.Binding(70, shared)
         ));
 
-        CompiledDeviceConfig atTwo = runtimeDefinitions.get(2);
-        CompiledDeviceConfig atSeven = runtimeDefinitions.get(7);
+        CompiledDeviceConfig atTwo = publisher.get(2);
+        CompiledDeviceConfig atSeven = publisher.get(70);
         assertSame(atTwo, atSeven);
         assertSame(atTwo.portDefinition(), ports.blockPorts(2));
-        assertSame(atSeven.portDefinition(), ports.blockPorts(7));
+        assertSame(atSeven.portDefinition(), ports.blockPorts(70));
 
         DeviceConfig replacement = config("test:replacement", 220.0, 9);
-        publisher.rebuild(List.of(new DeviceBlockDefinitions.Binding(7, replacement)));
+        publisher.rebuild(List.of(new DeviceBlockDefinitions.Binding(70, replacement)));
 
-        assertNull(runtimeDefinitions.get(2));
+        assertNull(publisher.get(2));
         assertNull(ports.blockPorts(2));
-        assertSame(runtimeDefinitions.get(7).portDefinition(), ports.blockPorts(7));
-        assertEquals(220.0, runtimeDefinitions.get(7).parameterDefaultAt(0));
+        assertSame(publisher.get(70).portDefinition(), ports.blockPorts(70));
+        assertEquals(220.0, publisher.get(70).parameters().get(0).defaultValue());
     }
 
     @Test
@@ -82,7 +97,6 @@ final class DeviceBlockDefinitionsTest {
         PortStandard<ElectricalPortProfile, ElectricalPortConnection> conductor = conductorStandard(ports);
         DeviceBlockDefinitions.Publisher publisher = new DeviceBlockDefinitions.Publisher(
                 descriptors,
-                new RuntimeDeviceDefinitions(),
                 ports,
                 conductor
         );
@@ -93,6 +107,28 @@ final class DeviceBlockDefinitionsTest {
                         new DeviceBlockDefinitions.Binding(0, config("test:device", 100.0, 0))
                 ))
         );
+    }
+
+    @Test
+    void nativeInvalidDefaultLeavesPublishedConfigurationsAndPortsIntact() {
+        DeviceDescriptorRegistry descriptors = descriptors();
+        descriptors.freeze();
+        PortModule ports = new PortModule();
+        var publisher = new DeviceBlockDefinitions.Publisher(descriptors, ports, conductorStandard(ports));
+        publisher.rebuild(List.of(new DeviceBlockDefinitions.Binding(2, config("test:old", 100.0, 4))));
+        CompiledDeviceConfig previous = publisher.get(2);
+        assertThrows(IllegalArgumentException.class, () -> publisher.rebuild(List.of(
+                new DeviceBlockDefinitions.Binding(70, config("test:new", 220.0, 9)),
+                new DeviceBlockDefinitions.Binding(3, config("test:invalid", 0.0, 7)))));
+        assertSame(previous, publisher.get(2));
+        assertSame(previous.portDefinition(), ports.blockPorts(2));
+        assertNull(publisher.get(70));
+        assertNull(publisher.get(3));
+        assertNull(ports.blockPorts(70));
+        assertNull(ports.blockPorts(3));
+        publisher.rebuild(List.of(new DeviceBlockDefinitions.Binding(70, config("test:new", 220.0, 9))));
+        assertNull(publisher.get(2));
+        assertEquals(220.0, publisher.get(70).parameter(0).defaultValue());
     }
 
     private static DeviceDescriptorRegistry descriptors() {

@@ -43,6 +43,17 @@ public final class MemberMapping {
         return nativeIndexes[stableId];
     }
 
+    void validateAgainst(String descriptorId, String member, int count) {
+        for (int stableId = 0; stableId < nativeIndexes.length; stableId++) {
+            int nativeIndex = nativeIndexes[stableId];
+            if (nativeIndex >= count) {
+                throw new IllegalArgumentException("Device descriptor " + descriptorId + " maps "
+                        + member + " stable ID " + stableId + " to native index " + nativeIndex
+                        + ", outside [0, " + count + ")");
+            }
+        }
+    }
+
     private static void validate(int[] nativeIndexes) {
         for (int stableId = 0; stableId < nativeIndexes.length; stableId++) {
             int nativeIndex = nativeIndexes[stableId];

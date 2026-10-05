@@ -18,8 +18,8 @@ final class DeviceComponentTest {
             DeviceDescriptor descriptor = new DeviceDescriptor("test:voltage", VoltageSource.TYPE,
                     new MemberMapping(0), new MemberMapping(0, 1), new MemberMapping(0, 1));
             CompiledDeviceConfig compiled = new CompiledDeviceConfig(descriptor,
-                    new int[]{0}, new int[]{0}, new double[]{0.0},
-                    new int[0], new int[0], new int[0], BlockPortDefinition.of());
+                java.util.List.of(new CompiledDeviceConfig.ParameterBinding(0, 0, 0.0)),
+                java.util.List.of(), BlockPortDefinition.of());
             DeviceComponent component = new DeviceComponent("test:voltage");
             java.util.ArrayList<Long> saved = new java.util.ArrayList<>();
             ElectricalDeviceSystem.bindDevice(component, compiled, system,
@@ -251,15 +251,8 @@ final class DeviceComponentTest {
                 new MemberMapping(observerMapping)
         );
 
-        return new CompiledDeviceConfig(
-                descriptor,
-                new int[]{stableParameterId},
-                new int[]{0},
-                new double[]{defaultValue},
-                new int[0],
-                new int[0],
-                new int[0],
-                BlockPortDefinition.of()
-        );
+        return new CompiledDeviceConfig(descriptor,
+                java.util.List.of(new CompiledDeviceConfig.ParameterBinding(stableParameterId, 0, defaultValue)),
+                java.util.List.of(), BlockPortDefinition.of());
     }
 }

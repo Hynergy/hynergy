@@ -31,5 +31,8 @@ public record DeviceDescriptor(
         if (id.isBlank()) {
             throw new IllegalArgumentException("Device descriptor id must not be blank");
         }
+        parameters.validateAgainst(id, "parameter", type.parameterCount());
+        terminals.validateAgainst(id, "terminal", type.terminalCount());
+        observers.validateAgainst(id, "observer", type.observerCount());
     }
 }

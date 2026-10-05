@@ -28,9 +28,9 @@ final class DeviceWireConnectionsTest {
     void wireFirstDiscoveryUsesTheSameAttachments() {
         try (Fixture fixture = new Fixture(false)) {
             var dedup = new DeviceWireConnections.AttachmentDedup();
-            for (int index = 0; index < fixture.compiled.portCount(); index++) {
-                int terminal = fixture.compiled.nativeTerminalIdAt(index);
-                fixture.ports.discovery().discover(fixture, 0, 0, 0, fixture.compiled.portIdAt(index),
+            for (int index = 0; index < fixture.compiled.ports().size(); index++) {
+                int terminal = fixture.compiled.ports().get(index).nativeTerminalId();
+                fixture.ports.discovery().discover(fixture, 0, 0, 0, fixture.compiled.ports().get(index).portId(),
                         fixture.domain, (x, y, z, portId, connection, sourceFirst) ->
                                 DeviceWireConnections.attachIfNew(fixture.resistance, terminal,
                                         x == -1 ? fixture.positive : fixture.negative, dedup));
@@ -164,6 +164,7 @@ final class DeviceWireConnectionsTest {
                     (first, second, geometry) ->
                             first.normalX() == -second.normalX() ? ElectricalPortConnection.DIRECT : null);
             PortModuleTestAccess.freeze(ports);
+            runtime.register(Resistance.TYPE);
             var descriptors = new DeviceDescriptorRegistry();
             descriptors.register("test:resistance", Resistance.TYPE,
                     new MemberMapping(-1, -1, -1, -1, 0),

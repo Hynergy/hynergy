@@ -31,9 +31,9 @@ public final class DeviceWireConnections {
         if (device == null || compiled == null) {
             return false;
         }
-        for (int index = 0; index < compiled.portCount(); index++) {
-            if (compiled.portIdAt(index) == portId) {
-                return attachIfNew(device, compiled.nativeTerminalIdAt(index), wire, dedup);
+        for (var port : compiled.ports()) {
+            if (port.portId() == portId) {
+                return attachIfNew(device, port.nativeTerminalId(), wire, dedup);
             }
         }
         return false;

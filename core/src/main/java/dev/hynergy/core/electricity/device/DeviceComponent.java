@@ -91,17 +91,17 @@ public final class DeviceComponent implements Component<ChunkStore> {
 
         CompiledDeviceConfig compiled = requireCompiledConfig();
         Device device = requireDevice();
-        int defaultIndex = compiled.findParameterDefault(stableParameterId);
-        if (defaultIndex < 0) {
+        CompiledDeviceConfig.ParameterBinding parameter = compiled.parameter(stableParameterId);
+        if (parameter == null) {
             throw new IllegalArgumentException(
                     "Stable parameter ID is not configurable by this device config: " + stableParameterId
             );
         }
 
-        device.setParameter(compiled.nativeParameterIdAt(defaultIndex), value);
+        device.setParameter(parameter.nativeId(), value);
 
         boolean changed;
-        if (Double.doubleToLongBits(value) == Double.doubleToLongBits(compiled.parameterDefaultAt(defaultIndex))) {
+        if (Double.doubleToLongBits(value) == Double.doubleToLongBits(parameter.defaultValue())) {
             changed = overrides.remove(stableParameterId);
         } else {
             changed = !overrides.contains(stableParameterId)

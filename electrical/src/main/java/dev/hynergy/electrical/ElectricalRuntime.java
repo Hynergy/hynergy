@@ -71,6 +71,10 @@ public final class ElectricalRuntime implements AutoCloseable {
         DeviceDefinition existing = type.existingDefinition(this);
 
         if (existing != null) {
+            if (!type.registeredWith(this)) {
+                type.bind(this, existing, type.metadata());
+                boundTypes.add(type);
+            }
             return existing;
         }
 
@@ -148,7 +152,7 @@ public final class ElectricalRuntime implements AutoCloseable {
             boundTypes.add(type);
 
             try {
-                type.bind(this, definition);
+                type.bind(this, definition, builder.metadata());
             } catch (RuntimeException | Error failure) {
                 boundTypes.removeLast();
                 throw failure;

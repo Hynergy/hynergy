@@ -17,15 +17,18 @@ import java.util.function.Consumer;
  */
 public final class DeviceType {
     private final @Nullable DeviceDefinition primitiveDefinition;
+    private final @Nullable Metadata primitiveMetadata;
     private final @Nullable Consumer<DeviceDefinitionBuilder> definitionBuilder;
 
     private volatile @Nullable Registration registration;
 
     private DeviceType(
-        @Nullable DeviceDefinition primitiveDefinition,
-        @Nullable Consumer<DeviceDefinitionBuilder> definitionBuilder
+            @Nullable DeviceDefinition primitiveDefinition,
+            @Nullable Metadata primitiveMetadata,
+            @Nullable Consumer<DeviceDefinitionBuilder> definitionBuilder
     ) {
         this.primitiveDefinition = primitiveDefinition;
+        this.primitiveMetadata = primitiveMetadata;
         this.definitionBuilder = definitionBuilder;
     }
 
@@ -38,20 +41,66 @@ public final class DeviceType {
      * the callback returns.</p>
      *
      * @param definitionBuilder the function that builds the electrical
-     *     definition
-     *
+     *                          definition
      * @return the device type
-     *
      * @throws NullPointerException if an argument is null
      */
     public static DeviceType create(
-        Consumer<DeviceDefinitionBuilder> definitionBuilder
+            Consumer<DeviceDefinitionBuilder> definitionBuilder
     ) {
-        return new DeviceType(null, Objects.requireNonNull(definitionBuilder, "definitionBuilder"));
+        return new DeviceType(null, null, Objects.requireNonNull(definitionBuilder, "definitionBuilder"));
     }
 
     public static DeviceType primitive(int definitionId) {
-        return new DeviceType(new DeviceDefinition(definitionId), null);
+        Metadata metadata = switch (definitionId) {
+            case 1, 2, 3, 4, 7, 8 -> new Metadata(1, 2, 2);
+            case 5, 6 -> new Metadata(1, 4, 3);
+            case 9, 13 -> new Metadata(3, 4, 3);
+            case 10 -> new Metadata(4, 3, 3);
+            case 11 -> new Metadata(0, 4, 3);
+            case 12 -> new Metadata(2, 2, 2);
+            case 14, 15, 16, 17 -> new Metadata(3, 5, 4);
+            case 18 -> new Metadata(4, 4, 3);
+            default -> throw new IllegalArgumentException("Unknown primitive definition ID: " + definitionId);
+        };
+        return new DeviceType(new DeviceDefinition(definitionId), metadata, null);
+    }
+
+    public Metadata metadata() {
+        if (primitiveMetadata != null) {
+            return primitiveMetadata;
+        }
+        Registration registration = this.registration;
+        if (registration == null) {
+            throw new IllegalStateException("Device type is not registered");
+        }
+        return registration.metadata();
+    }
+
+    public int parameterCount() {
+        return metadata().parameterCount();
+    }
+
+    public int terminalCount() {
+        return metadata().terminalCount();
+    }
+
+    public int observerCount() {
+        return metadata().observerCount();
+    }
+
+    public void validateParameter(int parameterId, double value) {
+        Registration registration = this.registration;
+        if (registration == null) {
+            throw new IllegalStateException("Device type is not registered");
+        }
+        registration.metadata().requireParameter(parameterId);
+        registration.runtime().validateParameter(registration.definition(), parameterId, value);
+    }
+
+    boolean registeredWith(ElectricalRuntime runtime) {
+        Registration registration = this.registration;
+        return registration != null && registration.runtime() == runtime;
     }
 
     void buildDefinition(DeviceDefinitionBuilder builder) {
@@ -104,13 +153,10 @@ public final class DeviceType {
         return definition;
     }
 
-    synchronized void bind(ElectricalRuntime runtime, DeviceDefinition definition) {
+    synchronized void bind(ElectricalRuntime runtime, DeviceDefinition definition, Metadata metadata) {
         Objects.requireNonNull(runtime, "runtime");
         Objects.requireNonNull(definition, "definition");
 
-        if (primitiveDefinition != null) {
-            throw new IllegalStateException("Primitive device type cannot be runtime-bound");
-        }
 
         Registration registration = this.registration;
 
@@ -118,7 +164,7 @@ public final class DeviceType {
             throw new IllegalStateException("Device type is already bound to this electrical runtime");
         }
 
-        this.registration = new Registration(runtime, definition);
+        this.registration = new Registration(runtime, definition, Objects.requireNonNull(metadata, "metadata"));
     }
 
     synchronized void unbind(ElectricalRuntime runtime) {
@@ -129,6 +175,29 @@ public final class DeviceType {
         }
     }
 
-    private record Registration(ElectricalRuntime runtime, DeviceDefinition definition) {
+    public record Metadata(int parameterCount, int terminalCount, int observerCount) {
+        public Metadata {
+            if (parameterCount < 0 || terminalCount < 0 || observerCount < 0) {
+                throw new IllegalArgumentException("Device member counts must be non-negative");
+            }
+        }
+
+        void requireParameter(int id) {
+            requireMember(id, parameterCount, "parameter");
+        }
+
+        void requireTerminal(int id) {
+            requireMember(id, terminalCount, "terminal");
+        }
+
+        private static void requireMember(int id, int count, String member) {
+            if (id < 0 || id >= count) {
+                throw new IllegalArgumentException("Device " + member + " index " + id
+                        + " is outside [0, " + count + ")");
+            }
+        }
+    }
+
+    private record Registration(ElectricalRuntime runtime, DeviceDefinition definition, Metadata metadata) {
     }
 }

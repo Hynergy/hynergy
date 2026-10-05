@@ -29,8 +29,8 @@ final class ElectricalDeviceSystemTest {
             component.overrides().set(9, 123.0);
             CompiledDeviceConfig valid = compiled(4, 20.0);
             CompiledDeviceConfig invalid = new CompiledDeviceConfig(valid.descriptor(),
-                    new int[]{4, 5}, new int[]{0, 1}, new double[]{20.0, 1.0},
-                    new int[0], new int[0], new int[0], BlockPortDefinition.of());
+                java.util.List.of(new CompiledDeviceConfig.ParameterBinding(4, 0, 20.0), new CompiledDeviceConfig.ParameterBinding(5, 1, 1.0)),
+                java.util.List.of(), BlockPortDefinition.of());
             assertThrows(IllegalArgumentException.class,
                     () -> ElectricalDeviceSystem.bindDevice(component, invalid, system, () -> {
                     }));
@@ -254,16 +254,9 @@ final class ElectricalDeviceSystemTest {
         );
 
         int nativeParameterId = descriptor.parameters().nativeIndex(stableParameterId);
-        return new CompiledDeviceConfig(
-                descriptor,
-                new int[]{stableParameterId},
-                new int[]{nativeParameterId},
-                new double[]{defaultValue},
-                new int[0],
-                new int[0],
-                new int[0],
-                BlockPortDefinition.of()
-        );
+        return new CompiledDeviceConfig(descriptor,
+                java.util.List.of(new CompiledDeviceConfig.ParameterBinding(stableParameterId, nativeParameterId, defaultValue)),
+                java.util.List.of(), BlockPortDefinition.of());
     }
 
     private static CompiledDeviceConfig compiledWithoutDefault(int stableParameterId, int nativeParameterId) {
@@ -274,16 +267,9 @@ final class ElectricalDeviceSystemTest {
                 new MemberMapping(0, 1),
                 new MemberMapping(0, 1)
         );
-        return new CompiledDeviceConfig(
-                descriptor,
-                new int[0],
-                new int[0],
-                new double[0],
-                new int[0],
-                new int[0],
-                new int[0],
-                BlockPortDefinition.of()
-        );
+        return new CompiledDeviceConfig(descriptor,
+                java.util.List.of(),
+                java.util.List.of(), BlockPortDefinition.of());
     }
 
     private static MemberMapping mappingAt(int stableId, int nativeId) {

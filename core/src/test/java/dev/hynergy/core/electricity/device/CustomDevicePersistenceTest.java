@@ -27,29 +27,29 @@ final class CustomDevicePersistenceTest {
                     .elementParameter(resistance).endElement();
             builder.addChildObserver(0, 1);
         });
-        DeviceDescriptorRegistry registry = new DeviceDescriptorRegistry();
-        DeviceDescriptor descriptor = registry.register("test:custom", type,
-                new MemberMapping(-1, -1, -1, -1, 0),
-                new MemberMapping(-1, -1, 0, -1, -1, 1),
-                new MemberMapping(-1, -1, -1, -1, -1, -1, 0));
-        registry.freeze();
-        PortModule ports = new PortModule();
-        var domain = ports.<ElectricalPortConnection>registerDomain("test:electrical");
-        var conductor = ports.registerStandard("test:conductor", domain,
-                ElectricalPortProfile.class, (first, second, geometry) -> ElectricalPortConnection.DIRECT);
-        DeviceConfig config = new DeviceConfig("test:asset", "test:custom",
-                new DeviceParameterConfig[]{new DeviceParameterConfig(4, 10.0)},
-                new DevicePortConfig[]{
-                        new DevicePortConfig(9, 2, null, new Vector3i(1, 0, 0)),
-                        new DevicePortConfig(12, 5, null, new Vector3i(-1, 0, 0))});
-        CompiledDeviceConfig compiled = config.compile(registry, conductor);
-        assertSame(descriptor, compiled.descriptor());
-        assertEquals(9, compiled.portIdAt(0));
-        assertEquals(0, compiled.nativeTerminalIdAt(0));
-        assertEquals(1, compiled.nativeTerminalIdAt(1));
-        AtomicInteger dirty = new AtomicInteger();
         try (ElectricalRuntime runtime = ElectricalRuntime.create()) {
             runtime.register(type);
+            DeviceDescriptorRegistry registry = new DeviceDescriptorRegistry();
+            DeviceDescriptor descriptor = registry.register("test:custom", type,
+                    new MemberMapping(-1, -1, -1, -1, 0),
+                    new MemberMapping(-1, -1, 0, -1, -1, 1),
+                    new MemberMapping(-1, -1, -1, -1, -1, -1, 0));
+            registry.freeze();
+            PortModule ports = new PortModule();
+            var domain = ports.<ElectricalPortConnection>registerDomain("test:electrical");
+            var conductor = ports.registerStandard("test:conductor", domain,
+                    ElectricalPortProfile.class, (first, second, geometry) -> ElectricalPortConnection.DIRECT);
+            DeviceConfig config = new DeviceConfig("test:asset", "test:custom",
+                    new DeviceParameterConfig[]{new DeviceParameterConfig(4, 10.0)},
+                    new DevicePortConfig[]{
+                            new DevicePortConfig(9, 2, null, new Vector3i(1, 0, 0)),
+                            new DevicePortConfig(12, 5, null, new Vector3i(-1, 0, 0))});
+            CompiledDeviceConfig compiled = config.compile(registry, conductor);
+            assertSame(descriptor, compiled.descriptor());
+            assertEquals(9, compiled.ports().get(0).portId());
+            assertEquals(0, compiled.ports().get(0).nativeTerminalId());
+            assertEquals(1, compiled.ports().get(1).nativeTerminalId());
+            AtomicInteger dirty = new AtomicInteger();
             try (ElectricalSystem system = runtime.createSystem(20)) {
                 DeviceComponent component = new DeviceComponent("test:asset");
                 ElectricalDeviceSystem.bindDevice(component, compiled, system, dirty::incrementAndGet);
@@ -61,8 +61,8 @@ final class CustomDevicePersistenceTest {
                 Wire negative = system.createWire();
                 source.attachPositive(positive);
                 source.attachNegative(negative);
-                handle.attachTerminal(compiled.nativeTerminalIdAt(0), positive);
-                handle.attachTerminal(compiled.nativeTerminalIdAt(1), negative);
+                handle.attachTerminal(compiled.ports().get(0).nativeTerminalId(), positive);
+                handle.attachTerminal(compiled.ports().get(1).nativeTerminalId(), negative);
                 ArrayList<Double> currents = new ArrayList<>();
                 component.observe(6, (status, value) -> currents.add(value));
                 component.setParameter(4, 20.0);

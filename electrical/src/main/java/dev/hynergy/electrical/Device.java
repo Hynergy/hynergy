@@ -19,6 +19,7 @@ public final class Device {
 
     private @Nullable DeviceId deviceId;
     private @Nullable DeviceDefinition definition;
+    private DeviceType.@Nullable Metadata metadata;
 
     /**
      * Creates an unbound device.
@@ -47,7 +48,7 @@ public final class Device {
         return requireBound().subscribe(this, observerId, listener);
     }
 
-    final void bind(ElectricalSystem system, DeviceId deviceId, DeviceDefinition definition) {
+    final void bind(ElectricalSystem system, DeviceId deviceId, DeviceDefinition definition, DeviceType.Metadata metadata) {
         requireUnbound();
 
         Objects.requireNonNull(system, "system");
@@ -57,6 +58,7 @@ public final class Device {
         this.system = system;
         this.deviceId = deviceId;
         this.definition = definition;
+        this.metadata = Objects.requireNonNull(metadata, "metadata");
     }
 
     /**
@@ -67,6 +69,10 @@ public final class Device {
      */
     public final void requireDefinition(DeviceType type) {
         requireBound().requireDefinition(this, type);
+    }
+
+    final DeviceType.Metadata metadata() {
+        return Objects.requireNonNull(metadata, "metadata");
     }
 
     final DeviceDefinition definition() {

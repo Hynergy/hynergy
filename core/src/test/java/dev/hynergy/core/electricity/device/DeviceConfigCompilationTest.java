@@ -3,13 +3,43 @@ package dev.hynergy.core.electricity.device;
 import dev.hynergy.core.electricity.ElectricalPortConnection;
 import dev.hynergy.core.electricity.ElectricalPortProfile;
 import dev.hynergy.core.port.*;
-import dev.hynergy.electrical.primitives.passive.Resistance;
+import dev.hynergy.electrical.DeviceType;
+import dev.hynergy.electrical.ElectricalRuntime;
+import dev.hynergy.electrical.PrimitiveDeviceTypes;
 import org.joml.Vector3i;
+import org.junit.jupiter.api.AfterEach;
+import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 
 import static org.junit.jupiter.api.Assertions.*;
 
 final class DeviceConfigCompilationTest {
+    private ElectricalRuntime runtime;
+    private DeviceType type;
+
+    @BeforeEach
+    void registerDefinition() {
+        runtime = ElectricalRuntime.create();
+        type = DeviceType.create(builder -> {
+            int positive = builder.addTerminal();
+            int negative = builder.addTerminal();
+            int first = builder.addParameter(dev.hynergy.electrical.DeviceDefinitionBuilder.Bound.inclusive(1.0), null, true);
+            int second = builder.addParameter(dev.hynergy.electrical.DeviceDefinitionBuilder.Bound.inclusive(1.0), null, true);
+            builder.beginElement(PrimitiveDeviceTypes.RESISTANCE)
+                   .elementTerminal(positive).elementTerminal(negative).elementParameter(first).endElement();
+            builder.beginElement(PrimitiveDeviceTypes.RESISTANCE)
+                   .elementTerminal(positive).elementTerminal(negative).elementParameter(second).endElement();
+            builder.addChildObserver(0, 1);
+            builder.addChildObserver(1, 1);
+        });
+        runtime.register(type);
+    }
+
+    @AfterEach
+    void closeRuntime() {
+        runtime.close();
+    }
+
     @Test
     void compileMapsStableIdsOnceAndPreservesStableGaps() {
         DeviceDescriptorRegistry registry = registry(
@@ -34,24 +64,22 @@ final class DeviceConfigCompilationTest {
         CompiledDeviceConfig compiled = config.compile(registry, conductor);
 
         assertSame(registry.require("test:resistance"), compiled.descriptor());
-        assertEquals(2, compiled.parameterCount());
-        assertEquals(3, compiled.stableParameterIdAt(0));
-        assertEquals(1, compiled.nativeParameterIdAt(0));
-        assertEquals(470.0, compiled.parameterDefaultAt(0));
-        assertEquals(1, compiled.stableParameterIdAt(1));
-        assertEquals(0, compiled.nativeParameterIdAt(1));
-        assertEquals(100.0, compiled.parameterDefaultAt(1));
+        assertEquals(2, compiled.parameters().size());
+        assertEquals(3, compiled.parameters().get(0).stableId());
+        assertEquals(1, compiled.parameters().get(0).nativeId());
+        assertEquals(470.0, compiled.parameters().get(0).defaultValue());
+        assertEquals(1, compiled.parameters().get(1).stableId());
+        assertEquals(0, compiled.parameters().get(1).nativeId());
+        assertEquals(100.0, compiled.parameters().get(1).defaultValue());
         assertEquals(-1, compiled.nativeParameterId(2));
         assertEquals(1, compiled.nativeParameterId(3));
         assertEquals(1, compiled.nativeObserverId(2));
 
-        assertEquals(2, compiled.portCount());
-        assertEquals(7, compiled.portIdAt(0));
-        assertEquals(2, compiled.stableTerminalIdAt(0));
-        assertEquals(1, compiled.nativeTerminalIdAt(0));
-        assertEquals(2, compiled.portIdAt(1));
-        assertEquals(1, compiled.stableTerminalIdAt(1));
-        assertEquals(0, compiled.nativeTerminalIdAt(1));
+        assertEquals(2, compiled.ports().size());
+        assertEquals(7, compiled.ports().get(0).portId());
+        assertEquals(1, compiled.ports().get(0).nativeTerminalId());
+        assertEquals(2, compiled.ports().get(1).portId());
+        assertEquals(0, compiled.ports().get(1).nativeTerminalId());
 
         BlockPortDefinition ports = compiled.portDefinition();
         assertEquals(2, ports.size());
@@ -186,17 +214,30 @@ final class DeviceConfigCompilationTest {
 
         CompiledDeviceConfig compiled = config.compile(registry, conductorStandard());
 
-        assertEquals(0, compiled.portCount());
+        assertEquals(0, compiled.ports().size());
         assertEquals(0, compiled.portDefinition().size());
     }
 
-    private static DeviceDescriptorRegistry registry(
+    @Test
+    void compiledBindingsRemainImmutableWhenSourceListsChange() {
+        DeviceDescriptorRegistry registry = registry(new MemberMapping(0), new MemberMapping(), new MemberMapping());
+        var parameters = new java.util.ArrayList<CompiledDeviceConfig.ParameterBinding>();
+        parameters.add(new CompiledDeviceConfig.ParameterBinding(0, 0, 100.0));
+        CompiledDeviceConfig compiled = new CompiledDeviceConfig(registry.require("test:resistance"),
+                parameters, java.util.List.of(), BlockPortDefinition.of());
+        parameters.clear();
+        assertEquals(100.0, compiled.parameter(0).defaultValue());
+        assertThrows(UnsupportedOperationException.class, () -> compiled.parameters().clear());
+        assertNull(compiled.parameter(1));
+    }
+
+    private DeviceDescriptorRegistry registry(
             MemberMapping parameters,
             MemberMapping terminals,
             MemberMapping observers
     ) {
         DeviceDescriptorRegistry registry = new DeviceDescriptorRegistry();
-        registry.register("test:resistance", Resistance.TYPE, parameters, terminals, observers);
+        registry.register("test:resistance", type, parameters, terminals, observers);
         return registry;
     }
 

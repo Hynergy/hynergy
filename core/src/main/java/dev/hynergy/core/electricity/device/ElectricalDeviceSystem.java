@@ -37,7 +37,7 @@ public final class ElectricalDeviceSystem extends RefSystem<ChunkStore> {
     private final ResourceType<ChunkStore, ElectricalSystemResource> electricalSystemResourceType;
     private final ComponentType<ChunkStore, DeviceComponent> deviceComponentType;
     private final ComponentType<ChunkStore, WireComponent> wireComponentType;
-    private final RuntimeDeviceDefinitions runtimeDefinitions;
+    private final DeviceBlockDefinitions runtimeDefinitions;
     private final PortModule portModule;
     private final PortDomain<ElectricalPortConnection> electricalPortDomain;
     private final Query<ChunkStore> query;
@@ -53,7 +53,7 @@ public final class ElectricalDeviceSystem extends RefSystem<ChunkStore> {
             ResourceType<ChunkStore, ElectricalSystemResource> electricalSystemResourceType,
             ComponentType<ChunkStore, DeviceComponent> deviceComponentType,
             ComponentType<ChunkStore, WireComponent> wireComponentType,
-            RuntimeDeviceDefinitions runtimeDefinitions,
+            DeviceBlockDefinitions runtimeDefinitions,
             PortModule portModule,
             PortDomain<ElectricalPortConnection> electricalPortDomain
     ) {
@@ -193,7 +193,7 @@ public final class ElectricalDeviceSystem extends RefSystem<ChunkStore> {
         if (device == null) {
             throw new IllegalStateException("New DeviceComponent is not runtime-bound");
         }
-        if (compiled.portCount() == 0) {
+        if (compiled.ports().isEmpty()) {
             return;
         }
 
@@ -208,14 +208,14 @@ public final class ElectricalDeviceSystem extends RefSystem<ChunkStore> {
         scratch.begin(device, chunkStore, commandBuffer, wireComponentType);
 
         try {
-            for (int index = 0; index < compiled.portCount(); index++) {
-                scratch.nativeTerminalId = compiled.nativeTerminalIdAt(index);
+            for (var port : compiled.ports()) {
+                scratch.nativeTerminalId = port.nativeTerminalId();
                 portModule.discovery().discover(
                         worldView,
                         scratch.sourcePosition.x,
                         scratch.sourcePosition.y,
                         scratch.sourcePosition.z,
-                        compiled.portIdAt(index),
+                        port.portId(),
                         electricalPortDomain,
                         scratch
                 );
@@ -276,14 +276,14 @@ public final class ElectricalDeviceSystem extends RefSystem<ChunkStore> {
 
         // Check the complete intent before queuing any writes to a restored device.
         // A later invalid value must not leave earlier values queued for application.
-        for (int index = 0; index < compiled.parameterCount(); index++) {
-            int stableId = compiled.stableParameterIdAt(index);
-            double value = overrides.getOrDefault(stableId, compiled.parameterDefaultAt(index));
-            device.validateParameter(compiled.nativeParameterIdAt(index), value);
+        for (var parameter : compiled.parameters()) {
+            int stableId = parameter.stableId();
+            double value = overrides.getOrDefault(stableId, parameter.defaultValue());
+            device.validateParameter(parameter.nativeId(), value);
         }
         for (int index = 0; index < overrides.size(); index++) {
             int stableId = overrides.stableIdAt(index);
-            if (compiled.findParameterDefault(stableId) >= 0) {
+            if (compiled.parameter(stableId) != null) {
                 continue;
             }
             int nativeId = compiled.nativeParameterId(stableId);
@@ -292,15 +292,15 @@ public final class ElectricalDeviceSystem extends RefSystem<ChunkStore> {
             }
         }
 
-        for (int index = 0; index < compiled.parameterCount(); index++) {
-            int stableId = compiled.stableParameterIdAt(index);
-            double value = overrides.getOrDefault(stableId, compiled.parameterDefaultAt(index));
-            device.setParameter(compiled.nativeParameterIdAt(index), value);
+        for (var parameter : compiled.parameters()) {
+            int stableId = parameter.stableId();
+            double value = overrides.getOrDefault(stableId, parameter.defaultValue());
+            device.setParameter(parameter.nativeId(), value);
         }
 
         for (int index = 0; index < overrides.size(); index++) {
             int stableId = overrides.stableIdAt(index);
-            if (compiled.findParameterDefault(stableId) >= 0) {
+            if (compiled.parameter(stableId) != null) {
                 continue;
             }
 

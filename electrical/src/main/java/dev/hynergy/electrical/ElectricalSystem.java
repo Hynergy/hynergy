@@ -215,7 +215,7 @@ public final class ElectricalSystem implements AutoCloseable {
         int generation = world.deviceGeneration(id);
         DeviceId deviceId = new DeviceId(id, generation);
 
-        device.bind(this, deviceId, definition);
+        device.bind(this, deviceId, definition, type.metadata());
 
         return device;
     }
@@ -247,7 +247,7 @@ public final class ElectricalSystem implements AutoCloseable {
         }
 
         Device device = new Device();
-        device.bind(this, id, definition);
+        device.bind(this, id, definition, type.metadata());
 
         return device;
     }
@@ -271,6 +271,7 @@ public final class ElectricalSystem implements AutoCloseable {
     void validateParameter(Device device, int parameterId, double value) {
         requireOwned(device);
         world.requireDevice(device.id());
+        device.metadata().requireParameter(parameterId);
         runtime.validateParameter(device.definition(), parameterId, value);
     }
 
@@ -279,6 +280,8 @@ public final class ElectricalSystem implements AutoCloseable {
         requireOwned(wire);
 
         DeviceId id = device.id();
+        world.requireDevice(id);
+        device.metadata().requireTerminal(terminalId);
         world.attachTerminal(wire.id(), id.value(), id.generation(), terminalId);
     }
 
@@ -287,6 +290,8 @@ public final class ElectricalSystem implements AutoCloseable {
         requireOwned(wire);
 
         DeviceId id = device.id();
+        world.requireDevice(id);
+        device.metadata().requireTerminal(terminalId);
         world.detachTerminal(wire.id(), id.value(), id.generation(), terminalId);
     }
 
@@ -297,6 +302,7 @@ public final class ElectricalSystem implements AutoCloseable {
 
         DeviceId deviceId = device.id();
 
+        world.requireDevice(deviceId);
         int subscriptionId = world.subscribeObserver(deviceId.value(), deviceId.generation(), observerId);
 
         try {

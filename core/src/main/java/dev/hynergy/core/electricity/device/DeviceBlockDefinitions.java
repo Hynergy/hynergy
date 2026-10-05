@@ -9,11 +9,13 @@ import dev.hynergy.core.port.PortModule;
 import dev.hynergy.core.port.PortStandard;
 import it.unimi.dsi.fastutil.ints.IntIterator;
 import it.unimi.dsi.fastutil.ints.IntOpenHashSet;
+import org.jspecify.annotations.Nullable;
 
 import java.util.ArrayList;
 import java.util.IdentityHashMap;
 import java.util.Map;
 import java.util.Objects;
+import java.util.concurrent.atomic.AtomicReferenceArray;
 
 /**
  * Publishes immutable compiled device configurations for runtime block indexes.
@@ -29,13 +31,19 @@ public final class DeviceBlockDefinitions {
 
     public DeviceBlockDefinitions(
             DeviceDescriptorRegistry descriptors,
-            RuntimeDeviceDefinitions runtimeDefinitions,
             PortModule portModule,
             PortStandard<ElectricalPortProfile, ElectricalPortConnection> conductorStandard,
             ComponentType<ChunkStore, DeviceComponent> deviceComponentType
     ) {
         this.deviceComponentType = Objects.requireNonNull(deviceComponentType, "deviceComponentType");
-        this.publisher = new Publisher(descriptors, runtimeDefinitions, portModule, conductorStandard);
+        this.publisher = new Publisher(descriptors, portModule, conductorStandard);
+    }
+
+    /**
+     * Returns the published configuration for a runtime block type.
+     */
+    public @Nullable CompiledDeviceConfig get(int blockTypeId) {
+        return publisher.get(blockTypeId);
     }
 
     public synchronized void rebuild() {
@@ -94,6 +102,35 @@ public final class DeviceBlockDefinitions {
     }
 
     static final class Publisher {
+        private volatile AtomicReferenceArray<CompiledDeviceConfig> definitions = new AtomicReferenceArray<>(16);
+
+        @Nullable CompiledDeviceConfig get(int blockTypeId) {
+            if (blockTypeId < 0) {
+                return null;
+            }
+            AtomicReferenceArray<CompiledDeviceConfig> current = definitions;
+            return blockTypeId < current.length() ? current.get(blockTypeId) : null;
+        }
+
+        private void publish(int blockTypeId, CompiledDeviceConfig compiled) {
+            AtomicReferenceArray<CompiledDeviceConfig> current = definitions;
+            if (blockTypeId >= current.length()) {
+                int newLength = current.length();
+                while (blockTypeId >= newLength) {
+                    newLength = Math.multiplyExact(newLength, 2);
+                }
+                var grown = new AtomicReferenceArray<CompiledDeviceConfig>(newLength);
+                for (int index = 0; index < current.length(); index++) {
+                    grown.set(index, current.get(index));
+                }
+                // Publish the new entry before readers can observe the grown table.
+                grown.set(blockTypeId, compiled);
+                definitions = grown;
+            } else {
+                current.set(blockTypeId, compiled);
+            }
+        }
+
         private final DeviceDescriptorRegistry descriptors;
         private final PortStandard<ElectricalPortProfile, ElectricalPortConnection> conductorStandard;
         private final Sink sink;
@@ -105,14 +142,13 @@ public final class DeviceBlockDefinitions {
 
         Publisher(
                 DeviceDescriptorRegistry descriptors,
-                RuntimeDeviceDefinitions runtimeDefinitions,
                 PortModule portModule,
                 PortStandard<ElectricalPortProfile, ElectricalPortConnection> conductorStandard
         ) {
             this(
                     descriptors,
                     conductorStandard,
-                    new RuntimeSink(runtimeDefinitions, portModule)
+                    new RuntimeSink(portModule)
             );
         }
 
@@ -150,6 +186,7 @@ public final class DeviceBlockDefinitions {
             }
 
             for (PreparedBinding binding : preparedBindings) {
+                publish(binding.blockTypeIndex(), binding.compiled());
                 sink.set(binding.blockTypeIndex(), binding.compiled());
                 rebuiltBlockTypes.add(binding.blockTypeIndex());
             }
@@ -158,6 +195,7 @@ public final class DeviceBlockDefinitions {
             while (iterator.hasNext()) {
                 int blockTypeIndex = iterator.nextInt();
                 if (!rebuiltBlockTypes.contains(blockTypeIndex)) {
+                    definitions.set(blockTypeIndex, null);
                     sink.clear(blockTypeIndex);
                 }
             }
@@ -170,21 +208,18 @@ public final class DeviceBlockDefinitions {
     private record PreparedBinding(int blockTypeIndex, CompiledDeviceConfig compiled) {
     }
 
-    private record RuntimeSink(RuntimeDeviceDefinitions runtimeDefinitions, PortModule portModule) implements Sink {
-        private RuntimeSink(RuntimeDeviceDefinitions runtimeDefinitions, PortModule portModule) {
-            this.runtimeDefinitions = Objects.requireNonNull(runtimeDefinitions, "runtimeDefinitions");
+    private record RuntimeSink(PortModule portModule) implements Sink {
+        private RuntimeSink(PortModule portModule) {
             this.portModule = Objects.requireNonNull(portModule, "portModule");
         }
 
         @Override
         public void set(int blockTypeIndex, CompiledDeviceConfig compiled) {
-            runtimeDefinitions.set(blockTypeIndex, compiled);
             portModule.setBlockPorts(blockTypeIndex, compiled.portDefinition());
         }
 
         @Override
         public void clear(int blockTypeIndex) {
-            runtimeDefinitions.clear(blockTypeIndex);
             portModule.clearBlockPorts(blockTypeIndex);
         }
     }

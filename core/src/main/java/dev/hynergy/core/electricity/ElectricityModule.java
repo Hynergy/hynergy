@@ -52,7 +52,6 @@ public final class ElectricityModule extends HynergyModule {
     private final AssetRegistry assetRegistry;
     private final EventRegistry eventRegistry;
     private final DeviceDescriptorRegistry deviceDescriptors = new DeviceDescriptorRegistry();
-    private final RuntimeDeviceDefinitions runtimeDeviceDefinitions = new RuntimeDeviceDefinitions();
 
     private @Nullable ElectricalRuntime runtime;
     private @Nullable PortDomain<ElectricalPortConnection> electricalPortDomain;
@@ -114,7 +113,6 @@ public final class ElectricityModule extends HynergyModule {
 
         deviceBlockDefinitions = new DeviceBlockDefinitions(
                 deviceDescriptors,
-                runtimeDeviceDefinitions,
                 portModule,
                 conductorPortStandard(),
                 deviceComponentType
@@ -265,7 +263,7 @@ public final class ElectricityModule extends HynergyModule {
                         resourceType,
                         deviceComponentType,
                         wireComponentType,
-                        runtimeDeviceDefinitions,
+                        Objects.requireNonNull(deviceBlockDefinitions, "deviceBlockDefinitions"),
                         portModule,
                         electricalPortDomain()
                 )
@@ -386,6 +384,7 @@ public final class ElectricityModule extends HynergyModule {
             );
         }
 
+        runtime.register(type);
         DeviceDescriptor descriptor = deviceDescriptors.register(
                 id,
                 type,
@@ -393,7 +392,6 @@ public final class ElectricityModule extends HynergyModule {
                 terminals,
                 observers
         );
-        runtime.register(type);
         return descriptor;
     }
 

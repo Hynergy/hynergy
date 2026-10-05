@@ -20,6 +20,7 @@ import dev.hynergy.core.port.*;
 import lombok.Getter;
 import org.joml.Vector3i;
 
+import java.util.ArrayList;
 import java.util.Objects;
 
 /**
@@ -41,45 +42,45 @@ public final class DeviceConfig implements JsonAssetWithMap<String, DefaultAsset
     public static AssetBuilderCodec<String, DeviceConfig> createCodec(DeviceDescriptorRegistry descriptors) {
         Objects.requireNonNull(descriptors, "descriptors");
         return AssetBuilderCodec.builder(
-                                     DeviceConfig.class,
-                                     DeviceConfig::new,
-                                     Codec.STRING,
-                                     (config, id) -> config.id = id,
-                                     config -> config.id,
-                                     (config, data) -> config.extraData = data,
-                                     config -> config.extraData
-                             )
-                             .append(
-                                     new KeyedCodec<>("Type", Codec.STRING, true),
-                                     (config, type) -> config.type = type,
-                                     config -> config.type
-                             )
-                             .addValidator(Validators.nonEmptyString())
-                             .addValidator(new DeviceDescriptorValidator(descriptors))
-                             .metadata(new UIEditor(new UIEditor.Dropdown(DeviceDescriptorRegistry.DATA_SET)))
-                             .documentation("Stable registered electrical device descriptor ID.")
-                             .add()
-                             .append(
-                                     new KeyedCodec<>(
-                                             "Parameters",
-                                             new ArrayCodec<>(DeviceParameterConfig.CODEC, DeviceParameterConfig[]::new)
-                                     ),
-                                     (config, parameters) -> config.parameters = parameters == null ? EMPTY_PARAMETERS : parameters,
-                                     config -> config.parameters
-                             )
-                             .documentation("Optional configured defaults keyed by stable parameter ID.")
-                             .add()
-                             .append(
-                                     new KeyedCodec<>(
-                                             "Ports",
-                                             new ArrayCodec<>(DevicePortConfig.CODEC, DevicePortConfig[]::new)
-                                     ),
-                                     (config, ports) -> config.ports = ports == null ? EMPTY_PORTS : ports,
-                                     config -> config.ports
-                             )
-                             .documentation("Physical electrical ports exposed by this device block. May be empty.")
-                             .add()
-                             .build();
+                                        DeviceConfig.class,
+                                        DeviceConfig::new,
+                                        Codec.STRING,
+                                        (config, id) -> config.id = id,
+                                        config -> config.id,
+                                        (config, data) -> config.extraData = data,
+                                        config -> config.extraData
+                                )
+                                .append(
+                                        new KeyedCodec<>("Type", Codec.STRING, true),
+                                        (config, type) -> config.type = type,
+                                        config -> config.type
+                                )
+                                .addValidator(Validators.nonEmptyString())
+                                .addValidator(new DeviceDescriptorValidator(descriptors))
+                                .metadata(new UIEditor(new UIEditor.Dropdown(DeviceDescriptorRegistry.DATA_SET)))
+                                .documentation("Stable registered electrical device descriptor ID.")
+                                .add()
+                                .append(
+                                        new KeyedCodec<>(
+                                                "Parameters",
+                                                new ArrayCodec<>(DeviceParameterConfig.CODEC, DeviceParameterConfig[]::new)
+                                        ),
+                                        (config, parameters) -> config.parameters = parameters == null ? EMPTY_PARAMETERS : parameters,
+                                        config -> config.parameters
+                                )
+                                .documentation("Optional configured defaults keyed by stable parameter ID.")
+                                .add()
+                                .append(
+                                        new KeyedCodec<>(
+                                                "Ports",
+                                                new ArrayCodec<>(DevicePortConfig.CODEC, DevicePortConfig[]::new)
+                                        ),
+                                        (config, ports) -> config.ports = ports == null ? EMPTY_PORTS : ports,
+                                        config -> config.ports
+                                )
+                                .documentation("Physical electrical ports exposed by this device block. May be empty.")
+                                .add()
+                                .build();
     }
 
     public static final ValidatorCache<String> VALIDATOR_CACHE =
@@ -136,8 +137,7 @@ public final class DeviceConfig implements JsonAssetWithMap<String, DefaultAsset
 
         DeviceParameterConfig[] parameterConfigs = parameters == null ? EMPTY_PARAMETERS : parameters;
         int[] stableParameterIds = new int[parameterConfigs.length];
-        int[] nativeParameterIds = new int[parameterConfigs.length];
-        double[] parameterDefaults = new double[parameterConfigs.length];
+        var parameterBindings = new ArrayList<CompiledDeviceConfig.ParameterBinding>(parameterConfigs.length);
 
         for (int index = 0; index < parameterConfigs.length; index++) {
             DeviceParameterConfig parameter = parameterConfigs[index];
@@ -162,14 +162,17 @@ public final class DeviceConfig implements JsonAssetWithMap<String, DefaultAsset
             }
 
             stableParameterIds[index] = stableId;
-            nativeParameterIds[index] = nativeId;
-            parameterDefaults[index] = defaultValue;
+            try {
+                descriptor.type().validateParameter(nativeId, defaultValue);
+            } catch (IllegalArgumentException failure) {
+                throw invalid("Invalid parameter Default for stable ID " + stableId, failure);
+            }
+            parameterBindings.add(new CompiledDeviceConfig.ParameterBinding(stableId, nativeId, defaultValue));
         }
 
         DevicePortConfig[] portConfigs = ports == null ? EMPTY_PORTS : ports;
         int[] portIds = new int[portConfigs.length];
-        int[] stableTerminalIds = new int[portConfigs.length];
-        int[] nativeTerminalIds = new int[portConfigs.length];
+        var portBindings = new ArrayList<CompiledDeviceConfig.PortBinding>(portConfigs.length);
         PortDefinition<?, ?>[] portDefinitions = new PortDefinition[portConfigs.length];
 
         for (int index = 0; index < portConfigs.length; index++) {
@@ -205,8 +208,7 @@ public final class DeviceConfig implements JsonAssetWithMap<String, DefaultAsset
                     : new PortOffset(anchor.x, anchor.y, anchor.z);
 
             portIds[index] = portId;
-            stableTerminalIds[index] = stableTerminalId;
-            nativeTerminalIds[index] = nativeTerminalId;
+            portBindings.add(new CompiledDeviceConfig.PortBinding(portId, nativeTerminalId));
             portDefinitions[index] = new PortDefinition<>(
                     portId,
                     offset,
@@ -218,12 +220,8 @@ public final class DeviceConfig implements JsonAssetWithMap<String, DefaultAsset
 
         return new CompiledDeviceConfig(
                 descriptor,
-                stableParameterIds,
-                nativeParameterIds,
-                parameterDefaults,
-                portIds,
-                stableTerminalIds,
-                nativeTerminalIds,
+                parameterBindings,
+                portBindings,
                 BlockPortDefinition.of(portDefinitions)
         );
     }

@@ -114,6 +114,7 @@ public final class DeviceDefinitionBuilder implements AutoCloseable {
     private long commandCount;
 
     private long nodeCount;
+    private int terminalCount;
     private long parameterCount;
     private long elementCount;
     private long observerCount;
@@ -209,12 +210,19 @@ public final class DeviceDefinitionBuilder implements AutoCloseable {
         commandCount = 0;
 
         nodeCount = 0;
+        terminalCount = 0;
         parameterCount = 0;
         elementCount = 0;
         observerCount = 0;
 
         clearElementState();
         writeHeader();
+    }
+
+    DeviceType.Metadata metadata() {
+        requireTopLevel();
+        return new DeviceType.Metadata(Math.toIntExact(parameterCount), terminalCount,
+                Math.toIntExact(observerCount));
     }
 
     /**
@@ -238,6 +246,7 @@ public final class DeviceDefinitionBuilder implements AutoCloseable {
         commitCommand(payload);
 
         nodeCount++;
+        terminalCount++;
 
         return nodeId;
     }

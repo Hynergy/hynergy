@@ -1,115 +1,53 @@
 package dev.hynergy.core.electricity.device;
 
 import dev.hynergy.core.port.BlockPortDefinition;
-
+import org.jspecify.annotations.Nullable;
+import java.util.List;
 import java.util.Objects;
 
 /**
- * Immutable runtime form of one device asset configuration.
- *
- * <p>Stable member IDs are retained for the Hytale/config boundary while the
- * corresponding native indexes are compiled once for runtime use.</p>
+ * Immutable, resolved asset configuration shared by runtime devices.
+ * Stable parameter IDs remain available for persisted overrides.
  */
 public final class CompiledDeviceConfig {
     private final DeviceDescriptor descriptor;
-
-    private final int[] stableParameterIds;
-    private final int[] nativeParameterIds;
-    private final double[] parameterDefaults;
-
-    private final int[] portIds;
-    private final int[] stableTerminalIds;
-    private final int[] nativeTerminalIds;
+    private final List<ParameterBinding> parameters;
+    private final List<PortBinding> ports;
     private final BlockPortDefinition portDefinition;
 
-    CompiledDeviceConfig(
-            DeviceDescriptor descriptor,
-            int[] stableParameterIds,
-            int[] nativeParameterIds,
-            double[] parameterDefaults,
-            int[] portIds,
-            int[] stableTerminalIds,
-            int[] nativeTerminalIds,
-            BlockPortDefinition portDefinition
-    ) {
+    CompiledDeviceConfig(DeviceDescriptor descriptor, List<ParameterBinding> parameters,
+                         List<PortBinding> ports, BlockPortDefinition portDefinition) {
         this.descriptor = Objects.requireNonNull(descriptor, "descriptor");
-        this.stableParameterIds = stableParameterIds.clone();
-        this.nativeParameterIds = nativeParameterIds.clone();
-        this.parameterDefaults = parameterDefaults.clone();
-        this.portIds = portIds.clone();
-        this.stableTerminalIds = stableTerminalIds.clone();
-        this.nativeTerminalIds = nativeTerminalIds.clone();
+        this.parameters = List.copyOf(parameters);
+        this.ports = List.copyOf(ports);
         this.portDefinition = Objects.requireNonNull(portDefinition, "portDefinition");
-
-        if (this.stableParameterIds.length != this.nativeParameterIds.length
-                || this.stableParameterIds.length != this.parameterDefaults.length) {
-            throw new IllegalArgumentException("Compiled parameter arrays must have equal lengths");
-        }
-        if (this.portIds.length != this.stableTerminalIds.length
-                || this.portIds.length != this.nativeTerminalIds.length
-                || this.portIds.length != portDefinition.size()) {
-            throw new IllegalArgumentException("Compiled port arrays must match the block port definition");
+        if (ports.size() != portDefinition.size()) {
+            throw new IllegalArgumentException("Compiled ports must match the block port definition");
         }
     }
 
-    public DeviceDescriptor descriptor() {
-        return descriptor;
-    }
+    public record ParameterBinding(int stableId, int nativeId, double defaultValue) { }
+    public record PortBinding(int portId, int nativeTerminalId) { }
 
-    public int nativeParameterId(int stableParameterId) {
-        return descriptor.parameters().nativeIndex(stableParameterId);
-    }
+    public DeviceDescriptor descriptor() { return descriptor; }
+    public List<ParameterBinding> parameters() { return parameters; }
+    public List<PortBinding> ports() { return ports; }
+    public BlockPortDefinition portDefinition() { return portDefinition; }
 
-    public int nativeTerminalId(int stableTerminalId) {
-        return descriptor.terminals().nativeIndex(stableTerminalId);
-    }
-
-    public int nativeObserverId(int stableObserverId) {
-        return descriptor.observers().nativeIndex(stableObserverId);
-    }
-
-    public int parameterCount() {
-        return stableParameterIds.length;
-    }
-
-    public int stableParameterIdAt(int index) {
-        return stableParameterIds[index];
-    }
-
-    public int nativeParameterIdAt(int index) {
-        return nativeParameterIds[index];
-    }
-
-    public double parameterDefaultAt(int index) {
-        return parameterDefaults[index];
-    }
-
-    public int findParameterDefault(int stableParameterId) {
-        for (int index = 0; index < stableParameterIds.length; index++) {
-            if (stableParameterIds[index] == stableParameterId) {
-                return index;
+    public @Nullable ParameterBinding parameter(int stableId) {
+        for (ParameterBinding parameter : parameters) {
+            if (parameter.stableId() == stableId) {
+                return parameter;
             }
         }
-        return -1;
+        return null;
     }
 
-    public int portCount() {
-        return portIds.length;
+    public int nativeParameterId(int stableId) {
+        return descriptor.parameters().nativeIndex(stableId);
     }
 
-    public int portIdAt(int index) {
-        return portIds[index];
-    }
-
-    public int stableTerminalIdAt(int index) {
-        return stableTerminalIds[index];
-    }
-
-    public int nativeTerminalIdAt(int index) {
-        return nativeTerminalIds[index];
-    }
-
-    public BlockPortDefinition portDefinition() {
-        return portDefinition;
+    public int nativeObserverId(int stableId) {
+        return descriptor.observers().nativeIndex(stableId);
     }
 }
