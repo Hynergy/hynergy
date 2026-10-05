@@ -19,8 +19,8 @@ import java.util.Objects;
 public final class ElectricalRuntime implements AutoCloseable {
     private final ElectricalEngine engine;
 
-    private final ArrayList<DeviceType<?>> boundTypes = new ArrayList<>();
-    private final IdentityHashMap<DeviceType<?>, Boolean> registeringTypes = new IdentityHashMap<>();
+    private final ArrayList<DeviceType> boundTypes = new ArrayList<>();
+    private final IdentityHashMap<DeviceType, Boolean> registeringTypes = new IdentityHashMap<>();
 
     private boolean closeRequested;
     private boolean closed;
@@ -52,7 +52,6 @@ public final class ElectricalRuntime implements AutoCloseable {
      * its registered definition.</p>
      *
      * @param type the device type
-     * @param <T> the device class
      *
      * @return the registered device definition
      *
@@ -61,8 +60,8 @@ public final class ElectricalRuntime implements AutoCloseable {
      *     been requested, if an electrical system is active, or if registration
      *     fails
      */
-    public synchronized <T extends Device> DeviceDefinition register(
-        DeviceType<T> type
+    public synchronized DeviceDefinition register(
+        DeviceType type
     ) {
         requireOpen();
         requireActive();
@@ -122,7 +121,7 @@ public final class ElectricalRuntime implements AutoCloseable {
         }
     }
 
-    DeviceDefinition requireDefinition(DeviceType<?> type) {
+    DeviceDefinition requireDefinition(DeviceType type) {
         return Objects.requireNonNull(type, "type").requireDefinition(this);
     }
 
@@ -130,7 +129,7 @@ public final class ElectricalRuntime implements AutoCloseable {
         engine.validateParameter(definition, parameter, value);
     }
 
-    private DeviceDefinition resolveDefinition(DeviceType<?> type) {
+    private DeviceDefinition resolveDefinition(DeviceType type) {
         DeviceDefinition existing = type.existingDefinition(this);
 
         if (existing != null) {

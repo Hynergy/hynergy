@@ -46,7 +46,7 @@ final class DeviceDescriptorRegistryTest {
         MemberMapping terminals = new MemberMapping(0, 1);
         MemberMapping observers = new MemberMapping(0, 1);
 
-        DeviceDescriptor<Resistance> descriptor = registry.register(
+        DeviceDescriptor descriptor = registry.register(
                 "test:resistance",
                 Resistance.TYPE,
                 parameters,
@@ -97,7 +97,7 @@ final class DeviceDescriptorRegistryTest {
     void freezeMakesRegistryImmutableButKeepsLookupsAvailable() {
         DeviceDescriptorRegistry registry = new DeviceDescriptorRegistry();
         MemberMapping empty = new MemberMapping();
-        DeviceDescriptor<Resistance> descriptor =
+        DeviceDescriptor descriptor =
                 registry.register("test:resistance", Resistance.TYPE, empty, empty, empty);
 
         assertFalse(registry.isFrozen());

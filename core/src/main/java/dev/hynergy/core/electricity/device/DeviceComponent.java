@@ -9,7 +9,10 @@ import com.hypixel.hytale.codec.validation.Validators;
 import com.hypixel.hytale.component.Component;
 import com.hypixel.hytale.server.core.universe.world.storage.ChunkStore;
 import dev.hynergy.core.electricity.ElectricalCodecs;
-import dev.hynergy.electrical.*;
+import dev.hynergy.electrical.Device;
+import dev.hynergy.electrical.DeviceId;
+import dev.hynergy.electrical.ObservationListener;
+import dev.hynergy.electrical.ObservationSubscription;
 import lombok.Getter;
 import org.jspecify.annotations.NonNull;
 import org.jspecify.annotations.Nullable;
@@ -95,7 +98,7 @@ public final class DeviceComponent implements Component<ChunkStore> {
             );
         }
 
-        DeviceAccess.setParameter(device, compiled.nativeParameterIdAt(defaultIndex), value);
+        device.setParameter(compiled.nativeParameterIdAt(defaultIndex), value);
 
         boolean changed;
         if (Double.doubleToLongBits(value) == Double.doubleToLongBits(compiled.parameterDefaultAt(defaultIndex))) {
@@ -121,7 +124,7 @@ public final class DeviceComponent implements Component<ChunkStore> {
         if (nativeObserverId == MemberMapping.UNMAPPED) {
             throw new IllegalArgumentException("Unknown or retired stable observer ID: " + stableObserverId);
         }
-        return DeviceAccess.observe(device, nativeObserverId, listener);
+        return device.observe(nativeObserverId, listener);
     }
 
     @Override

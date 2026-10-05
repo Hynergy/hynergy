@@ -21,7 +21,7 @@ final class ElectricalSystemObservationTest {
             ElectricalSystem system = runtime.createSystem(20)) {
             Resistance resistor = Resistance.create(system, 10.0);
 
-            ObservationSubscription subscription = system.subscribe(resistor, 0, NOOP_LISTENER);
+            ObservationSubscription subscription = system.subscribe(resistor.device(), 0, NOOP_LISTENER);
 
             assertTrue(subscription.isActive());
             assertNotEquals(0, subscription.nativeId());
@@ -36,7 +36,7 @@ final class ElectricalSystemObservationTest {
             ElectricalSystem system = runtime.createSystem(20)) {
             Resistance resistor = Resistance.create(system, 10.0);
 
-            ObservationSubscription subscription = system.subscribe(resistor, 0, NOOP_LISTENER);
+            ObservationSubscription subscription = system.subscribe(resistor.device(), 0, NOOP_LISTENER);
 
             subscription.unsubscribe();
 
@@ -55,8 +55,8 @@ final class ElectricalSystemObservationTest {
             ElectricalSystem system = runtime.createSystem(20)) {
             Resistance resistor = Resistance.create(system, 10.0);
 
-            ObservationSubscription voltage = system.subscribe(resistor, 0, NOOP_LISTENER);
-            ObservationSubscription current = system.subscribe(resistor, 1, NOOP_LISTENER);
+            ObservationSubscription voltage = system.subscribe(resistor.device(), 0, NOOP_LISTENER);
+            ObservationSubscription current = system.subscribe(resistor.device(), 1, NOOP_LISTENER);
 
             resistor.destroy();
 
@@ -79,8 +79,8 @@ final class ElectricalSystemObservationTest {
 
             Resistance second = Resistance.create(system, 20.0);
 
-            ObservationSubscription firstSubscription = system.subscribe(first, 0, NOOP_LISTENER);
-            ObservationSubscription secondSubscription = system.subscribe(second, 0, NOOP_LISTENER);
+            ObservationSubscription firstSubscription = system.subscribe(first.device(), 0, NOOP_LISTENER);
+            ObservationSubscription secondSubscription = system.subscribe(second.device(), 0, NOOP_LISTENER);
 
             first.destroy();
 
@@ -99,10 +99,10 @@ final class ElectricalSystemObservationTest {
 
             assertThrows(
                 ElectricalWorld.SubscriptionOperationException.class,
-                () -> system.subscribe(resistor, Integer.MAX_VALUE, NOOP_LISTENER)
+                () -> system.subscribe(resistor.device(), Integer.MAX_VALUE, NOOP_LISTENER)
             );
 
-            ObservationSubscription valid = assertDoesNotThrow(() -> system.subscribe(resistor, 0, NOOP_LISTENER));
+            ObservationSubscription valid = assertDoesNotThrow(() -> system.subscribe(resistor.device(), 0, NOOP_LISTENER));
 
             assertTrue(valid.isActive());
         }
@@ -115,7 +115,7 @@ final class ElectricalSystemObservationTest {
             ElectricalSystem second = runtime.createSystem(20)) {
             Resistance resistor = Resistance.create(first, 10.0);
 
-            ObservationSubscription subscription = first.subscribe(resistor, 0, NOOP_LISTENER);
+            ObservationSubscription subscription = first.subscribe(resistor.device(), 0, NOOP_LISTENER);
 
             assertThrows(IllegalArgumentException.class, () -> second.unsubscribe(subscription));
             assertTrue(subscription.isActive());
@@ -133,8 +133,8 @@ final class ElectricalSystemObservationTest {
 
             Resistance resistor = Resistance.create(system, 10.0);
 
-            ObservationSubscription voltage = system.subscribe(resistor, 0, NOOP_LISTENER);
-            ObservationSubscription current = system.subscribe(resistor, 1, NOOP_LISTENER);
+            ObservationSubscription voltage = system.subscribe(resistor.device(), 0, NOOP_LISTENER);
+            ObservationSubscription current = system.subscribe(resistor.device(), 1, NOOP_LISTENER);
 
             system.close();
 
@@ -156,7 +156,7 @@ final class ElectricalSystemObservationTest {
 
             AtomicInteger callbacks = new AtomicInteger();
 
-            system.subscribe(resistor, 0, (status, value) -> callbacks.incrementAndGet());
+            system.subscribe(resistor.device(), 0, (status, value) -> callbacks.incrementAndGet());
             system.tick();
 
             assertEquals(1, callbacks.get());
@@ -171,7 +171,7 @@ final class ElectricalSystemObservationTest {
 
             AtomicInteger callbacks = new AtomicInteger();
 
-            system.subscribe(resistor, 0, (status, value) -> callbacks.incrementAndGet());
+            system.subscribe(resistor.device(), 0, (status, value) -> callbacks.incrementAndGet());
             system.tick();
 
             assertEquals(1, callbacks.get());
@@ -195,7 +195,7 @@ final class ElectricalSystemObservationTest {
             ArrayList<Double> values = new ArrayList<>();
 
             system.subscribe(
-                resistor, 0, (status, value) -> {
+                resistor.device(), 0, (status, value) -> {
                     statuses.add(status);
                     values.add(value);
 
@@ -231,7 +231,7 @@ final class ElectricalSystemObservationTest {
             SubscriptionHolder secondHolder = new SubscriptionHolder();
 
             ObservationSubscription first = system.subscribe(
-                resistor, 0, (status, value) -> {
+                resistor.device(), 0, (status, value) -> {
                     int invocation = callbacks.incrementAndGet();
 
                     if (invocation == 1) {
@@ -243,7 +243,7 @@ final class ElectricalSystemObservationTest {
             firstHolder.set(first);
 
             ObservationSubscription second = system.subscribe(
-                resistor, 1, (status, value) -> {
+                resistor.device(), 1, (status, value) -> {
                     int invocation = callbacks.incrementAndGet();
 
                     if (invocation == 1) {
@@ -276,10 +276,10 @@ final class ElectricalSystemObservationTest {
             SubscriptionHolder created = new SubscriptionHolder();
 
             system.subscribe(
-                resistor,
+                resistor.device(),
                 0,
                 (status, value) -> created.set(system.subscribe(
-                    resistor,
+                    resistor.device(),
                     1,
                     (createdStatus, createdValue) -> createdCallbacks.incrementAndGet()
                 ))
@@ -307,12 +307,12 @@ final class ElectricalSystemObservationTest {
             AtomicInteger otherCallbacks = new AtomicInteger();
 
             system.subscribe(
-                resistor, 0, (status, value) -> {
+                resistor.device(), 0, (status, value) -> {
                     throw listenerFailure;
                 }
             );
 
-            system.subscribe(resistor, 1, (status, value) -> otherCallbacks.incrementAndGet());
+            system.subscribe(resistor.device(), 1, (status, value) -> otherCallbacks.incrementAndGet());
 
             IllegalStateException thrown = assertThrows(IllegalStateException.class, system::tick);
 
@@ -335,13 +335,13 @@ final class ElectricalSystemObservationTest {
             RuntimeException secondFailure = new IllegalArgumentException("second");
 
             system.subscribe(
-                resistor, 0, (status, value) -> {
+                resistor.device(), 0, (status, value) -> {
                     throw firstFailure;
                 }
             );
 
             system.subscribe(
-                resistor, 1, (status, value) -> {
+                resistor.device(), 1, (status, value) -> {
                     throw secondFailure;
                 }
             );
@@ -370,7 +370,7 @@ final class ElectricalSystemObservationTest {
             AtomicInteger otherCallbacks = new AtomicInteger();
 
             system.subscribe(
-                resistor, 0, (status, value) -> {
+                resistor.device(), 0, (status, value) -> {
                     IllegalStateException failure = assertThrows(IllegalStateException.class, system::tick);
 
                     assertEquals("Recursive calls to tick are not allowed", failure.getMessage());
@@ -379,7 +379,7 @@ final class ElectricalSystemObservationTest {
                 }
             );
 
-            system.subscribe(resistor, 1, (status, value) -> otherCallbacks.incrementAndGet());
+            system.subscribe(resistor.device(), 1, (status, value) -> otherCallbacks.incrementAndGet());
 
             system.tick();
 
@@ -400,14 +400,14 @@ final class ElectricalSystemObservationTest {
             AtomicInteger otherCallbacks = new AtomicInteger();
 
             system.subscribe(
-                resistor, 0, (status, value) -> {
+                resistor.device(), 0, (status, value) -> {
                     assertThrows(IllegalStateException.class, system::close);
 
                     closeFailures.incrementAndGet();
                 }
             );
 
-            system.subscribe(resistor, 1, (status, value) -> otherCallbacks.incrementAndGet());
+            system.subscribe(resistor.device(), 1, (status, value) -> otherCallbacks.incrementAndGet());
 
             system.tick();
 
@@ -441,11 +441,11 @@ final class ElectricalSystemObservationTest {
                 }
             };
 
-            ObservationSubscription first = system.subscribe(resistor, 0, listener);
+            ObservationSubscription first = system.subscribe(resistor.device(), 0, listener);
 
             firstHolder.set(first);
 
-            ObservationSubscription second = system.subscribe(resistor, 1, listener);
+            ObservationSubscription second = system.subscribe(resistor.device(), 1, listener);
 
             secondHolder.set(second);
 

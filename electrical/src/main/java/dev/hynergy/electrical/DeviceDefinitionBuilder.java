@@ -9,13 +9,12 @@ import java.nio.ByteOrder;
 import java.util.Objects;
 import java.util.function.Consumer;
 import java.util.function.Function;
-import java.util.function.Supplier;
 
 /**
  * Builds a composite electrical device definition.
  *
  * <p>Plugin code receives this builder from the definition callback of
- * {@link DeviceType#create(Supplier, Consumer)}.</p>
+ * {@link DeviceType#create(Consumer)}.</p>
  *
  * <p>The runtime owns the builder that it supplies to the callback.
  * Do not close that builder. Do not keep a reference to it after the
@@ -106,7 +105,7 @@ public final class DeviceDefinitionBuilder implements AutoCloseable {
     private static final ValueLayout.OfDouble F64 =
         ValueLayout.JAVA_DOUBLE_UNALIGNED.withOrder(ByteOrder.LITTLE_ENDIAN);
 
-    private final @Nullable Function<DeviceType<?>, DeviceDefinition> definitionResolver;
+    private final @Nullable Function<DeviceType, DeviceDefinition> definitionResolver;
 
     private @Nullable Arena arena;
     private MemorySegment buffer;
@@ -152,14 +151,14 @@ public final class DeviceDefinitionBuilder implements AutoCloseable {
     }
 
     DeviceDefinitionBuilder(
-        Function<DeviceType<?>, DeviceDefinition> definitionResolver
+        Function<DeviceType, DeviceDefinition> definitionResolver
     ) {
         this(DEFAULT_INITIAL_CAPACITY, Objects.requireNonNull(definitionResolver, "definitionResolver"));
     }
 
     private DeviceDefinitionBuilder(
         int initialCapacity,
-        @Nullable Function<DeviceType<?>, DeviceDefinition> definitionResolver
+        @Nullable Function<DeviceType, DeviceDefinition> definitionResolver
     ) {
         this.definitionResolver = definitionResolver;
 
@@ -355,12 +354,12 @@ public final class DeviceDefinitionBuilder implements AutoCloseable {
      *     builder is closed, or if the child type cannot be resolved
      */
     public DeviceDefinitionBuilder beginElement(
-        DeviceType<?> type
+        DeviceType type
     ) {
         requireTopLevel();
         Objects.requireNonNull(type, "type");
 
-        Function<DeviceType<?>, DeviceDefinition> definitionResolver = this.definitionResolver;
+        Function<DeviceType, DeviceDefinition> definitionResolver = this.definitionResolver;
 
         DeviceDefinition definition;
 

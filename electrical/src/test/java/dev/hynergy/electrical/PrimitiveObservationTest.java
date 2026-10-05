@@ -22,19 +22,19 @@ final class PrimitiveObservationTest {
     void twoTerminalPrimitivesExposeVoltageAndCurrentObservers() {
         try (ElectricalRuntime runtime = ElectricalRuntime.create();
             ElectricalSystem system = runtime.createSystem(20)) {
-            Resistance resistance = system.create(Resistance.TYPE);
+            Resistance resistance = new Resistance(system.create(Resistance.TYPE));
 
-            Conductance conductance = system.create(Conductance.TYPE);
+            Conductance conductance = new Conductance(system.create(Conductance.TYPE));
 
-            VoltageSource voltageSource = system.create(VoltageSource.TYPE);
+            VoltageSource voltageSource = new VoltageSource(system.create(VoltageSource.TYPE));
 
-            CurrentSource currentSource = system.create(CurrentSource.TYPE);
+            CurrentSource currentSource = new CurrentSource(system.create(CurrentSource.TYPE));
 
-            Capacitor capacitor = system.create(Capacitor.TYPE);
+            Capacitor capacitor = new Capacitor(system.create(Capacitor.TYPE));
 
-            Inductor inductor = system.create(Inductor.TYPE);
+            Inductor inductor = new Inductor(system.create(Inductor.TYPE));
 
-            Diode diode = system.create(Diode.TYPE);
+            Diode diode = new Diode(system.create(Diode.TYPE));
 
             assertActive(
                 resistance.observeVoltage(NOOP_LISTENER), resistance.observeCurrent(NOOP_LISTENER),
@@ -58,13 +58,13 @@ final class PrimitiveObservationTest {
     void controlledPrimitivesExposeSemanticObservers() {
         try (ElectricalRuntime runtime = ElectricalRuntime.create();
             ElectricalSystem system = runtime.createSystem(20)) {
-            VoltageControlledCurrentSource currentSource = system.create(VoltageControlledCurrentSource.TYPE);
+            VoltageControlledCurrentSource currentSource = new VoltageControlledCurrentSource(system.create(VoltageControlledCurrentSource.TYPE));
 
-            VoltageControlledVoltageSource voltageSource = system.create(VoltageControlledVoltageSource.TYPE);
+            VoltageControlledVoltageSource voltageSource = new VoltageControlledVoltageSource(system.create(VoltageControlledVoltageSource.TYPE));
 
-            VoltageControlledSwitch controlledSwitch = system.create(VoltageControlledSwitch.TYPE);
+            VoltageControlledSwitch controlledSwitch = new VoltageControlledSwitch(system.create(VoltageControlledSwitch.TYPE));
 
-            VoltageControlledConductance conductance = system.create(VoltageControlledConductance.TYPE);
+            VoltageControlledConductance conductance = new VoltageControlledConductance(system.create(VoltageControlledConductance.TYPE));
 
             assertActive(
                 currentSource.observeOutputVoltage(NOOP_LISTENER),
@@ -90,9 +90,9 @@ final class PrimitiveObservationTest {
     void singleInputLogicPrimitivesExposeSemanticObservers() {
         try (ElectricalRuntime runtime = ElectricalRuntime.create();
             ElectricalSystem system = runtime.createSystem(20)) {
-            Not not = system.create(Not.TYPE);
+            Not not = new Not(system.create(Not.TYPE));
 
-            SchmittBuffer schmitt = system.create(SchmittBuffer.TYPE);
+            SchmittBuffer schmitt = new SchmittBuffer(system.create(SchmittBuffer.TYPE));
 
             assertActive(
                 not.observeOutputVoltage(NOOP_LISTENER),
@@ -110,13 +110,13 @@ final class PrimitiveObservationTest {
     void twoInputLogicPrimitivesExposeSemanticObservers() {
         try (ElectricalRuntime runtime = ElectricalRuntime.create();
             ElectricalSystem system = runtime.createSystem(20)) {
-            And and = system.create(And.TYPE);
+            And and = new And(system.create(And.TYPE));
 
-            Nand nand = system.create(Nand.TYPE);
+            Nand nand = new Nand(system.create(Nand.TYPE));
 
-            Or or = system.create(Or.TYPE);
+            Or or = new Or(system.create(Or.TYPE));
 
-            Nor nor = system.create(Nor.TYPE);
+            Nor nor = new Nor(system.create(Nor.TYPE));
 
             assertActive(
                 and.observeOutputVoltage(NOOP_LISTENER),
@@ -146,7 +146,7 @@ final class PrimitiveObservationTest {
     void tickDelayExposesSemanticObservers() {
         try (ElectricalRuntime runtime = ElectricalRuntime.create();
             ElectricalSystem system = runtime.createSystem(20)) {
-            TickDelay delay = system.create(TickDelay.TYPE);
+            TickDelay delay = new TickDelay(system.create(TickDelay.TYPE));
 
             assertActive(
                 delay.observeInputVoltage(NOOP_LISTENER),
@@ -215,7 +215,7 @@ final class PrimitiveObservationTest {
     void semanticObserverRejectsNullListener() {
         try (ElectricalRuntime runtime = ElectricalRuntime.create();
             ElectricalSystem system = runtime.createSystem(20)) {
-            Resistance resistance = system.create(Resistance.TYPE);
+            Resistance resistance = new Resistance(system.create(Resistance.TYPE));
 
             assertThrows(NullPointerException.class, () -> resistance.observeVoltage(null));
             ObservationSubscription subscription = assertDoesNotThrow(() -> resistance.observeVoltage(NOOP_LISTENER));

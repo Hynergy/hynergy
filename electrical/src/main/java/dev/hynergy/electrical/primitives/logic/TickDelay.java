@@ -11,11 +11,11 @@ import dev.hynergy.electrical.*;
  *
  * <p>Positive output current flows from output-positive to output-negative.</p>
  */
-public final class TickDelay extends Device {
+public final class TickDelay {
     /**
      * The device type for {@code TickDelay}.
      */
-    public static final DeviceType<TickDelay> TYPE = DeviceType.primitive(11, TickDelay::new);
+    public static final DeviceType TYPE = PrimitiveDeviceTypes.TICK_DELAY;
 
     private static final int TERMINAL_INPUT_POSITIVE = 0;
     private static final int TERMINAL_INPUT_NEGATIVE = 1;
@@ -26,7 +26,32 @@ public final class TickDelay extends Device {
     private static final int OBSERVER_OUTPUT_VOLTAGE = 1;
     private static final int OBSERVER_OUTPUT_CURRENT = 2;
 
-    private TickDelay() {
+    private final Device device;
+
+    /**
+     * Wraps a live device with this primitive definition.
+     *
+     * @throws IllegalArgumentException if the native definition differs
+     * @throws IllegalStateException if the device is no longer usable
+     */
+    public TickDelay(Device device) {
+        java.util.Objects.requireNonNull(device, "device").requireDefinition(TYPE);
+        this.device = device;
+    }
+
+    /** Returns the underlying runtime handle. */
+    public Device device() {
+        return device;
+    }
+
+    /** Returns the runtime identity. */
+    public DeviceId id() {
+        return device.id();
+    }
+
+    /** Destroys the underlying device and its observation subscriptions. */
+    public void destroy() {
+        device.destroy();
     }
 
     /**
@@ -37,7 +62,7 @@ public final class TickDelay extends Device {
      * @return the tick delay
      */
     public static TickDelay create(ElectricalSystem system) {
-        return system.create(TYPE);
+        return new TickDelay(system.create(TYPE));
     }
 
     /**
@@ -46,7 +71,7 @@ public final class TickDelay extends Device {
      * @param wire the wire
      */
     public void attachInputPositive(Wire wire) {
-        attachTerminal(TERMINAL_INPUT_POSITIVE, wire);
+        device.attachTerminal(TERMINAL_INPUT_POSITIVE, wire);
     }
 
     /**
@@ -55,7 +80,7 @@ public final class TickDelay extends Device {
      * @param wire the wire
      */
     public void detachInputPositive(Wire wire) {
-        detachTerminal(TERMINAL_INPUT_POSITIVE, wire);
+        device.detachTerminal(TERMINAL_INPUT_POSITIVE, wire);
     }
 
     /**
@@ -64,7 +89,7 @@ public final class TickDelay extends Device {
      * @param wire the wire
      */
     public void attachInputNegative(Wire wire) {
-        attachTerminal(TERMINAL_INPUT_NEGATIVE, wire);
+        device.attachTerminal(TERMINAL_INPUT_NEGATIVE, wire);
     }
 
     /**
@@ -73,7 +98,7 @@ public final class TickDelay extends Device {
      * @param wire the wire
      */
     public void detachInputNegative(Wire wire) {
-        detachTerminal(TERMINAL_INPUT_NEGATIVE, wire);
+        device.detachTerminal(TERMINAL_INPUT_NEGATIVE, wire);
     }
 
     /**
@@ -82,7 +107,7 @@ public final class TickDelay extends Device {
      * @param wire the wire
      */
     public void attachOutputPositive(Wire wire) {
-        attachTerminal(TERMINAL_OUTPUT_POSITIVE, wire);
+        device.attachTerminal(TERMINAL_OUTPUT_POSITIVE, wire);
     }
 
     /**
@@ -91,7 +116,7 @@ public final class TickDelay extends Device {
      * @param wire the wire
      */
     public void detachOutputPositive(Wire wire) {
-        detachTerminal(TERMINAL_OUTPUT_POSITIVE, wire);
+        device.detachTerminal(TERMINAL_OUTPUT_POSITIVE, wire);
     }
 
     /**
@@ -100,7 +125,7 @@ public final class TickDelay extends Device {
      * @param wire the wire
      */
     public void attachOutputNegative(Wire wire) {
-        attachTerminal(TERMINAL_OUTPUT_NEGATIVE, wire);
+        device.attachTerminal(TERMINAL_OUTPUT_NEGATIVE, wire);
     }
 
     /**
@@ -109,7 +134,7 @@ public final class TickDelay extends Device {
      * @param wire the wire
      */
     public void detachOutputNegative(Wire wire) {
-        detachTerminal(TERMINAL_OUTPUT_NEGATIVE, wire);
+        device.detachTerminal(TERMINAL_OUTPUT_NEGATIVE, wire);
     }
 
     /**
@@ -125,7 +150,7 @@ public final class TickDelay extends Device {
     public ObservationSubscription observeInputVoltage(
         ObservationListener listener
     ) {
-        return observe(OBSERVER_INPUT_VOLTAGE, listener);
+        return device.observe(OBSERVER_INPUT_VOLTAGE, listener);
     }
 
     /**
@@ -141,7 +166,7 @@ public final class TickDelay extends Device {
     public ObservationSubscription observeOutputVoltage(
         ObservationListener listener
     ) {
-        return observe(OBSERVER_OUTPUT_VOLTAGE, listener);
+        return device.observe(OBSERVER_OUTPUT_VOLTAGE, listener);
     }
 
     /**
@@ -157,6 +182,6 @@ public final class TickDelay extends Device {
     public ObservationSubscription observeOutputCurrent(
         ObservationListener listener
     ) {
-        return observe(OBSERVER_OUTPUT_CURRENT, listener);
+        return device.observe(OBSERVER_OUTPUT_CURRENT, listener);
     }
 }

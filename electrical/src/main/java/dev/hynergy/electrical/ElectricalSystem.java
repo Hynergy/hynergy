@@ -197,22 +197,19 @@ public final class ElectricalSystem implements AutoCloseable {
      * this system.</p>
      *
      * @param type the device type
-     * @param <T>  the device class
      * @return the new device
      * @throws NullPointerException  if {@code type} is null
      * @throws IllegalStateException if the system is closed or unusable, or
      *                               if the device type is not registered in this runtime
      */
-    public <T extends Device> T create(DeviceType<T> type) {
+    public Device create(DeviceType type) {
         requireUsable();
 
         Objects.requireNonNull(type, "type");
 
         DeviceDefinition definition = runtime.requireDefinition(type);
 
-        T device = type.construct();
-
-        device.requireUnbound();
+        Device device = new Device();
 
         int id = world.addDevice(definition);
         int generation = world.deviceGeneration(id);
@@ -231,15 +228,14 @@ public final class ElectricalSystem implements AutoCloseable {
      * still be usable in this electrical world.</p>
      *
      * @param id the persistent device identity
-     * @param type the Java device type to construct
-     * @param <T> the device class
+     * @param type the electrical device definition
      * @return a newly bound runtime handle for the existing device
      * @throws NullPointerException if {@code id} or {@code type} is null
      * @throws IllegalArgumentException if the type has a different native definition
      * @throws IllegalStateException if the system is closed or unusable, the
      *     type is not registered for this runtime, or the identity is stale
      */
-    public <T extends Device> T resolveDevice(DeviceId id, DeviceType<T> type) {
+    public Device resolveDevice(DeviceId id, DeviceType type) {
         requireUsable();
 
         Objects.requireNonNull(id, "id");
@@ -250,11 +246,19 @@ public final class ElectricalSystem implements AutoCloseable {
             throw new IllegalArgumentException("Device type does not match the existing native definition");
         }
 
-        T device = type.construct();
-        device.requireUnbound();
+        Device device = new Device();
         device.bind(this, id, definition);
 
         return device;
+    }
+
+    void requireDefinition(Device device, DeviceType type) {
+        requireOwned(device);
+        world.requireDevice(device.id());
+        DeviceDefinition expected = runtime.requireDefinition(type);
+        if (device.definition().id() != expected.id()) {
+            throw new IllegalArgumentException("Device type does not match existing native definition");
+        }
     }
 
     void setParameter(Device device, int parameterId, double value) {

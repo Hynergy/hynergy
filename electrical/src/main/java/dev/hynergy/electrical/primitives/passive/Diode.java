@@ -12,11 +12,11 @@ import dev.hynergy.electrical.*;
  * is positive. It uses the minimum conductance when the voltage is zero or
  * negative.</p>
  */
-public final class Diode extends Device {
+public final class Diode {
     /**
      * The device type for {@code Diode}.
      */
-    public static final DeviceType<Diode> TYPE = DeviceType.primitive(12, Diode::new);
+    public static final DeviceType TYPE = PrimitiveDeviceTypes.DIODE;
 
     private static final int TERMINAL_ANODE = 0;
     private static final int TERMINAL_CATHODE = 1;
@@ -27,7 +27,32 @@ public final class Diode extends Device {
     private static final int OBSERVER_VOLTAGE = 0;
     private static final int OBSERVER_CURRENT = 1;
 
-    private Diode() {
+    private final Device device;
+
+    /**
+     * Wraps a live device with this primitive definition.
+     *
+     * @throws IllegalArgumentException if the native definition differs
+     * @throws IllegalStateException if the device is no longer usable
+     */
+    public Diode(Device device) {
+        java.util.Objects.requireNonNull(device, "device").requireDefinition(TYPE);
+        this.device = device;
+    }
+
+    /** Returns the underlying runtime handle. */
+    public Device device() {
+        return device;
+    }
+
+    /** Returns the runtime identity. */
+    public DeviceId id() {
+        return device.id();
+    }
+
+    /** Destroys the underlying device and its observation subscriptions. */
+    public void destroy() {
+        device.destroy();
     }
 
     /**
@@ -43,7 +68,7 @@ public final class Diode extends Device {
      * @return the diode
      */
     public static Diode create(ElectricalSystem system, double maximumConductance, double minimumConductance) {
-        Diode device = system.create(TYPE);
+        Diode device = new Diode(system.create(TYPE));
 
         device.setMaximumConductance(maximumConductance);
         device.setMinimumConductance(minimumConductance);
@@ -59,7 +84,7 @@ public final class Diode extends Device {
      *     conductance
      */
     public void setMaximumConductance(double maximumConductance) {
-        setParameter(PARAMETER_MAXIMUM_CONDUCTANCE, maximumConductance);
+        device.setParameter(PARAMETER_MAXIMUM_CONDUCTANCE, maximumConductance);
     }
 
     /**
@@ -69,7 +94,7 @@ public final class Diode extends Device {
      *     finite, non-negative, and less than the current maximum conductance
      */
     public void setMinimumConductance(double minimumConductance) {
-        setParameter(PARAMETER_MINIMUM_CONDUCTANCE, minimumConductance);
+        device.setParameter(PARAMETER_MINIMUM_CONDUCTANCE, minimumConductance);
     }
 
     /**
@@ -78,7 +103,7 @@ public final class Diode extends Device {
      * @param wire the wire
      */
     public void attachAnode(Wire wire) {
-        attachTerminal(TERMINAL_ANODE, wire);
+        device.attachTerminal(TERMINAL_ANODE, wire);
     }
 
     /**
@@ -87,7 +112,7 @@ public final class Diode extends Device {
      * @param wire the wire
      */
     public void attachCathode(Wire wire) {
-        attachTerminal(TERMINAL_CATHODE, wire);
+        device.attachTerminal(TERMINAL_CATHODE, wire);
     }
 
     /**
@@ -96,7 +121,7 @@ public final class Diode extends Device {
      * @param wire the wire
      */
     public void detachAnode(Wire wire) {
-        detachTerminal(TERMINAL_ANODE, wire);
+        device.detachTerminal(TERMINAL_ANODE, wire);
     }
 
     /**
@@ -105,7 +130,7 @@ public final class Diode extends Device {
      * @param wire the wire
      */
     public void detachCathode(Wire wire) {
-        detachTerminal(TERMINAL_CATHODE, wire);
+        device.detachTerminal(TERMINAL_CATHODE, wire);
     }
 
     /**
@@ -120,7 +145,7 @@ public final class Diode extends Device {
     public ObservationSubscription observeVoltage(
         ObservationListener listener
     ) {
-        return observe(OBSERVER_VOLTAGE, listener);
+        return device.observe(OBSERVER_VOLTAGE, listener);
     }
 
     /**
@@ -135,6 +160,6 @@ public final class Diode extends Device {
     public ObservationSubscription observeCurrent(
         ObservationListener listener
     ) {
-        return observe(OBSERVER_CURRENT, listener);
+        return device.observe(OBSERVER_CURRENT, listener);
     }
 }

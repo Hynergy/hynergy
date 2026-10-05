@@ -5,19 +5,16 @@ import org.jspecify.annotations.Nullable;
 import java.util.Objects;
 
 /**
- * Is the base class for an electrical device.
+ * A runtime handle for an electrical device.
  *
- * <p>A custom electrical device extends this class and defines a shared
- * {@link DeviceType}.</p>
+ * <p>The electrical system owns the identity, native definition, and lifecycle.
+ * Member IDs are native definition-order indexes, not persistent stable IDs.</p>
  *
- * <p>An {@link ElectricalSystem} binds each device that it creates. Plugin
- * code must not bind a device directly.</p>
- *
- * <p>Use the protected methods to set parameters, attach terminals,
- * detach terminals, and create observation subscriptions.</p>
+ * <p>Gameplay integrations must set parameters through their persistent
+ * component so that overrides and dirty marking are retained.</p>
  */
 @SuppressWarnings("resource")
-public abstract class Device {
+public final class Device {
     private @Nullable ElectricalSystem system;
 
     private @Nullable DeviceId deviceId;
@@ -28,7 +25,7 @@ public abstract class Device {
      *
      * <p>The electrical system binds the device after construction.</p>
      */
-    protected Device() {
+    Device() {
     }
 
     /**
@@ -36,10 +33,6 @@ public abstract class Device {
      *
      * <p>The observer ID is the zero-based order in which the device
      * definition adds its observers.</p>
-     *
-     * <p>Avoid exposing observer IDs in a plugin API. Provide methods with
-     * semantic names, such as {@code observeVoltage()} or
-     * {@code observeControlVoltage()}.</p>
      *
      * @param observerId the observer ID
      * @param listener the observation listener
@@ -50,7 +43,7 @@ public abstract class Device {
      * @throws IllegalStateException if the device is not bound or its system
      *     is not usable
      */
-    protected final ObservationSubscription observe(int observerId, ObservationListener listener) {
+    public final ObservationSubscription observe(int observerId, ObservationListener listener) {
         return requireBound().subscribe(this, observerId, listener);
     }
 
@@ -66,12 +59,23 @@ public abstract class Device {
         this.definition = definition;
     }
 
+    /**
+     * Checks that this live handle uses the supplied native definition.
+     *
+     * @throws IllegalArgumentException if the definitions differ
+     * @throws IllegalStateException if the handle is stale or the type is unregistered
+     */
+    public final void requireDefinition(DeviceType type) {
+        requireBound().requireDefinition(this, type);
+    }
+
     final DeviceDefinition definition() {
         requireBound();
         return Objects.requireNonNull(definition, "definition");
     }
 
-    final void validateParameter(int parameterId, double value) {
+    /** Checks native parameter constraints without queuing a mutation. */
+    public final void validateParameter(int parameterId, double value) {
         requireBound().validateParameter(this, parameterId, value);
     }
 
@@ -105,7 +109,7 @@ public abstract class Device {
      *
      * @throws IllegalStateException if the device or its system is not usable
      */
-    protected final void setParameter(int parameterId, double value) {
+    public final void setParameter(int parameterId, double value) {
         requireBound().setParameter(this, parameterId, value);
     }
 
@@ -122,7 +126,7 @@ public abstract class Device {
      * @throws IllegalArgumentException if the wire belongs to another system
      * @throws IllegalStateException if the device or its system is not usable
      */
-    protected final void attachTerminal(int terminalId, Wire wire) {
+    public final void attachTerminal(int terminalId, Wire wire) {
         requireBound().attachTerminal(this, terminalId, wire);
     }
 
@@ -137,7 +141,7 @@ public abstract class Device {
      * @throws IllegalArgumentException if the wire belongs to another system
      * @throws IllegalStateException if the device or its system is not usable
      */
-    protected final void detachTerminal(int terminalId, Wire wire) {
+    public final void detachTerminal(int terminalId, Wire wire) {
         requireBound().detachTerminal(this, terminalId, wire);
     }
 

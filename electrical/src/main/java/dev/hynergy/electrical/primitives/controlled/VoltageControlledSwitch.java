@@ -13,12 +13,12 @@ import dev.hynergy.electrical.*;
  *
  * <p>Positive output current flows from output-positive to output-negative.</p>
  */
-public final class VoltageControlledSwitch extends Device {
+public final class VoltageControlledSwitch {
     /**
      * The device type for {@code VoltageControlledSwitch}.
      */
-    public static final DeviceType<VoltageControlledSwitch> TYPE =
-        DeviceType.primitive(9, VoltageControlledSwitch::new);
+    public static final DeviceType TYPE =
+        PrimitiveDeviceTypes.VOLTAGE_CONTROLLED_SWITCH;
 
     private static final int TERMINAL_OUTPUT_POSITIVE = 0;
     private static final int TERMINAL_OUTPUT_NEGATIVE = 1;
@@ -33,7 +33,32 @@ public final class VoltageControlledSwitch extends Device {
     private static final int OBSERVER_CONTROL_VOLTAGE = 1;
     private static final int OBSERVER_OUTPUT_CURRENT = 2;
 
-    private VoltageControlledSwitch() {
+    private final Device device;
+
+    /**
+     * Wraps a live device with this primitive definition.
+     *
+     * @throws IllegalArgumentException if the native definition differs
+     * @throws IllegalStateException if the device is no longer usable
+     */
+    public VoltageControlledSwitch(Device device) {
+        java.util.Objects.requireNonNull(device, "device").requireDefinition(TYPE);
+        this.device = device;
+    }
+
+    /** Returns the underlying runtime handle. */
+    public Device device() {
+        return device;
+    }
+
+    /** Returns the runtime identity. */
+    public DeviceId id() {
+        return device.id();
+    }
+
+    /** Destroys the underlying device and its observation subscriptions. */
+    public void destroy() {
+        device.destroy();
     }
 
     /**
@@ -56,7 +81,7 @@ public final class VoltageControlledSwitch extends Device {
         double maximumConductance,
         double minimumConductance
     ) {
-        VoltageControlledSwitch device = system.create(TYPE);
+        VoltageControlledSwitch device = new VoltageControlledSwitch(system.create(TYPE));
 
         device.setThresholdVoltage(thresholdVoltage);
         device.setMaximumConductance(maximumConductance);
@@ -72,7 +97,7 @@ public final class VoltageControlledSwitch extends Device {
      *     be finite
      */
     public void setThresholdVoltage(double thresholdVoltage) {
-        setParameter(PARAMETER_THRESHOLD_VOLTAGE, thresholdVoltage);
+        device.setParameter(PARAMETER_THRESHOLD_VOLTAGE, thresholdVoltage);
     }
 
     /**
@@ -83,7 +108,7 @@ public final class VoltageControlledSwitch extends Device {
      *     conductance
      */
     public void setMaximumConductance(double maximumConductance) {
-        setParameter(PARAMETER_MAXIMUM_CONDUCTANCE, maximumConductance);
+        device.setParameter(PARAMETER_MAXIMUM_CONDUCTANCE, maximumConductance);
     }
 
     /**
@@ -93,7 +118,7 @@ public final class VoltageControlledSwitch extends Device {
      *     finite, non-negative, and less than the current maximum conductance
      */
     public void setMinimumConductance(double minimumConductance) {
-        setParameter(PARAMETER_MINIMUM_CONDUCTANCE, minimumConductance);
+        device.setParameter(PARAMETER_MINIMUM_CONDUCTANCE, minimumConductance);
     }
 
     /**
@@ -102,7 +127,7 @@ public final class VoltageControlledSwitch extends Device {
      * @param wire the wire
      */
     public void attachOutputPositive(Wire wire) {
-        attachTerminal(TERMINAL_OUTPUT_POSITIVE, wire);
+        device.attachTerminal(TERMINAL_OUTPUT_POSITIVE, wire);
     }
 
     /**
@@ -111,7 +136,7 @@ public final class VoltageControlledSwitch extends Device {
      * @param wire the wire
      */
     public void detachOutputPositive(Wire wire) {
-        detachTerminal(TERMINAL_OUTPUT_POSITIVE, wire);
+        device.detachTerminal(TERMINAL_OUTPUT_POSITIVE, wire);
     }
 
     /**
@@ -120,7 +145,7 @@ public final class VoltageControlledSwitch extends Device {
      * @param wire the wire
      */
     public void attachOutputNegative(Wire wire) {
-        attachTerminal(TERMINAL_OUTPUT_NEGATIVE, wire);
+        device.attachTerminal(TERMINAL_OUTPUT_NEGATIVE, wire);
     }
 
     /**
@@ -129,7 +154,7 @@ public final class VoltageControlledSwitch extends Device {
      * @param wire the wire
      */
     public void detachOutputNegative(Wire wire) {
-        detachTerminal(TERMINAL_OUTPUT_NEGATIVE, wire);
+        device.detachTerminal(TERMINAL_OUTPUT_NEGATIVE, wire);
     }
 
     /**
@@ -138,7 +163,7 @@ public final class VoltageControlledSwitch extends Device {
      * @param wire the wire
      */
     public void attachControlPositive(Wire wire) {
-        attachTerminal(TERMINAL_CONTROL_POSITIVE, wire);
+        device.attachTerminal(TERMINAL_CONTROL_POSITIVE, wire);
     }
 
     /**
@@ -147,7 +172,7 @@ public final class VoltageControlledSwitch extends Device {
      * @param wire the wire
      */
     public void detachControlPositive(Wire wire) {
-        detachTerminal(TERMINAL_CONTROL_POSITIVE, wire);
+        device.detachTerminal(TERMINAL_CONTROL_POSITIVE, wire);
     }
 
     /**
@@ -156,7 +181,7 @@ public final class VoltageControlledSwitch extends Device {
      * @param wire the wire
      */
     public void attachControlNegative(Wire wire) {
-        attachTerminal(TERMINAL_CONTROL_NEGATIVE, wire);
+        device.attachTerminal(TERMINAL_CONTROL_NEGATIVE, wire);
     }
 
     /**
@@ -165,7 +190,7 @@ public final class VoltageControlledSwitch extends Device {
      * @param wire the wire
      */
     public void detachControlNegative(Wire wire) {
-        detachTerminal(TERMINAL_CONTROL_NEGATIVE, wire);
+        device.detachTerminal(TERMINAL_CONTROL_NEGATIVE, wire);
     }
 
     /**
@@ -181,7 +206,7 @@ public final class VoltageControlledSwitch extends Device {
     public ObservationSubscription observeOutputVoltage(
         ObservationListener listener
     ) {
-        return observe(OBSERVER_OUTPUT_VOLTAGE, listener);
+        return device.observe(OBSERVER_OUTPUT_VOLTAGE, listener);
     }
 
     /**
@@ -197,7 +222,7 @@ public final class VoltageControlledSwitch extends Device {
     public ObservationSubscription observeControlVoltage(
         ObservationListener listener
     ) {
-        return observe(OBSERVER_CONTROL_VOLTAGE, listener);
+        return device.observe(OBSERVER_CONTROL_VOLTAGE, listener);
     }
 
     /**
@@ -213,6 +238,6 @@ public final class VoltageControlledSwitch extends Device {
     public ObservationSubscription observeOutputCurrent(
         ObservationListener listener
     ) {
-        return observe(OBSERVER_OUTPUT_CURRENT, listener);
+        return device.observe(OBSERVER_OUTPUT_CURRENT, listener);
     }
 }

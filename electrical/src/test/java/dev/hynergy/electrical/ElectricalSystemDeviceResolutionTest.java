@@ -18,9 +18,9 @@ final class ElectricalSystemDeviceResolutionTest {
             assertThrows(IllegalArgumentException.class,
                     () -> system.resolveDevice(original.id(),
                             dev.hynergy.electrical.primitives.sources.VoltageSource.TYPE));
-            Resistance restored = system.resolveDevice(original.id(), Resistance.TYPE);
-            assertThrows(IllegalArgumentException.class, () -> restored.setResistance(0.0));
-            restored.setResistance(20.0);
+            Device restored = system.resolveDevice(original.id(), Resistance.TYPE);
+            assertThrows(IllegalArgumentException.class, () -> restored.setParameter(0, 0.0));
+            restored.setParameter(0, 20.0);
             assertDoesNotThrow(system::tick);
         }
     }
@@ -33,7 +33,7 @@ final class ElectricalSystemDeviceResolutionTest {
             Resistance original = Resistance.create(system, 10.0);
             DeviceId id = original.id();
 
-            Resistance resolved = system.resolveDevice(id, Resistance.TYPE);
+            Device resolved = system.resolveDevice(id, Resistance.TYPE);
 
             assertNotSame(original, resolved);
             assertEquals(id, resolved.id());
@@ -46,7 +46,7 @@ final class ElectricalSystemDeviceResolutionTest {
 
             assertThrows(
                     IllegalStateException.class,
-                    () -> DeviceAccess.setParameter(resolved, 0, 30.0)
+                    () -> resolved.setParameter(0, 30.0)
             );
         }
     }
@@ -74,7 +74,7 @@ final class ElectricalSystemDeviceResolutionTest {
                     () -> system.resolveDevice(stale, Resistance.TYPE)
             );
 
-            Resistance resolved = assertDoesNotThrow(
+            Device resolved = assertDoesNotThrow(
                     () -> system.resolveDevice(current, Resistance.TYPE)
             );
 

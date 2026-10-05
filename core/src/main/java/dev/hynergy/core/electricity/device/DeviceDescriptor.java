@@ -1,6 +1,5 @@
 package dev.hynergy.core.electricity.device;
 
-import dev.hynergy.electrical.Device;
 import dev.hynergy.electrical.DeviceType;
 
 import java.util.Objects;
@@ -14,11 +13,10 @@ import java.util.Objects;
  * @param parameters stable parameter IDs to native parameter indexes
  * @param terminals  stable terminal IDs to native terminal indexes
  * @param observers  stable observer IDs to native observer indexes
- * @param <T>        the electrical device class
  */
-public record DeviceDescriptor<T extends Device>(
+public record DeviceDescriptor(
         String id,
-        DeviceType<T> type,
+        DeviceType type,
         MemberMapping parameters,
         MemberMapping terminals,
         MemberMapping observers

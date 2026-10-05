@@ -24,11 +24,10 @@ import dev.hynergy.core.port.PortDomain;
 import dev.hynergy.core.port.PortGeometry;
 import dev.hynergy.core.port.PortModule;
 import dev.hynergy.core.port.PortStandard;
-import dev.hynergy.electrical.Device;
 import dev.hynergy.electrical.DeviceDefinition;
 import dev.hynergy.electrical.DeviceType;
 import dev.hynergy.electrical.ElectricalRuntime;
-import dev.hynergy.electrical.primitives.passive.Resistance;
+import dev.hynergy.electrical.PrimitiveDeviceTypes;
 import org.joml.Vector3i;
 import org.jspecify.annotations.Nullable;
 
@@ -40,9 +39,9 @@ public final class ElectricityModule extends HynergyModule {
 
     private static final HytaleLogger LOGGER = HytaleLogger.forEnclosingClass();
 
-    static final DeviceDescriptor<Resistance> RESISTANCE_DESCRIPTOR = new DeviceDescriptor<>(
+    static final DeviceDescriptor RESISTANCE_DESCRIPTOR = new DeviceDescriptor(
             "hynergy:resistance",
-            Resistance.TYPE,
+            PrimitiveDeviceTypes.RESISTANCE,
             new MemberMapping(0),
             new MemberMapping(0, 1),
             new MemberMapping(0, 1)
@@ -371,9 +370,9 @@ public final class ElectricityModule extends HynergyModule {
      * Registers a descriptor and its runtime type.
      * Call during plugin setup, before Hytale loads device assets.
      */
-    public <T extends Device> DeviceDescriptor<T> registerDevice(
+    public DeviceDescriptor registerDevice(
             String id,
-            DeviceType<T> type,
+            DeviceType type,
             MemberMapping parameters,
             MemberMapping terminals,
             MemberMapping observers
@@ -387,7 +386,7 @@ public final class ElectricityModule extends HynergyModule {
             );
         }
 
-        DeviceDescriptor<T> descriptor = deviceDescriptors.register(
+        DeviceDescriptor descriptor = deviceDescriptors.register(
                 id,
                 type,
                 parameters,
@@ -398,7 +397,7 @@ public final class ElectricityModule extends HynergyModule {
         return descriptor;
     }
 
-    public <T extends Device> DeviceDefinition register(DeviceType<T> type) {
+    public DeviceDefinition register(DeviceType type) {
         requireRegistrationOpen();
 
         ElectricalRuntime runtime = this.runtime;

@@ -127,7 +127,7 @@ public final class DeviceConfig implements JsonAssetWithMap<String, DefaultAsset
             throw invalid("Type must name a registered device descriptor");
         }
 
-        DeviceDescriptor<?> descriptor;
+        DeviceDescriptor descriptor;
         try {
             descriptor = descriptors.require(type);
         } catch (IllegalArgumentException failure) {

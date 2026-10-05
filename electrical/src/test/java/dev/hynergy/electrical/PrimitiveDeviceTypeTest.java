@@ -38,7 +38,7 @@ final class PrimitiveDeviceTypeTest {
         assertDefinitionId(18, SchmittBuffer.TYPE);
     }
 
-    private static void assertDefinitionId(int expectedId, DeviceType<?> type) {
+    private static void assertDefinitionId(int expectedId, DeviceType type) {
         DeviceDefinition definition =
             Objects.requireNonNull(type.currentDefinition(), "Primitive definition is missing");
 

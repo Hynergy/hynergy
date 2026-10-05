@@ -11,7 +11,7 @@ import java.util.Objects;
  * corresponding native indexes are compiled once for runtime use.</p>
  */
 public final class CompiledDeviceConfig {
-    private final DeviceDescriptor<?> descriptor;
+    private final DeviceDescriptor descriptor;
 
     private final int[] stableParameterIds;
     private final int[] nativeParameterIds;
@@ -23,7 +23,7 @@ public final class CompiledDeviceConfig {
     private final BlockPortDefinition portDefinition;
 
     CompiledDeviceConfig(
-            DeviceDescriptor<?> descriptor,
+            DeviceDescriptor descriptor,
             int[] stableParameterIds,
             int[] nativeParameterIds,
             double[] parameterDefaults,
@@ -52,7 +52,7 @@ public final class CompiledDeviceConfig {
         }
     }
 
-    public DeviceDescriptor<?> descriptor() {
+    public DeviceDescriptor descriptor() {
         return descriptor;
     }
 

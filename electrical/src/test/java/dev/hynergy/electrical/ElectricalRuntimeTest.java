@@ -2,7 +2,6 @@ package dev.hynergy.electrical;
 
 import org.junit.jupiter.api.Test;
 
-import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicReference;
 
 import static org.junit.jupiter.api.Assertions.*;
@@ -12,9 +11,9 @@ final class ElectricalRuntimeTest {
 
     @Test
     void registrationResolvesDependenciesAndCachesDefinitions() {
-        DeviceType<TestDevice> resistance = resistanceType();
-        DeviceType<TestDevice> child = resistorComposite(resistance);
-        DeviceType<TestDevice> parent = forwardingComposite(child);
+        DeviceType resistance = resistanceType();
+        DeviceType child = resistorComposite(resistance);
+        DeviceType parent = forwardingComposite(child);
 
         try (ElectricalRuntime runtime = ElectricalRuntime.create()) {
             DeviceDefinition parentDefinition = runtime.register(parent);
@@ -29,18 +28,18 @@ final class ElectricalRuntimeTest {
 
     @Test
     void registrationRejectsRecursiveDependenciesAndRemainsUsable() {
-        AtomicReference<DeviceType<TestDevice>> firstReference = new AtomicReference<>();
-        AtomicReference<DeviceType<TestDevice>> secondReference = new AtomicReference<>();
+        AtomicReference<DeviceType> firstReference = new AtomicReference<>();
+        AtomicReference<DeviceType> secondReference = new AtomicReference<>();
 
-        DeviceType<TestDevice> first =
-            DeviceType.create(TestDevice::new, builder -> builder.beginElement(secondReference.get()));
-        DeviceType<TestDevice> second =
-            DeviceType.create(TestDevice::new, builder -> builder.beginElement(firstReference.get()));
+        DeviceType first =
+            DeviceType.create(builder -> builder.beginElement(secondReference.get()));
+        DeviceType second =
+            DeviceType.create(builder -> builder.beginElement(firstReference.get()));
 
         firstReference.set(first);
         secondReference.set(second);
 
-        DeviceType<TestDevice> valid = resistorComposite(resistanceType());
+        DeviceType valid = resistorComposite(resistanceType());
 
         try (ElectricalRuntime runtime = ElectricalRuntime.create()) {
             assertThrows(IllegalStateException.class, () -> runtime.register(first));
@@ -51,9 +50,9 @@ final class ElectricalRuntimeTest {
 
     @Test
     void failedRootRegistrationKeepsSuccessfulDependencies() {
-        DeviceType<TestDevice> child = resistorComposite(resistanceType());
-        DeviceType<TestDevice> invalidParent =
-            DeviceType.create(TestDevice::new, builder -> builder.beginElement(child).endElement());
+        DeviceType child = resistorComposite(resistanceType());
+        DeviceType invalidParent =
+            DeviceType.create(builder -> builder.beginElement(child).endElement());
 
         try (ElectricalRuntime runtime = ElectricalRuntime.create()) {
             assertThrows(IllegalArgumentException.class, () -> runtime.register(invalidParent));
@@ -66,7 +65,7 @@ final class ElectricalRuntimeTest {
 
     @Test
     void unregisteredTypesCannotBeAddedWhileSystemsAreActive() {
-        DeviceType<TestDevice> type = resistorComposite(resistanceType());
+        DeviceType type = resistorComposite(resistanceType());
 
         try (ElectricalRuntime runtime = ElectricalRuntime.create()) {
             ElectricalSystem system = runtime.createSystem(20);
@@ -81,7 +80,7 @@ final class ElectricalRuntimeTest {
 
     @Test
     void registeredDefinitionIsClearedWhenRuntimeCloses() {
-        DeviceType<TestDevice> type = resistorComposite(resistanceType());
+        DeviceType type = resistorComposite(resistanceType());
 
         DeviceDefinition firstDefinition;
 
@@ -99,7 +98,7 @@ final class ElectricalRuntimeTest {
 
     @Test
     void staleRuntimeCleanupDoesNotClearNewRuntimeBinding() {
-        DeviceType<TestDevice> type = resistorComposite(resistanceType());
+        DeviceType type = resistorComposite(resistanceType());
 
         ElectricalRuntime firstRuntime = ElectricalRuntime.create();
 
@@ -116,42 +115,8 @@ final class ElectricalRuntimeTest {
     }
 
     @Test
-    void reusedDeviceInstanceIsRejectedBeforeWorldIdAllocation() {
-        TestDevice reused = new TestDevice();
-        AtomicInteger constructorCalls = new AtomicInteger();
-
-        DeviceType<TestDevice> type = DeviceType.create(
-            () -> constructorCalls.getAndIncrement() < 2 ? reused : new TestDevice(), builder -> {
-                int firstTerminal = builder.addTerminal();
-                int secondTerminal = builder.addTerminal();
-
-                builder.beginElement(resistanceType())
-                    .elementTerminal(firstTerminal)
-                    .elementTerminal(secondTerminal)
-                    .elementLiteral(1_000.0)
-                    .endElement();
-            }
-        );
-
-        try (ElectricalRuntime runtime = ElectricalRuntime.create()) {
-            runtime.register(type);
-
-            try (ElectricalSystem system = runtime.createSystem(20)) {
-                TestDevice first = system.create(type);
-
-                assertEquals(1, first.id().value());
-                assertThrows(IllegalStateException.class, () -> system.create(type));
-
-                TestDevice second = system.create(type);
-
-                assertEquals(2, second.id().value());
-            }
-        }
-    }
-
-    @Test
     void primitiveTypesHaveFixedDefinitions() {
-        DeviceType<TestDevice> resistance = resistanceType();
+        DeviceType resistance = resistanceType();
 
         try (ElectricalRuntime runtime = ElectricalRuntime.create()) {
             DeviceDefinition definition = runtime.register(resistance);
@@ -161,40 +126,33 @@ final class ElectricalRuntimeTest {
         }
     }
 
-    private static DeviceType<TestDevice> resistanceType() {
-        return DeviceType.primitive(RESISTANCE_DEFINITION_ID, TestDevice::new);
+    private static DeviceType resistanceType() {
+        return DeviceType.primitive(RESISTANCE_DEFINITION_ID);
     }
 
-    private static DeviceType<TestDevice> resistorComposite(
-        DeviceType<?> resistance
+    private static DeviceType resistorComposite(
+        DeviceType resistance
     ) {
-        return DeviceType.create(
-            TestDevice::new, builder -> {
-                int firstTerminal = builder.addTerminal();
-                int secondTerminal = builder.addTerminal();
+        return DeviceType.create(builder -> {
+        int firstTerminal = builder.addTerminal();
+        int secondTerminal = builder.addTerminal();
 
-                builder.beginElement(resistance)
-                    .elementTerminal(firstTerminal)
-                    .elementTerminal(secondTerminal)
-                    .elementLiteral(1_000.0)
-                    .endElement();
-            }
-        );
+        builder.beginElement(resistance)
+            .elementTerminal(firstTerminal)
+            .elementTerminal(secondTerminal)
+            .elementLiteral(1_000.0)
+            .endElement();
+        });
     }
 
-    private static DeviceType<TestDevice> forwardingComposite(
-        DeviceType<?> child
+    private static DeviceType forwardingComposite(
+        DeviceType child
     ) {
-        return DeviceType.create(
-            TestDevice::new, builder -> {
-                int firstTerminal = builder.addTerminal();
-                int secondTerminal = builder.addTerminal();
+        return DeviceType.create(builder -> {
+        int firstTerminal = builder.addTerminal();
+        int secondTerminal = builder.addTerminal();
 
-                builder.beginElement(child).elementTerminal(firstTerminal).elementTerminal(secondTerminal).endElement();
-            }
-        );
-    }
-
-    private static final class TestDevice extends Device {
+        builder.beginElement(child).elementTerminal(firstTerminal).elementTerminal(secondTerminal).endElement();
+        });
     }
 }

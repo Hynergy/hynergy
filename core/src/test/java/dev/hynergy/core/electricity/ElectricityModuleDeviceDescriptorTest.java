@@ -10,7 +10,7 @@ import static org.junit.jupiter.api.Assertions.assertSame;
 final class ElectricityModuleDeviceDescriptorTest {
     @Test
     void builtInResistanceDescriptorUsesFrozenStableMemberIds() {
-        DeviceDescriptor<Resistance> descriptor = ElectricityModule.RESISTANCE_DESCRIPTOR;
+        DeviceDescriptor descriptor = ElectricityModule.RESISTANCE_DESCRIPTOR;
 
         assertEquals("hynergy:resistance", descriptor.id());
         assertSame(Resistance.TYPE, descriptor.type());

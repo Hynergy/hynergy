@@ -81,7 +81,7 @@ final class DeviceDefinitionTest {
     @Test
     void groundedJavaCompositePublishesNativeVoltageAndCurrents() {
         for (boolean exposed : new boolean[]{true, false}) {
-            DeviceType<GroundedDevice> type = DeviceType.create(GroundedDevice::new, builder -> {
+            DeviceType type = DeviceType.create(builder -> {
                 int output = exposed ? builder.addTerminal() : builder.addNode();
                 int ground = builder.addGroundNode();
                 builder.addVoltageObserver(output, ground);
@@ -97,19 +97,19 @@ final class DeviceDefinitionTest {
             try (ElectricalRuntime runtime = ElectricalRuntime.create()) {
                 runtime.register(type);
                 try (ElectricalSystem system = runtime.createSystem(20)) {
-                    GroundedDevice device = system.create(type);
+                    Device device = system.create(type);
                     ArrayList<Double> voltage = new ArrayList<>();
                     ArrayList<Double> sourceCurrent = new ArrayList<>();
                     ArrayList<Double> loadCurrent = new ArrayList<>();
-                    device.observeValue(0, (status, value) -> {
+                    device.observe(0, (status, value) -> {
                         assertEquals(ObservationStatus.AVAILABLE, status);
                         voltage.add(value);
                     });
-                    device.observeValue(1, (status, value) -> {
+                    device.observe(1, (status, value) -> {
                         assertEquals(ObservationStatus.AVAILABLE, status);
                         sourceCurrent.add(value);
                     });
-                    device.observeValue(2, (status, value) -> {
+                    device.observe(2, (status, value) -> {
                         assertEquals(ObservationStatus.AVAILABLE, status);
                         loadCurrent.add(value);
                     });
@@ -125,9 +125,4 @@ final class DeviceDefinitionTest {
         }
     }
 
-    private static final class GroundedDevice extends Device {
-        ObservationSubscription observeValue(int observer, ObservationListener listener) {
-            return observe(observer, listener);
-        }
-    }
 }

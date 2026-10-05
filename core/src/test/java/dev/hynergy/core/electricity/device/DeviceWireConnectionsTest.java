@@ -48,10 +48,10 @@ final class DeviceWireConnectionsTest {
 
             fixture.positive.destroy();
             Wire replacement = fixture.system.createWire();
-            DeviceAccess.attachTerminal(fixture.source, 0, replacement);
+            fixture.source.attachTerminal(0, replacement);
             fixture.discoverWire(replacement, -1);
             fixture.assertCurrent(0.5);
-            DeviceAccess.setParameter(fixture.source, 0, 8.0);
+            fixture.source.setParameter(0, 8.0);
             fixture.assertCurrent(0.8);
         }
     }
@@ -66,7 +66,7 @@ final class DeviceWireConnectionsTest {
             assertTrue(DeviceWireConnections.attachPortIfNew(fixture.component, 3, fixture.negative, dedup));
             fixture.assertCurrent(0.5);
 
-            DeviceAccess.detachTerminal(fixture.resistance, 0, fixture.positive);
+            fixture.resistance.detachTerminal(0, fixture.positive);
             fixture.assertCurrent(0.0);
         }
     }
@@ -77,9 +77,9 @@ final class DeviceWireConnectionsTest {
             DeviceComponent second = new DeviceComponent("test:resistance");
             ElectricalDeviceSystem.bindDevice(second, fixture.compiled, fixture.system, () -> {
             });
-            Resistance secondResistance = (Resistance) second.device();
+            Device secondResistance = second.device();
             ArrayList<Double> currents = new ArrayList<>();
-            DeviceAccess.observe(secondResistance, 1, (status, value) -> currents.add(value));
+            secondResistance.observe(1, (status, value) -> currents.add(value));
             var dedup = new DeviceWireConnections.AttachmentDedup();
             for (DeviceComponent component : new DeviceComponent[]{fixture.component, second}) {
                 assertTrue(DeviceWireConnections.attachPortIfNew(component, 7, fixture.positive, dedup));
@@ -122,7 +122,7 @@ final class DeviceWireConnectionsTest {
                     }
             ).created());
             assertEquals(retained, fixture.component.getDeviceId());
-            DeviceAccess.setParameter(fixture.source, 0, 8.0);
+            fixture.source.setParameter(0, 8.0);
             fixture.assertCurrent(0.8);
         }
     }
@@ -135,7 +135,7 @@ final class DeviceWireConnectionsTest {
             fixture.assertCurrent(0.5);
             Wire restored = fixture.system.resolveWire(fixture.positive.id());
             assertEquals(fixture.positive.id(), restored.id());
-            DeviceAccess.setParameter(fixture.source, 0, 8.0);
+            fixture.source.setParameter(0, 8.0);
             fixture.assertCurrent(0.8);
         }
     }
@@ -147,8 +147,8 @@ final class DeviceWireConnectionsTest {
         private final PortDomain<ElectricalPortConnection> domain = ports.registerDomain("test:electrical");
         private final CompiledDeviceConfig compiled;
         private final DeviceComponent component = new DeviceComponent("test:resistance");
-        private final Resistance resistance;
-        private final VoltageSource source = system.create(VoltageSource.TYPE);
+        private final Device resistance;
+        private final Device source = system.create(VoltageSource.TYPE);
         private final Wire positive;
         private final Wire negative;
         private final ArrayList<Double> currents = new ArrayList<>();
@@ -189,11 +189,11 @@ final class DeviceWireConnectionsTest {
                 ElectricalDeviceSystem.bindDevice(component, compiled, system, () -> {
                 });
             }
-            resistance = (Resistance) component.device();
-            DeviceAccess.setParameter(source, 0, 5.0);
-            DeviceAccess.attachTerminal(source, 0, positive);
-            DeviceAccess.attachTerminal(source, 1, negative);
-            DeviceAccess.observe(resistance, 1, (status, value) -> {
+            resistance = component.device();
+            source.setParameter(0, 5.0);
+            source.attachTerminal(0, positive);
+            source.attachTerminal(1, negative);
+            resistance.observe(1, (status, value) -> {
                 assertEquals(ObservationStatus.AVAILABLE, status);
                 currents.add(value);
             });

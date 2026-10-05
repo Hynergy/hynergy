@@ -2,10 +2,7 @@ package dev.hynergy.core.electricity.device;
 
 import dev.hynergy.core.electricity.ElectricalCodecs;
 import dev.hynergy.core.port.BlockPortDefinition;
-import dev.hynergy.electrical.DeviceId;
-import dev.hynergy.electrical.ElectricalRuntime;
-import dev.hynergy.electrical.ElectricalSystem;
-import dev.hynergy.electrical.ObservationSubscription;
+import dev.hynergy.electrical.*;
 import dev.hynergy.electrical.primitives.passive.Resistance;
 import dev.hynergy.electrical.primitives.sources.VoltageSource;
 import org.bson.BsonValue;
@@ -18,7 +15,7 @@ final class DeviceComponentTest {
     void signedZeroOverrideIsPreservedUntilTheExactDefaultIsRestored() {
         try (ElectricalRuntime runtime = ElectricalRuntime.create();
              ElectricalSystem system = runtime.createSystem(20)) {
-            DeviceDescriptor<VoltageSource> descriptor = new DeviceDescriptor<>("test:voltage", VoltageSource.TYPE,
+            DeviceDescriptor descriptor = new DeviceDescriptor("test:voltage", VoltageSource.TYPE,
                     new MemberMapping(0), new MemberMapping(0, 1), new MemberMapping(0, 1));
             CompiledDeviceConfig compiled = new CompiledDeviceConfig(descriptor,
                     new int[]{0}, new int[]{0}, new double[]{0.0},
@@ -98,7 +95,7 @@ final class DeviceComponentTest {
         try (ElectricalRuntime runtime = ElectricalRuntime.create();
              ElectricalSystem system = runtime.createSystem(20)) {
             CompiledDeviceConfig compiled = compiled(4, 100.0, 6);
-            Resistance resistance = system.create(Resistance.TYPE);
+            Device resistance = system.create(Resistance.TYPE);
             DeviceComponent component = new DeviceComponent("test:device");
             component.setDeviceId(resistance.id());
             component.overrides().set(4, 470.0);
@@ -123,7 +120,7 @@ final class DeviceComponentTest {
         try (ElectricalRuntime runtime = ElectricalRuntime.create();
              ElectricalSystem system = runtime.createSystem(20)) {
             CompiledDeviceConfig compiled = compiled(4, 100.0, 6);
-            Resistance resistance = system.create(Resistance.TYPE);
+            Device resistance = system.create(Resistance.TYPE);
             DeviceComponent component = new DeviceComponent("test:device");
             component.setDeviceId(resistance.id());
             component.overrides().set(4, 470.0);
@@ -148,7 +145,7 @@ final class DeviceComponentTest {
         try (ElectricalRuntime runtime = ElectricalRuntime.create();
              ElectricalSystem system = runtime.createSystem(20)) {
             CompiledDeviceConfig compiled = compiled(4, 100.0, 6);
-            Resistance resistance = system.create(Resistance.TYPE);
+            Device resistance = system.create(Resistance.TYPE);
             DeviceComponent component = new DeviceComponent("test:device");
             component.setDeviceId(resistance.id());
             component.overrides().set(4, 470.0);
@@ -173,7 +170,7 @@ final class DeviceComponentTest {
         try (ElectricalRuntime runtime = ElectricalRuntime.create();
              ElectricalSystem system = runtime.createSystem(20)) {
             CompiledDeviceConfig compiled = compiled(4, 100.0, 6);
-            Resistance resistance = system.create(Resistance.TYPE);
+            Device resistance = system.create(Resistance.TYPE);
             DeviceComponent component = new DeviceComponent("test:device");
             component.bindRuntime(resistance, compiled, () -> {
             });
@@ -196,7 +193,7 @@ final class DeviceComponentTest {
         try (ElectricalRuntime runtime = ElectricalRuntime.create();
              ElectricalSystem system = runtime.createSystem(20)) {
             CompiledDeviceConfig compiled = compiled(4, 100.0, 6);
-            Resistance resistance = system.create(Resistance.TYPE);
+            Device resistance = system.create(Resistance.TYPE);
             DeviceComponent component = new DeviceComponent("test:device");
             component.bindRuntime(resistance, compiled, () -> {
             });
@@ -221,7 +218,7 @@ final class DeviceComponentTest {
 
         try (ElectricalRuntime runtime = ElectricalRuntime.create();
              ElectricalSystem system = runtime.createSystem(20)) {
-            Resistance resistance = system.create(Resistance.TYPE);
+            Device resistance = system.create(Resistance.TYPE);
             DeviceComponent component = new DeviceComponent("test:device");
             component.bindRuntime(resistance, compiled, () -> {
             });
@@ -246,7 +243,7 @@ final class DeviceComponentTest {
         java.util.Arrays.fill(observerMapping, MemberMapping.UNMAPPED);
         observerMapping[stableObserverId] = 0;
 
-        DeviceDescriptor<Resistance> descriptor = new DeviceDescriptor<>(
+        DeviceDescriptor descriptor = new DeviceDescriptor(
                 "test:resistance",
                 Resistance.TYPE,
                 new MemberMapping(parameterMapping),

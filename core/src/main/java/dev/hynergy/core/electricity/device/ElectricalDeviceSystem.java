@@ -15,7 +15,10 @@ import dev.hynergy.core.port.HytalePortWorldView;
 import dev.hynergy.core.port.PortConnectionConsumer;
 import dev.hynergy.core.port.PortDomain;
 import dev.hynergy.core.port.PortModule;
-import dev.hynergy.electrical.*;
+import dev.hynergy.electrical.Device;
+import dev.hynergy.electrical.DeviceId;
+import dev.hynergy.electrical.ElectricalRuntime;
+import dev.hynergy.electrical.ElectricalSystem;
 import org.joml.Vector3i;
 import org.jspecify.annotations.NonNull;
 import org.jspecify.annotations.Nullable;
@@ -276,7 +279,7 @@ public final class ElectricalDeviceSystem extends RefSystem<ChunkStore> {
         for (int index = 0; index < compiled.parameterCount(); index++) {
             int stableId = compiled.stableParameterIdAt(index);
             double value = overrides.getOrDefault(stableId, compiled.parameterDefaultAt(index));
-            DeviceAccess.validateParameter(device, compiled.nativeParameterIdAt(index), value);
+            device.validateParameter(compiled.nativeParameterIdAt(index), value);
         }
         for (int index = 0; index < overrides.size(); index++) {
             int stableId = overrides.stableIdAt(index);
@@ -285,14 +288,14 @@ public final class ElectricalDeviceSystem extends RefSystem<ChunkStore> {
             }
             int nativeId = compiled.nativeParameterId(stableId);
             if (nativeId != MemberMapping.UNMAPPED) {
-                DeviceAccess.validateParameter(device, nativeId, overrides.valueAt(index));
+                device.validateParameter(nativeId, overrides.valueAt(index));
             }
         }
 
         for (int index = 0; index < compiled.parameterCount(); index++) {
             int stableId = compiled.stableParameterIdAt(index);
             double value = overrides.getOrDefault(stableId, compiled.parameterDefaultAt(index));
-            DeviceAccess.setParameter(device, compiled.nativeParameterIdAt(index), value);
+            device.setParameter(compiled.nativeParameterIdAt(index), value);
         }
 
         for (int index = 0; index < overrides.size(); index++) {
@@ -303,7 +306,7 @@ public final class ElectricalDeviceSystem extends RefSystem<ChunkStore> {
 
             int nativeId = compiled.nativeParameterId(stableId);
             if (nativeId != MemberMapping.UNMAPPED) {
-                DeviceAccess.setParameter(device, nativeId, overrides.valueAt(index));
+                device.setParameter(nativeId, overrides.valueAt(index));
             }
         }
 

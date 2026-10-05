@@ -4,32 +4,27 @@ import org.jspecify.annotations.Nullable;
 
 import java.util.Objects;
 import java.util.function.Consumer;
-import java.util.function.Supplier;
 
 /**
  * Describes one type of electrical device.
  *
- * <p>Define one shared device type for each custom device class.</p>
+ * <p>The native definition supplies the electrical behavior. Java convenience
+ * wrappers are independent of this type.</p>
  *
- * <p>Use {@link #create(Supplier, Consumer)} to define a custom device
+ * <p>Use {@link #create(Consumer)} to define a custom device
  * type. Register the type in an {@link ElectricalRuntime} before an
  * {@link ElectricalSystem} creates a device of that type.</p>
- *
- * @param <T> the device class
  */
-public final class DeviceType<T extends Device> {
-    private final Supplier<T> constructor;
+public final class DeviceType {
     private final @Nullable DeviceDefinition primitiveDefinition;
     private final @Nullable Consumer<DeviceDefinitionBuilder> definitionBuilder;
 
     private volatile @Nullable Registration registration;
 
     private DeviceType(
-        Supplier<T> constructor,
         @Nullable DeviceDefinition primitiveDefinition,
         @Nullable Consumer<DeviceDefinitionBuilder> definitionBuilder
     ) {
-        this.constructor = Objects.requireNonNull(constructor, "constructor");
         this.primitiveDefinition = primitiveDefinition;
         this.definitionBuilder = definitionBuilder;
     }
@@ -37,35 +32,26 @@ public final class DeviceType<T extends Device> {
     /**
      * Creates a custom device type.
      *
-     * <p>The constructor must return a new, unbound device on each call.</p>
-     *
      * <p>The runtime calls {@code definitionBuilder} when it registers the
      * type. The runtime owns the builder that it supplies to the callback.
      * Do not close the builder. Do not keep a reference to the builder after
      * the callback returns.</p>
      *
-     * @param constructor the function that creates a device
      * @param definitionBuilder the function that builds the electrical
      *     definition
-     * @param <T> the device class
      *
      * @return the device type
      *
      * @throws NullPointerException if an argument is null
      */
-    public static <T extends Device> DeviceType<T> create(
-        Supplier<T> constructor,
+    public static DeviceType create(
         Consumer<DeviceDefinitionBuilder> definitionBuilder
     ) {
-        return new DeviceType<>(constructor, null, Objects.requireNonNull(definitionBuilder, "definitionBuilder"));
+        return new DeviceType(null, Objects.requireNonNull(definitionBuilder, "definitionBuilder"));
     }
 
-    public static <T extends Device> DeviceType<T> primitive(int definitionId, Supplier<T> constructor) {
-        return new DeviceType<>(constructor, new DeviceDefinition(definitionId), null);
-    }
-
-    T construct() {
-        return Objects.requireNonNull(constructor.get(), "Device constructor returned null");
+    public static DeviceType primitive(int definitionId) {
+        return new DeviceType(new DeviceDefinition(definitionId), null);
     }
 
     void buildDefinition(DeviceDefinitionBuilder builder) {

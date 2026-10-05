@@ -1,7 +1,6 @@
 package dev.hynergy.core.electricity.device;
 
 import dev.hynergy.electrical.Device;
-import dev.hynergy.electrical.DeviceAccess;
 import dev.hynergy.electrical.Wire;
 import org.jspecify.annotations.Nullable;
 
@@ -51,7 +50,7 @@ public final class DeviceWireConnections {
         if (wire == null || !dedup.add(device.id().packed(), nativeTerminalId, wire.id().packed())) {
             return false;
         }
-        DeviceAccess.attachTerminal(device, nativeTerminalId, wire);
+        device.attachTerminal(nativeTerminalId, wire);
         return true;
     }
 

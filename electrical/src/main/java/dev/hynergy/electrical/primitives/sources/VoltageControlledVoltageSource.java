@@ -10,12 +10,12 @@ import dev.hynergy.electrical.*;
  * multiplied by the voltage gain. Positive output current flows from
  * output-positive to output-negative.</p>
  */
-public final class VoltageControlledVoltageSource extends Device {
+public final class VoltageControlledVoltageSource {
     /**
      * The device type for {@code VoltageControlledVoltageSource}.
      */
-    public static final DeviceType<VoltageControlledVoltageSource> TYPE =
-        DeviceType.primitive(6, VoltageControlledVoltageSource::new);
+    public static final DeviceType TYPE =
+        PrimitiveDeviceTypes.VOLTAGE_CONTROLLED_VOLTAGE_SOURCE;
 
     private static final int TERMINAL_OUTPUT_POSITIVE = 0;
     private static final int TERMINAL_OUTPUT_NEGATIVE = 1;
@@ -28,7 +28,32 @@ public final class VoltageControlledVoltageSource extends Device {
     private static final int OBSERVER_CONTROL_VOLTAGE = 1;
     private static final int OBSERVER_OUTPUT_CURRENT = 2;
 
-    private VoltageControlledVoltageSource() {
+    private final Device device;
+
+    /**
+     * Wraps a live device with this primitive definition.
+     *
+     * @throws IllegalArgumentException if the native definition differs
+     * @throws IllegalStateException if the device is no longer usable
+     */
+    public VoltageControlledVoltageSource(Device device) {
+        java.util.Objects.requireNonNull(device, "device").requireDefinition(TYPE);
+        this.device = device;
+    }
+
+    /** Returns the underlying runtime handle. */
+    public Device device() {
+        return device;
+    }
+
+    /** Returns the runtime identity. */
+    public DeviceId id() {
+        return device.id();
+    }
+
+    /** Destroys the underlying device and its observation subscriptions. */
+    public void destroy() {
+        device.destroy();
     }
 
     /**
@@ -40,7 +65,7 @@ public final class VoltageControlledVoltageSource extends Device {
      * @return the voltage-controlled voltage source
      */
     public static VoltageControlledVoltageSource create(ElectricalSystem system, double voltageGain) {
-        VoltageControlledVoltageSource device = system.create(TYPE);
+        VoltageControlledVoltageSource device = new VoltageControlledVoltageSource(system.create(TYPE));
 
         device.setVoltageGain(voltageGain);
 
@@ -53,7 +78,7 @@ public final class VoltageControlledVoltageSource extends Device {
      * @param voltageGain the voltage gain; the value must be finite
      */
     public void setVoltageGain(double voltageGain) {
-        setParameter(PARAMETER_VOLTAGE_GAIN, voltageGain);
+        device.setParameter(PARAMETER_VOLTAGE_GAIN, voltageGain);
     }
 
     /**
@@ -62,7 +87,7 @@ public final class VoltageControlledVoltageSource extends Device {
      * @param wire the wire
      */
     public void attachOutputPositive(Wire wire) {
-        attachTerminal(TERMINAL_OUTPUT_POSITIVE, wire);
+        device.attachTerminal(TERMINAL_OUTPUT_POSITIVE, wire);
     }
 
     /**
@@ -71,7 +96,7 @@ public final class VoltageControlledVoltageSource extends Device {
      * @param wire the wire
      */
     public void detachOutputPositive(Wire wire) {
-        detachTerminal(TERMINAL_OUTPUT_POSITIVE, wire);
+        device.detachTerminal(TERMINAL_OUTPUT_POSITIVE, wire);
     }
 
     /**
@@ -80,7 +105,7 @@ public final class VoltageControlledVoltageSource extends Device {
      * @param wire the wire
      */
     public void attachOutputNegative(Wire wire) {
-        attachTerminal(TERMINAL_OUTPUT_NEGATIVE, wire);
+        device.attachTerminal(TERMINAL_OUTPUT_NEGATIVE, wire);
     }
 
     /**
@@ -89,7 +114,7 @@ public final class VoltageControlledVoltageSource extends Device {
      * @param wire the wire
      */
     public void detachOutputNegative(Wire wire) {
-        detachTerminal(TERMINAL_OUTPUT_NEGATIVE, wire);
+        device.detachTerminal(TERMINAL_OUTPUT_NEGATIVE, wire);
     }
 
     /**
@@ -98,7 +123,7 @@ public final class VoltageControlledVoltageSource extends Device {
      * @param wire the wire
      */
     public void attachControlPositive(Wire wire) {
-        attachTerminal(TERMINAL_CONTROL_POSITIVE, wire);
+        device.attachTerminal(TERMINAL_CONTROL_POSITIVE, wire);
     }
 
     /**
@@ -107,7 +132,7 @@ public final class VoltageControlledVoltageSource extends Device {
      * @param wire the wire
      */
     public void detachControlPositive(Wire wire) {
-        detachTerminal(TERMINAL_CONTROL_POSITIVE, wire);
+        device.detachTerminal(TERMINAL_CONTROL_POSITIVE, wire);
     }
 
     /**
@@ -116,7 +141,7 @@ public final class VoltageControlledVoltageSource extends Device {
      * @param wire the wire
      */
     public void attachControlNegative(Wire wire) {
-        attachTerminal(TERMINAL_CONTROL_NEGATIVE, wire);
+        device.attachTerminal(TERMINAL_CONTROL_NEGATIVE, wire);
     }
 
     /**
@@ -125,7 +150,7 @@ public final class VoltageControlledVoltageSource extends Device {
      * @param wire the wire
      */
     public void detachControlNegative(Wire wire) {
-        detachTerminal(TERMINAL_CONTROL_NEGATIVE, wire);
+        device.detachTerminal(TERMINAL_CONTROL_NEGATIVE, wire);
     }
 
     /**
@@ -141,7 +166,7 @@ public final class VoltageControlledVoltageSource extends Device {
     public ObservationSubscription observeOutputVoltage(
         ObservationListener listener
     ) {
-        return observe(OBSERVER_OUTPUT_VOLTAGE, listener);
+        return device.observe(OBSERVER_OUTPUT_VOLTAGE, listener);
     }
 
     /**
@@ -157,7 +182,7 @@ public final class VoltageControlledVoltageSource extends Device {
     public ObservationSubscription observeControlVoltage(
         ObservationListener listener
     ) {
-        return observe(OBSERVER_CONTROL_VOLTAGE, listener);
+        return device.observe(OBSERVER_CONTROL_VOLTAGE, listener);
     }
 
     /**
@@ -173,6 +198,6 @@ public final class VoltageControlledVoltageSource extends Device {
     public ObservationSubscription observeOutputCurrent(
         ObservationListener listener
     ) {
-        return observe(OBSERVER_OUTPUT_CURRENT, listener);
+        return device.observe(OBSERVER_OUTPUT_CURRENT, listener);
     }
 }

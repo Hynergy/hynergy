@@ -8,11 +8,11 @@ import dev.hynergy.electrical.*;
  * <p>Voltage is the positive-terminal voltage minus the negative-terminal voltage.
  * Positive current flows from the positive terminal to the negative terminal.</p>
  */
-public final class CurrentSource extends Device {
+public final class CurrentSource {
     /**
      * The device type for CurrentSource.
      */
-    public static final DeviceType<CurrentSource> TYPE = DeviceType.primitive(4, CurrentSource::new);
+    public static final DeviceType TYPE = PrimitiveDeviceTypes.CURRENT_SOURCE;
 
     private static final int TERMINAL_POSITIVE = 0;
     private static final int TERMINAL_NEGATIVE = 1;
@@ -22,7 +22,32 @@ public final class CurrentSource extends Device {
     private static final int OBSERVER_VOLTAGE = 0;
     private static final int OBSERVER_CURRENT = 1;
 
-    private CurrentSource() {
+    private final Device device;
+
+    /**
+     * Wraps a live device with this primitive definition.
+     *
+     * @throws IllegalArgumentException if the native definition differs
+     * @throws IllegalStateException if the device is no longer usable
+     */
+    public CurrentSource(Device device) {
+        java.util.Objects.requireNonNull(device, "device").requireDefinition(TYPE);
+        this.device = device;
+    }
+
+    /** Returns the underlying runtime handle. */
+    public Device device() {
+        return device;
+    }
+
+    /** Returns the runtime identity. */
+    public DeviceId id() {
+        return device.id();
+    }
+
+    /** Destroys the underlying device and its observation subscriptions. */
+    public void destroy() {
+        device.destroy();
     }
 
     /**
@@ -34,7 +59,7 @@ public final class CurrentSource extends Device {
      * @return the current source
      */
     public static CurrentSource create(ElectricalSystem system, double current) {
-        CurrentSource device = system.create(TYPE);
+        CurrentSource device = new CurrentSource(system.create(TYPE));
 
         device.setCurrent(current);
 
@@ -47,7 +72,7 @@ public final class CurrentSource extends Device {
      * @param current the source current, in amperes; the value must be finite
      */
     public void setCurrent(double current) {
-        setParameter(PARAMETER_CURRENT, current);
+        device.setParameter(PARAMETER_CURRENT, current);
     }
 
     /**
@@ -56,7 +81,7 @@ public final class CurrentSource extends Device {
      * @param wire the wire
      */
     public void attachPositive(Wire wire) {
-        attachTerminal(TERMINAL_POSITIVE, wire);
+        device.attachTerminal(TERMINAL_POSITIVE, wire);
     }
 
     /**
@@ -65,7 +90,7 @@ public final class CurrentSource extends Device {
      * @param wire the wire
      */
     public void attachNegative(Wire wire) {
-        attachTerminal(TERMINAL_NEGATIVE, wire);
+        device.attachTerminal(TERMINAL_NEGATIVE, wire);
     }
 
     /**
@@ -74,7 +99,7 @@ public final class CurrentSource extends Device {
      * @param wire the wire
      */
     public void detachPositive(Wire wire) {
-        detachTerminal(TERMINAL_POSITIVE, wire);
+        device.detachTerminal(TERMINAL_POSITIVE, wire);
     }
 
     /**
@@ -83,7 +108,7 @@ public final class CurrentSource extends Device {
      * @param wire the wire
      */
     public void detachNegative(Wire wire) {
-        detachTerminal(TERMINAL_NEGATIVE, wire);
+        device.detachTerminal(TERMINAL_NEGATIVE, wire);
     }
 
     /**
@@ -98,7 +123,7 @@ public final class CurrentSource extends Device {
     public ObservationSubscription observeVoltage(
         ObservationListener listener
     ) {
-        return observe(OBSERVER_VOLTAGE, listener);
+        return device.observe(OBSERVER_VOLTAGE, listener);
     }
 
     /**
@@ -113,6 +138,6 @@ public final class CurrentSource extends Device {
     public ObservationSubscription observeCurrent(
         ObservationListener listener
     ) {
-        return observe(OBSERVER_CURRENT, listener);
+        return device.observe(OBSERVER_CURRENT, listener);
     }
 }
