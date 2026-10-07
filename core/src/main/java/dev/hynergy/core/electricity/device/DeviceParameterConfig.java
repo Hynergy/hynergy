@@ -11,7 +11,7 @@ import com.hypixel.hytale.codec.validation.Validators;
 import lombok.Getter;
 
 /**
- * Asset configuration for one stable device parameter default.
+ * Configures the default value for one device parameter by stable ID.
  */
 @Getter
 public final class DeviceParameterConfig {

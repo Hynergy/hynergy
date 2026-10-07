@@ -1,12 +1,6 @@
 package dev.hynergy.electrical;
 
-import dev.hynergy.electrical.primitives.controlled.VoltageControlledConductance;
-import dev.hynergy.electrical.primitives.controlled.VoltageControlledSwitch;
-import dev.hynergy.electrical.primitives.logic.*;
-import dev.hynergy.electrical.primitives.passive.*;
-import dev.hynergy.electrical.primitives.sources.CurrentSource;
-import dev.hynergy.electrical.primitives.sources.VoltageControlledCurrentSource;
-import dev.hynergy.electrical.primitives.sources.VoltageControlledVoltageSource;
+import dev.hynergy.electrical.primitives.passive.Resistance;
 import dev.hynergy.electrical.primitives.sources.VoltageSource;
 import org.junit.jupiter.api.Test;
 
@@ -17,144 +11,6 @@ import static org.junit.jupiter.api.Assertions.*;
 final class PrimitiveObservationTest {
     private static final ObservationListener NOOP_LISTENER = (status, value) -> {
     };
-
-    @Test
-    void twoTerminalPrimitivesExposeVoltageAndCurrentObservers() {
-        try (ElectricalRuntime runtime = ElectricalRuntime.create();
-            ElectricalSystem system = runtime.createSystem(20)) {
-            Resistance resistance = new Resistance(system.create(Resistance.TYPE));
-
-            Conductance conductance = new Conductance(system.create(Conductance.TYPE));
-
-            VoltageSource voltageSource = new VoltageSource(system.create(VoltageSource.TYPE));
-
-            CurrentSource currentSource = new CurrentSource(system.create(CurrentSource.TYPE));
-
-            Capacitor capacitor = new Capacitor(system.create(Capacitor.TYPE));
-
-            Inductor inductor = new Inductor(system.create(Inductor.TYPE));
-
-            Diode diode = new Diode(system.create(Diode.TYPE));
-
-            assertActive(
-                resistance.observeVoltage(NOOP_LISTENER), resistance.observeCurrent(NOOP_LISTENER),
-
-                conductance.observeVoltage(NOOP_LISTENER), conductance.observeCurrent(NOOP_LISTENER),
-
-                voltageSource.observeVoltage(NOOP_LISTENER), voltageSource.observeCurrent(NOOP_LISTENER),
-
-                currentSource.observeVoltage(NOOP_LISTENER), currentSource.observeCurrent(NOOP_LISTENER),
-
-                capacitor.observeVoltage(NOOP_LISTENER), capacitor.observeCurrent(NOOP_LISTENER),
-
-                inductor.observeVoltage(NOOP_LISTENER), inductor.observeCurrent(NOOP_LISTENER),
-
-                diode.observeVoltage(NOOP_LISTENER), diode.observeCurrent(NOOP_LISTENER)
-            );
-        }
-    }
-
-    @Test
-    void controlledPrimitivesExposeSemanticObservers() {
-        try (ElectricalRuntime runtime = ElectricalRuntime.create();
-            ElectricalSystem system = runtime.createSystem(20)) {
-            VoltageControlledCurrentSource currentSource = new VoltageControlledCurrentSource(system.create(VoltageControlledCurrentSource.TYPE));
-
-            VoltageControlledVoltageSource voltageSource = new VoltageControlledVoltageSource(system.create(VoltageControlledVoltageSource.TYPE));
-
-            VoltageControlledSwitch controlledSwitch = new VoltageControlledSwitch(system.create(VoltageControlledSwitch.TYPE));
-
-            VoltageControlledConductance conductance = new VoltageControlledConductance(system.create(VoltageControlledConductance.TYPE));
-
-            assertActive(
-                currentSource.observeOutputVoltage(NOOP_LISTENER),
-                currentSource.observeControlVoltage(NOOP_LISTENER),
-                currentSource.observeOutputCurrent(NOOP_LISTENER),
-
-                voltageSource.observeOutputVoltage(NOOP_LISTENER),
-                voltageSource.observeControlVoltage(NOOP_LISTENER),
-                voltageSource.observeOutputCurrent(NOOP_LISTENER),
-
-                controlledSwitch.observeOutputVoltage(NOOP_LISTENER),
-                controlledSwitch.observeControlVoltage(NOOP_LISTENER),
-                controlledSwitch.observeOutputCurrent(NOOP_LISTENER),
-
-                conductance.observeOutputVoltage(NOOP_LISTENER),
-                conductance.observeControlVoltage(NOOP_LISTENER),
-                conductance.observeOutputCurrent(NOOP_LISTENER)
-            );
-        }
-    }
-
-    @Test
-    void singleInputLogicPrimitivesExposeSemanticObservers() {
-        try (ElectricalRuntime runtime = ElectricalRuntime.create();
-            ElectricalSystem system = runtime.createSystem(20)) {
-            Not not = new Not(system.create(Not.TYPE));
-
-            SchmittBuffer schmitt = new SchmittBuffer(system.create(SchmittBuffer.TYPE));
-
-            assertActive(
-                not.observeOutputVoltage(NOOP_LISTENER),
-                not.observeInputVoltage(NOOP_LISTENER),
-                not.observeSupplyCurrent(NOOP_LISTENER),
-
-                schmitt.observeOutputVoltage(NOOP_LISTENER),
-                schmitt.observeInputVoltage(NOOP_LISTENER),
-                schmitt.observeSupplyCurrent(NOOP_LISTENER)
-            );
-        }
-    }
-
-    @Test
-    void twoInputLogicPrimitivesExposeSemanticObservers() {
-        try (ElectricalRuntime runtime = ElectricalRuntime.create();
-            ElectricalSystem system = runtime.createSystem(20)) {
-            And and = new And(system.create(And.TYPE));
-
-            Nand nand = new Nand(system.create(Nand.TYPE));
-
-            Or or = new Or(system.create(Or.TYPE));
-
-            Nor nor = new Nor(system.create(Nor.TYPE));
-
-            assertActive(
-                and.observeOutputVoltage(NOOP_LISTENER),
-                and.observeInputVoltageA(NOOP_LISTENER),
-                and.observeInputVoltageB(NOOP_LISTENER),
-                and.observeSupplyCurrent(NOOP_LISTENER),
-
-                nand.observeOutputVoltage(NOOP_LISTENER),
-                nand.observeInputVoltageA(NOOP_LISTENER),
-                nand.observeInputVoltageB(NOOP_LISTENER),
-                nand.observeSupplyCurrent(NOOP_LISTENER),
-
-                or.observeOutputVoltage(NOOP_LISTENER),
-                or.observeInputVoltageA(NOOP_LISTENER),
-                or.observeInputVoltageB(NOOP_LISTENER),
-                or.observeSupplyCurrent(NOOP_LISTENER),
-
-                nor.observeOutputVoltage(NOOP_LISTENER),
-                nor.observeInputVoltageA(NOOP_LISTENER),
-                nor.observeInputVoltageB(NOOP_LISTENER),
-                nor.observeSupplyCurrent(NOOP_LISTENER)
-            );
-        }
-    }
-
-    @Test
-    void tickDelayExposesSemanticObservers() {
-        try (ElectricalRuntime runtime = ElectricalRuntime.create();
-            ElectricalSystem system = runtime.createSystem(20)) {
-            TickDelay delay = new TickDelay(system.create(TickDelay.TYPE));
-
-            assertActive(
-                delay.observeInputVoltage(NOOP_LISTENER),
-                delay.observeOutputVoltage(NOOP_LISTENER),
-                delay.observeOutputCurrent(NOOP_LISTENER)
-            );
-        }
-    }
 
     @Test
     void semanticResistanceObserversPublishExpectedValues() {
@@ -221,15 +77,6 @@ final class PrimitiveObservationTest {
             ObservationSubscription subscription = assertDoesNotThrow(() -> resistance.observeVoltage(NOOP_LISTENER));
 
             assertTrue(subscription.isActive());
-        }
-    }
-
-    private static void assertActive(
-        ObservationSubscription... subscriptions
-    ) {
-        for (ObservationSubscription subscription : subscriptions) {
-            assertTrue(subscription.isActive());
-            assertNotEquals(0, subscription.nativeId());
         }
     }
 

@@ -5,6 +5,7 @@ import dev.hynergy.electrical.DeviceType;
 import dev.hynergy.electrical.ElectricalRuntime;
 import dev.hynergy.electrical.PrimitiveDeviceTypes;
 import dev.hynergy.electrical.composite.GroundedLogicGates;
+import dev.hynergy.electrical.composite.GroundedSwitchedLogicGates;
 import dev.hynergy.electrical.composite.ResistiveLoad;
 import dev.hynergy.electrical.composite.VoltageSupply;
 import dev.hynergy.electrical.primitives.passive.Resistance;
@@ -45,6 +46,11 @@ class ElectricityModuleDeviceRegistryTest {
             assertRegistered(registry, "hynergy:grounded_nand", GroundedLogicGates.GROUNDED_NAND);
             assertRegistered(registry, "hynergy:grounded_nor", GroundedLogicGates.GROUNDED_NOR);
             assertRegistered(registry, "hynergy:grounded_not", GroundedLogicGates.GROUNDED_NOT);
+            assertRegistered(registry, "hynergy:grounded_switched_not", GroundedSwitchedLogicGates.GROUNDED_SWITCHED_NOT);
+            assertRegistered(registry, "hynergy:grounded_switched_and", GroundedSwitchedLogicGates.GROUNDED_SWITCHED_AND);
+            assertRegistered(registry, "hynergy:grounded_switched_nand", GroundedSwitchedLogicGates.GROUNDED_SWITCHED_NAND);
+            assertRegistered(registry, "hynergy:grounded_switched_or", GroundedSwitchedLogicGates.GROUNDED_SWITCHED_OR);
+            assertRegistered(registry, "hynergy:grounded_switched_nor", GroundedSwitchedLogicGates.GROUNDED_SWITCHED_NOR);
 
             registry.freeze();
             assertThrows(IllegalStateException.class,

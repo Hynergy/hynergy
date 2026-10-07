@@ -14,7 +14,7 @@ import org.joml.Vector3i;
 import org.jspecify.annotations.Nullable;
 
 /**
- * Asset configuration for one physical electrical port of a device block.
+ * Configures one physical electrical port of a device block.
  */
 public final class DevicePortConfig {
     private static final Validator<Vector3i> CARDINAL_NORMAL_VALIDATOR = new Validator<>() {

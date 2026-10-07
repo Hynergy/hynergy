@@ -532,7 +532,11 @@ pub(crate) fn compile_island_parts(
     );
 
     let ir = ir_builder.finish()?;
-    let discrete_plan = compile_discrete_plan(&pattern, &ir, discrete_metadata);
+    let discrete_plan = if ir.requires_nonlinear_iteration() {
+        compile_discrete_plan(&pattern, &ir, discrete_metadata)
+    } else {
+        None
+    };
 
     Ok(CompiledIsland {
         pattern,

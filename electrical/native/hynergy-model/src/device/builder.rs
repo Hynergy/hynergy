@@ -197,7 +197,6 @@ impl<'a> DeviceDefinitionBuilder<'a> {
         Ok(node)
     }
 
-    /// Add an internal ideal 0 V reference. Distinct references do not join partitions.
     pub fn add_ground_node(&mut self) -> Result<NodeId, DeviceDefinitionBuilderError> {
         let node = self.add_node()?;
         self.ground_nodes.push(node);

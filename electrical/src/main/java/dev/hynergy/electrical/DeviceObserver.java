@@ -1,6 +1,8 @@
 package dev.hynergy.electrical;
 
-/** A canonical observer reference in one declaration. */
+/**
+ * Identifies an observer in one electrical declaration.
+ */
 public final class DeviceObserver {
     final Object owner;
     private final int id;

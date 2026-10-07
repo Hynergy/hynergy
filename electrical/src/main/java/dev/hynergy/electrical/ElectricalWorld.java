@@ -16,6 +16,12 @@ final class ElectricalWorld implements AutoCloseable {
     private final WorldIdAllocator wireIds;
     private final WorldIdAllocator deviceIds;
     private final Int2ObjectOpenHashMap<DeviceDefinition> deviceDefinitions = new Int2ObjectOpenHashMap<>();
+    /**
+     * Includes queued parameter values so validation does not require a command flush.
+     */
+    private final Int2ObjectOpenHashMap<double[]> deviceParameters = new Int2ObjectOpenHashMap<>();
+
+
 
     private final WorldCommandBuffer commandBuffer;
     private final SubscriptionRecordBuffer subscriptionBuffer;
@@ -66,6 +72,15 @@ final class ElectricalWorld implements AutoCloseable {
 
         this.commandBuffer = commandBuffer;
         this.subscriptionBuffer = subscriptionBuffer;
+    }
+
+    double[] parameterIntent(DeviceId id, int count) {
+        requireDevice(id);
+        return deviceParameters.computeIfAbsent(id.value(), ignored -> {
+            double[] values = new double[count];
+            java.util.Arrays.fill(values, Double.NaN);
+            return values;
+        }).clone();
     }
 
     int tick() {
@@ -288,6 +303,7 @@ final class ElectricalWorld implements AutoCloseable {
             throw failure;
         }
         deviceDefinitions.remove(deviceId);
+        deviceParameters.remove(deviceId);
     }
 
     void connectWires(WireId wireAId, WireId wireBId) {
@@ -342,6 +358,8 @@ final class ElectricalWorld implements AutoCloseable {
         deviceIds.requireUsable(deviceId, deviceGeneration);
 
         commandBuffer.setDeviceParameter(deviceId, parameterId, value);
+        double[] parameters = deviceParameters.get(deviceId);
+        if (parameters != null) parameters[parameterId] = value;
     }
 
     void applyCommands() {

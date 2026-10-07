@@ -1,6 +1,8 @@
 package dev.hynergy.electrical;
 
-/** A canonical parameter reference in one declaration. */
+/**
+ * Identifies a parameter in one electrical declaration.
+ */
 public final class DeviceParameter {
     final Object owner;
     private final int id;

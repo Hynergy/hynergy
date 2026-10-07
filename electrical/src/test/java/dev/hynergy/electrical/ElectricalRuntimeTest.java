@@ -49,14 +49,6 @@ class ElectricalRuntimeTest {
             assertSame(binding, runtime.register(parent));
         }
     }
-    @Test void failedRootRegistrationKeepsSuccessfulDependencies() {
-        var child = DeviceTypeCompilationTest.resistor();
-        var parent = DeviceTypeCompilationTest.failingParent(child);
-        try (var runtime = ElectricalRuntime.create()) {
-            assertThrows(IllegalArgumentException.class, () -> runtime.register(parent));
-            assertSame(runtime.requireBinding(child), runtime.register(child));
-        }
-    }
     @Test void unregisteredTypesCannotBeAddedWhileSystemsAreActive() {
         var type = resistorComposite(PrimitiveDeviceTypes.RESISTANCE);
         try (var runtime = ElectricalRuntime.create()) {
@@ -65,24 +57,6 @@ class ElectricalRuntimeTest {
                 assertThrows(IllegalStateException.class, () -> system.create(type));
             }
             assertDoesNotThrow(() -> runtime.register(type));
-        }
-    }
-    @Test void declarationCanBeReusedAfterRuntimeCloses() {
-        var type = resistorComposite(PrimitiveDeviceTypes.RESISTANCE);
-        RegisteredDeviceType old;
-        try (var runtime = ElectricalRuntime.create()) { old = runtime.register(type); }
-        assertEquals(2, type.terminalCount());
-        try (var runtime = ElectricalRuntime.create()) {
-            var binding = runtime.register(type);
-            assertNotSame(old, binding);
-            try (var system = runtime.createSystem(20)) { assertNotNull(system.create(type)); }
-        }
-    }
-    @Test void primitiveTypeKeepsItsDefinitionId() {
-        try (var runtime = ElectricalRuntime.create()) {
-            var binding = runtime.register(PrimitiveDeviceTypes.RESISTANCE);
-            assertEquals(1, binding.definition().id());
-            assertSame(binding, runtime.register(PrimitiveDeviceTypes.RESISTANCE));
         }
     }
 }

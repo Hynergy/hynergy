@@ -7,14 +7,14 @@ import org.jspecify.annotations.Nullable;
 import java.util.Arrays;
 import java.util.Objects;
 
-/** Connects block-derived device terminals without exposing runtime device handles. */
+/** Connects device terminals from block configurations without exposing runtime handles. */
 public final class DeviceWireConnections {
     private DeviceWireConnections() {
     }
 
     /**
      * Resolves a discovered port through the target's bound configuration.
-     * Unbound targets and ports absent from that configuration are skipped.
+     * The method skips unbound targets and ports that the configuration does not include.
      */
     public static boolean attachPortIfNew(
             @Nullable DeviceComponent component,

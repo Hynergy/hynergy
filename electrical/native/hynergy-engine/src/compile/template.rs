@@ -1,4 +1,4 @@
-use crate::compile::discrete::{BoundComplementaryDriver, BoundDiscreteMetadata};
+use crate::compile::discrete::{BoundComplementaryDriver, BoundDiscreteMetadata, BoundInputBias};
 use crate::compile::island_ir::IslandIrBuilder;
 use crate::compile::state::BoundStateSlots;
 use crate::compile::unknown::{UnknownAllocationError, UnknownRange};
@@ -151,6 +151,7 @@ impl LocalDiscreteMode {
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub(crate) struct LocalComplementaryDriver {
+    switched: bool,
     mode: LocalDiscreteMode,
     output: LocalUnknownId,
     high_rail: LocalUnknownId,
@@ -252,6 +253,7 @@ pub(crate) struct DefinitionTemplateBuilder {
 
     discrete_modes: Vec<LocalValueId>,
     complementary_drivers: Vec<LocalComplementaryDriver>,
+    input_biases: Vec<(LocalUnknownId, LocalUnknownId, LocalValueId)>,
 
     outputs: Vec<LocalValueId>,
 }
@@ -678,6 +680,7 @@ impl DefinitionTemplateBuilder {
 
             discrete_modes: self.discrete_modes.into_boxed_slice(),
             complementary_drivers: self.complementary_drivers.into_boxed_slice(),
+            input_biases: self.input_biases.into_boxed_slice(),
 
             outputs: self.outputs.into_boxed_slice(),
         })
@@ -834,6 +837,7 @@ impl DefinitionTemplateBuilder {
         );
 
         self.complementary_drivers.push(LocalComplementaryDriver {
+            switched: false,
             mode,
             output,
             high_rail,
@@ -844,6 +848,28 @@ impl DefinitionTemplateBuilder {
     }
 
     #[inline]
+    pub(crate) fn register_switched_driver(
+        &mut self,
+        mode: LocalDiscreteMode,
+        output: LocalUnknownId,
+        high_rail: LocalUnknownId,
+        low_rail: LocalUnknownId,
+        pull_up: LocalValueId,
+        pull_down: LocalValueId,
+    ) {
+        self.register_complementary_driver(mode, output, high_rail, low_rail, pull_up, pull_down);
+        self.complementary_drivers.last_mut().unwrap().switched = true;
+    }
+
+    pub(crate) fn register_input_bias(
+        &mut self,
+        input: LocalUnknownId,
+        reference: LocalUnknownId,
+        conductance: LocalValueId,
+    ) {
+        self.input_biases.push((input, reference, conductance));
+    }
+
     pub(crate) fn require_iteration_stability(&mut self, value: LocalValueId) {
         debug_assert!(value.index() < self.values.len());
 
@@ -878,6 +904,7 @@ pub(crate) struct CompiledDefinitionTemplate {
     iteration_latches: Box<[(LocalValueId, LocalValueId)]>,
     discrete_modes: Box<[LocalValueId]>,
     complementary_drivers: Box<[LocalComplementaryDriver]>,
+    input_biases: Box<[(LocalUnknownId, LocalUnknownId, LocalValueId)]>,
     outputs: Box<[LocalValueId]>,
 }
 
@@ -1004,6 +1031,14 @@ impl CompiledDefinitionTemplate {
                 unknowns[driver.low_rail.index()],
                 values[driver.pull_up.index()],
                 values[driver.pull_down.index()],
+            );
+            builder.complementary_drivers.last_mut().unwrap().switched = driver.switched;
+        }
+        for &(input, reference, conductance) in &self.input_biases {
+            builder.register_input_bias(
+                unknowns[input.index()],
+                unknowns[reference.index()],
+                values[conductance.index()],
             );
         }
 
@@ -1148,17 +1183,29 @@ impl CompiledDefinitionTemplate {
         );
 
         for &driver in &self.complementary_drivers {
-            complementary_drivers.push(BoundComplementaryDriver::new(
+            let mut bound = BoundComplementaryDriver::new(
                 values[driver.mode().value().index()],
                 unknowns.get(driver.output()),
                 unknowns.get(driver.high_rail()),
                 unknowns.get(driver.low_rail()),
                 values[driver.pull_up().index()],
                 values[driver.pull_down().index()],
-            ));
+            );
+            bound.switched = driver.switched;
+            complementary_drivers.push(bound);
         }
 
-        BoundDiscreteMetadata::new(modes, complementary_drivers)
+        let mut metadata = BoundDiscreteMetadata::new(modes, complementary_drivers);
+        metadata.input_biases = self
+            .input_biases
+            .iter()
+            .map(|&(input, reference, conductance)| BoundInputBias {
+                input: unknowns.get(input),
+                reference: unknowns.get(reference),
+                conductance: values[conductance.index()],
+            })
+            .collect();
+        metadata
     }
 
     fn bind_values(

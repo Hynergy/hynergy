@@ -21,6 +21,5 @@ final class DeviceTypeValidator implements Validator<String> {
 
     @Override
     public void updateSchema(SchemaContext context, Schema target) {
-        // The dropdown dataset supplies IDs without capturing setup-time registrations.
     }
 }

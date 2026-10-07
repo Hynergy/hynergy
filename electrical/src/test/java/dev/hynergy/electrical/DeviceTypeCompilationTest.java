@@ -128,7 +128,9 @@ class DeviceTypeCompilationTest {
         try (var runtime = ElectricalRuntime.create()) {
             assertThrows(IllegalArgumentException.class, () -> runtime.register(parent));
             assertThrows(IllegalStateException.class, () -> runtime.requireBinding(parent));
+            var retained = runtime.requireBinding(child);
             var binding = runtime.register(child);
+            assertSame(retained, binding);
             assertSame(binding, runtime.register(child));
             binding.validateParameter(child.parameter(4), 20);
         }

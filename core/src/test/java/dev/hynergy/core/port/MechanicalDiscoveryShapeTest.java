@@ -4,6 +4,8 @@ import com.hypixel.hytale.server.core.asset.type.blocktype.config.RotationTuple;
 import org.joml.Vector3i;
 import org.jspecify.annotations.Nullable;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.EnumSource;
 
 import java.util.ArrayList;
 import java.util.HashMap;
@@ -25,40 +27,23 @@ final class MechanicalDiscoveryShapeTest {
     }
 
     @Test
-    void smallAndLargeGearCanMeshAtDiagonalOffset() {
+    void smallAndLargeGearMeshAtDiagonalOffsetWithSignedRatio() {
         Fixture fixture = Fixture.create(
                 new GearProfile(12, GearSize.SMALL, Axis.Z),
                 new GearProfile(36, GearSize.LARGE, Axis.Z)
         );
-        assertEquals(1, fixture.discover().size());
+        assertEquals(List.of(new MechanicalRelation(-1, 3)), fixture.discover());
     }
 
-    @Test
-    void smallAndSmallGearDoNotMeshAtThatDiagonalOffset() {
+    @ParameterizedTest
+    @EnumSource(GearSize.class)
+    void equalSizeGearsDoNotMeshAtDiagonalOffset(GearSize size) {
+        int teeth = size == GearSize.SMALL ? 12 : 36;
         Fixture fixture = Fixture.create(
-                new GearProfile(12, GearSize.SMALL, Axis.Z),
-                new GearProfile(12, GearSize.SMALL, Axis.Z)
-        );
-        assertTrue(fixture.discover().isEmpty());
-    }
-
-    @Test
-    void largeAndLargeGearDoNotMeshAtThatDiagonalOffset() {
-        Fixture fixture = Fixture.create(
-                new GearProfile(36, GearSize.LARGE, Axis.Z),
-                new GearProfile(36, GearSize.LARGE, Axis.Z)
+                new GearProfile(teeth, size, Axis.Z),
+                new GearProfile(teeth, size, Axis.Z)
         );
         assertTrue(fixture.discover().isEmpty());
-    }
-
-    @Test
-    void validGearResolutionCarriesSignedRatio() {
-        MechanicalRelation relation = Fixture.create(
-                new GearProfile(12, GearSize.SMALL, Axis.Z),
-                new GearProfile(36, GearSize.LARGE, Axis.Z)
-        ).discover().getFirst();
-        assertEquals(-1, relation.numerator());
-        assertEquals(3, relation.denominator());
     }
 
     private static MechanicalRelation resolve(

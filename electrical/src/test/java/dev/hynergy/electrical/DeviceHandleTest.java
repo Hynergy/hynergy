@@ -10,22 +10,6 @@ import static org.junit.jupiter.api.Assertions.*;
 
 final class DeviceHandleTest {
     @Test
-    void primitiveDefinitionsCreateHandlesWithoutConvenienceWrappers() {
-        try (ElectricalRuntime runtime = ElectricalRuntime.create();
-             ElectricalSystem system = runtime.createSystem(20)) {
-            Device handle = system.create(PrimitiveDeviceTypes.RESISTANCE);
-            assertSame(PrimitiveDeviceTypes.RESISTANCE, Resistance.TYPE);
-            assertEquals(Device.class, handle.getClass());
-            handle.requireDefinition(PrimitiveDeviceTypes.RESISTANCE);
-            handle.setParameter(Resistance.TYPE.parameter(0), 20.0);
-            assertThrows(IllegalArgumentException.class,
-                    () -> handle.requireDefinition(PrimitiveDeviceTypes.VOLTAGE_SOURCE));
-            handle.destroy();
-            assertThrows(IllegalStateException.class, () -> new Resistance(handle));
-        }
-    }
-
-    @Test
     void customDefinitionCreatesIndependentHandlesWithoutJavaConstructors() {
         DeviceType type = DeviceType.define(builder -> {
             var positive = builder.terminal(0, "positive");
@@ -59,8 +43,13 @@ final class DeviceHandleTest {
     @Test
     void compositionUsesTheSuppliedHandleAndChecksItsDefinition() {
         try (ElectricalRuntime runtime = ElectricalRuntime.create();
-             ElectricalSystem system = runtime.createSystem(20)) {
+            ElectricalSystem system = runtime.createSystem(20)) {
             Device handle = system.create(Resistance.TYPE);
+            assertSame(PrimitiveDeviceTypes.RESISTANCE, Resistance.TYPE);
+            assertEquals(Device.class, handle.getClass());
+            handle.requireDefinition(PrimitiveDeviceTypes.RESISTANCE);
+            assertThrows(IllegalArgumentException.class,
+                    () -> handle.requireDefinition(PrimitiveDeviceTypes.VOLTAGE_SOURCE));
             Resistance resistance = new Resistance(handle);
             assertSame(handle, resistance.device());
             assertEquals(handle.id(), resistance.id());
@@ -87,6 +76,7 @@ final class DeviceHandleTest {
             assertEquals(0.25, currents.getLast(), 1e-9);
             resistance.destroy();
             assertFalse(subscription.isActive());
+            assertThrows(IllegalStateException.class, () -> new Resistance(handle));
             assertThrows(IllegalStateException.class, () -> handle.setParameter(Resistance.TYPE.parameter(0), 30.0));
         }
     }

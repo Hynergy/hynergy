@@ -24,10 +24,10 @@ import java.util.ArrayList;
 import java.util.Objects;
 
 /**
- * Asset configuration for one generic electrical device block definition.
+ * Configures one generic electrical device block definition.
  *
- * <p>Only stable IDs are serialized. Typed members are
- * resolved through the selected {@link DeviceRegistration} during compilation.</p>
+ * <p>The persistence codec saves only stable IDs.
+ * Compilation resolves typed members through the selected {@link DeviceRegistration}.</p>
  */
 public final class DeviceConfig implements JsonAssetWithMap<String, DefaultAssetMap<String, DeviceConfig>> {
     public static final String DATA_SET = "DeviceConfigs";
@@ -112,9 +112,9 @@ public final class DeviceConfig implements JsonAssetWithMap<String, DefaultAsset
     /**
      * Compiles stable asset member IDs to immutable typed bindings.
      *
-     * <p>This is a cold asset/rebuild path. Definition-specific native parameter
-     * constraints remain owned by the electrical engine and are not duplicated
-     * here.</p>
+     * <p>Asset loading and rebuilds use this method.
+     * The electrical engine owns the native constraints for each definition.
+     * This method does not duplicate those constraints.</p>
      */
     public CompiledDeviceConfig compile(
             DeviceRegistry devices,

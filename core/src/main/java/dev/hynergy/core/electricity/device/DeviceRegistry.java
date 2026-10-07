@@ -11,7 +11,8 @@ import java.util.Map;
 import java.util.Objects;
 
 /**
- * Setup-time asset registration. Publication follows successful native registration.
+ * Registers asset IDs during setup.
+ * The registry publishes an asset ID after native registration succeeds.
  */
 public final class DeviceRegistry {
     public static final String DATA_SET = "DeviceTypes";
@@ -23,6 +24,16 @@ public final class DeviceRegistry {
         this.runtime = Objects.requireNonNull(runtime, "runtime");
     }
 
+    /**
+     * Registers a complete declaration for asset use during plugin setup.
+     * The registry publishes the asset ID only after native registration succeeds.
+     * Different IDs can share one declaration and runtime binding.
+     * @param id the asset ID with one colon and nonblank namespace and local name
+     * @param type the immutable device declaration
+     * @return the asset registration and runtime binding
+     * @throws IllegalArgumentException if the ID or declaration is invalid
+     * @throws IllegalStateException if the ID already exists, the registry is frozen, or native registration fails
+     */
     public synchronized DeviceRegistration register(String id, DeviceType type) {
         requireOpen();
         Objects.requireNonNull(id, "id");
@@ -63,6 +74,10 @@ public final class DeviceRegistry {
         return frozen;
     }
 
+    /**
+     * Prevents further registrations while keeping existing entries available.
+     * @throws IllegalStateException if the registry is already frozen
+     */
     public synchronized void freeze() {
         requireOpen();
         frozen = true;

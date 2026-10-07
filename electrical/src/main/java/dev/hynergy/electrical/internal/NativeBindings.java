@@ -35,10 +35,18 @@ public final class NativeBindings {
 
 
 
+    /**
+     * Creates an engine through the native ABI.
+     *
+     * <p>Native signature:</p>
+     * <pre>{@code
+     * EngineHandle* (u32 max_worker_threads)
+     * }</pre>
+     */
     private static final MethodHandle ENGINE_CREATE = downcall(
         "hynergy_engine_create", FunctionDescriptor.of(
-            ValueLayout.ADDRESS, // return EngineHandle*
-            ValueLayout.JAVA_INT // max_worker_threads
+            ValueLayout.ADDRESS,
+            ValueLayout.JAVA_INT
         )
     );
 
@@ -65,13 +73,22 @@ public final class NativeBindings {
 
 
 
+    /**
+     * Registers an encoded definition through the native ABI.
+     *
+     * <p>Native signature:</p>
+     * <pre>{@code
+     * u32 (EngineHandle* engine, const u8* input, u32 input_len,
+     * DefinitionRegistrationResult* result)
+     * }</pre>
+     */
     private static final MethodHandle ENGINE_REGISTER_DEFINITION = downcall(
         "hynergy_engine_register_definition", FunctionDescriptor.of(
-            ValueLayout.JAVA_INT, // return u32
-            ValueLayout.ADDRESS,  // EngineHandle*
-            ValueLayout.ADDRESS,  // input
-            ValueLayout.JAVA_INT, // input_len
-            ValueLayout.ADDRESS   // DefinitionRegistrationResult*
+            ValueLayout.JAVA_INT,
+            ValueLayout.ADDRESS,
+            ValueLayout.ADDRESS,
+            ValueLayout.JAVA_INT,
+            ValueLayout.ADDRESS
         )
     );
 
@@ -104,12 +121,34 @@ public final class NativeBindings {
         }
     }
 
+    private static final MethodHandle ENGINE_VALIDATE_PARAMETERS = downcall(
+            "hynergy_engine_validate_parameters",
+            FunctionDescriptor.of(ValueLayout.JAVA_INT, ValueLayout.ADDRESS, ValueLayout.JAVA_INT,
+                    ValueLayout.ADDRESS, ValueLayout.JAVA_INT)
+    );
+
+    public static int validateParameters(MemorySegment engine, int definition, MemorySegment values, int count) {
+        try {
+            return (int) ENGINE_VALIDATE_PARAMETERS.invokeExact(engine, definition, values, count);
+        } catch (Throwable failure) {
+            throw new IllegalStateException("Failed to call hynergy_engine_validate_parameters", failure);
+        }
+    }
+
+    /**
+     * Creates a world through the native ABI.
+     *
+     * <p>Native signature:</p>
+     * <pre>{@code
+     * u32 (EngineHandle* engine, u32 tick_frequency_hz, WorldHandle** world)
+     * }</pre>
+     */
     private static final MethodHandle ENGINE_CREATE_WORLD = downcall(
         "hynergy_engine_create_world", FunctionDescriptor.of(
-            ValueLayout.JAVA_INT, // return u32
-            ValueLayout.ADDRESS,  // EngineHandle*
-            ValueLayout.JAVA_INT, // tick_frequency_hz
-            ValueLayout.ADDRESS   // WorldHandle*
+            ValueLayout.JAVA_INT,
+            ValueLayout.ADDRESS,
+            ValueLayout.JAVA_INT,
+            ValueLayout.ADDRESS
         )
     );
 
@@ -136,13 +175,22 @@ public final class NativeBindings {
 
 
 
+    /**
+     * Advances a world through the native ABI.
+     *
+     * <p>Native signature:</p>
+     * <pre>{@code
+     * u32 (WorldHandle* world, SubscriptionRecord* records, u32 record_capacity,
+     * TickResult* result)
+     * }</pre>
+     */
     private static final MethodHandle WORLD_TICK = downcall(
         "hynergy_world_tick", FunctionDescriptor.of(
-            ValueLayout.JAVA_INT, //return u32
-            ValueLayout.ADDRESS,  // WorldHandle*
-            ValueLayout.ADDRESS,  // SubscriptionRecord*
-            ValueLayout.JAVA_INT, // record_capacity
-            ValueLayout.ADDRESS   // TickResult*
+            ValueLayout.JAVA_INT,
+            ValueLayout.ADDRESS,
+            ValueLayout.ADDRESS,
+            ValueLayout.JAVA_INT,
+            ValueLayout.ADDRESS
         )
     );
 
@@ -156,13 +204,21 @@ public final class NativeBindings {
 
 
 
+    /**
+     * Applies encoded world commands through the native ABI.
+     *
+     * <p>Native signature:</p>
+     * <pre>{@code
+     * u32 (WorldHandle* world, const u8* input, u32 input_len, CommandResult* result)
+     * }</pre>
+     */
     private static final MethodHandle WORLD_APPLY_COMMANDS = downcall(
         "hynergy_world_apply_commands", FunctionDescriptor.of(
-            ValueLayout.JAVA_INT, // return u32
-            ValueLayout.ADDRESS,  // WorldHandle*
-            ValueLayout.ADDRESS,  // input
-            ValueLayout.JAVA_INT, // input_len
-            ValueLayout.ADDRESS   // CommandResult*
+            ValueLayout.JAVA_INT,
+            ValueLayout.ADDRESS,
+            ValueLayout.ADDRESS,
+            ValueLayout.JAVA_INT,
+            ValueLayout.ADDRESS
         )
     );
 
@@ -176,13 +232,21 @@ public final class NativeBindings {
 
 
 
+    /**
+     * Creates an observation subscription through the native ABI.
+     *
+     * <p>Native signature:</p>
+     * <pre>{@code
+     * u32 (WorldHandle* world, u32 device_id, u32 observer_id, u32* subscription_id)
+     * }</pre>
+     */
     private static final MethodHandle WORLD_SUBSCRIBE_OBSERVER = downcall(
         "hynergy_world_subscribe_observer", FunctionDescriptor.of(
-            ValueLayout.JAVA_INT, // return u32
-            ValueLayout.ADDRESS,  // WorldHandle*
-            ValueLayout.JAVA_INT, // device_id
-            ValueLayout.JAVA_INT, // observer_id
-            ValueLayout.ADDRESS   // u32* subscription_id
+            ValueLayout.JAVA_INT,
+            ValueLayout.ADDRESS,
+            ValueLayout.JAVA_INT,
+            ValueLayout.JAVA_INT,
+            ValueLayout.ADDRESS
         )
     );
 
@@ -201,11 +265,19 @@ public final class NativeBindings {
 
 
 
+    /**
+     * Stops an observation subscription through the native ABI.
+     *
+     * <p>Native signature:</p>
+     * <pre>{@code
+     * u32 (WorldHandle* world, u32 subscription_id)
+     * }</pre>
+     */
     private static final MethodHandle WORLD_UNSUBSCRIBE = downcall(
         "hynergy_world_unsubscribe", FunctionDescriptor.of(
-            ValueLayout.JAVA_INT, // return u32
-            ValueLayout.ADDRESS,  // WorldHandle*
-            ValueLayout.JAVA_INT  // subscription_id
+            ValueLayout.JAVA_INT,
+            ValueLayout.ADDRESS,
+            ValueLayout.JAVA_INT
         )
     );
 

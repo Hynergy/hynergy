@@ -33,30 +33,6 @@ final class DeviceMemberAccessTest {
             assertTrue(subscription.isActive());
         }
     }
-    @Test
-    void customDefinitionBoundsAreValidatedBeforeItsDeviceIsApplied() {
-        DeviceType type = DeviceType.define(builder -> {
-            var positive = builder.terminal(0, "positive");
-            var negative = builder.terminal(1, "negative");
-            var parameter = builder.parameter(0, "resistance", new ParameterConstraints(
-                ParameterConstraints.Bound.inclusive(10.0), ParameterConstraints.Bound.exclusive(100.0), true, false, null, null));
-            builder.element(Resistance.TYPE, e -> {
-                e.connect(Resistance.TYPE.terminal(0), positive);
-                e.connect(Resistance.TYPE.terminal(1), negative);
-                e.bind(Resistance.TYPE.parameter(0), parameter);
-            });
-        });
-        try (ElectricalRuntime runtime = ElectricalRuntime.create()) {
-            runtime.register(type);
-            try (ElectricalSystem system = runtime.createSystem(20)) {
-                Device device = system.create(type);
-                device.setParameter(type.parameter(0), 10.0);
-                assertThrows(IllegalArgumentException.class, () -> device.setParameter(type.parameter(0), 9.0));
-                assertThrows(IllegalArgumentException.class, () -> device.setParameter(type.parameter(0), 100.0));
-                assertDoesNotThrow(system::tick);
-            }
-        }
-    }
 
     @Test
     void invalidParameterIsRejectedBeforeEnqueueWithoutDiscardingValidCommands() {

@@ -12,7 +12,7 @@ public class GroundedLogicGates {
         var primitive = PrimitiveDeviceTypes.OR;
 
         var output = b.terminal(0, "output");
-        var supply = b.terminal(1, "supply");
+        var supply = b.node();
         var inputA = b.terminal(2, "input_a");
         var inputB = b.terminal(3, "input_b");
         var ground = b.ground();
@@ -23,6 +23,14 @@ public class GroundedLogicGates {
                 1, "maximum_conductance", primitive.parameter(1).constraints());
         var minimumConductance = b.parameter(
                 2, "minimum_conductance", primitive.parameter(2).constraints());
+
+        var source = PrimitiveDeviceTypes.VOLTAGE_SOURCE;
+        var supplyVoltage = b.parameter(3, "supply_voltage", source.parameter(0).constraints());
+        b.element(source, e -> {
+            e.connect(source.terminal(0), supply);
+            e.connect(source.terminal(1), ground);
+            e.bind(source.parameter(0), supplyVoltage);
+        });
 
         var gate = b.element(primitive, e -> {
             e.connect(primitive.terminal(0), output);
@@ -46,7 +54,7 @@ public class GroundedLogicGates {
         var primitive = PrimitiveDeviceTypes.AND;
 
         var output = b.terminal(0, "output");
-        var supply = b.terminal(1, "supply");
+        var supply = b.node();
         var inputA = b.terminal(2, "input_a");
         var inputB = b.terminal(3, "input_b");
         var ground = b.ground();
@@ -57,6 +65,14 @@ public class GroundedLogicGates {
                 1, "maximum_conductance", primitive.parameter(1).constraints());
         var minimumConductance = b.parameter(
                 2, "minimum_conductance", primitive.parameter(2).constraints());
+
+        var source = PrimitiveDeviceTypes.VOLTAGE_SOURCE;
+        var supplyVoltage = b.parameter(3, "supply_voltage", source.parameter(0).constraints());
+        b.element(source, e -> {
+            e.connect(source.terminal(0), supply);
+            e.connect(source.terminal(1), ground);
+            e.bind(source.parameter(0), supplyVoltage);
+        });
 
         var gate = b.element(primitive, e -> {
             e.connect(primitive.terminal(0), output);
@@ -80,7 +96,7 @@ public class GroundedLogicGates {
         var primitive = PrimitiveDeviceTypes.NAND;
 
         var output = b.terminal(0, "output");
-        var supply = b.terminal(1, "supply");
+        var supply = b.node();
         var inputA = b.terminal(2, "input_a");
         var inputB = b.terminal(3, "input_b");
         var ground = b.ground();
@@ -91,6 +107,14 @@ public class GroundedLogicGates {
                 1, "maximum_conductance", primitive.parameter(1).constraints());
         var minimumConductance = b.parameter(
                 2, "minimum_conductance", primitive.parameter(2).constraints());
+
+        var source = PrimitiveDeviceTypes.VOLTAGE_SOURCE;
+        var supplyVoltage = b.parameter(3, "supply_voltage", source.parameter(0).constraints());
+        b.element(source, e -> {
+            e.connect(source.terminal(0), supply);
+            e.connect(source.terminal(1), ground);
+            e.bind(source.parameter(0), supplyVoltage);
+        });
 
         var gate = b.element(primitive, e -> {
             e.connect(primitive.terminal(0), output);
@@ -114,7 +138,7 @@ public class GroundedLogicGates {
         var primitive = PrimitiveDeviceTypes.NOR;
 
         var output = b.terminal(0, "output");
-        var supply = b.terminal(1, "supply");
+        var supply = b.node();
         var inputA = b.terminal(2, "input_a");
         var inputB = b.terminal(3, "input_b");
         var ground = b.ground();
@@ -125,6 +149,14 @@ public class GroundedLogicGates {
                 1, "maximum_conductance", primitive.parameter(1).constraints());
         var minimumConductance = b.parameter(
                 2, "minimum_conductance", primitive.parameter(2).constraints());
+
+        var source = PrimitiveDeviceTypes.VOLTAGE_SOURCE;
+        var supplyVoltage = b.parameter(3, "supply_voltage", source.parameter(0).constraints());
+        b.element(source, e -> {
+            e.connect(source.terminal(0), supply);
+            e.connect(source.terminal(1), ground);
+            e.bind(source.parameter(0), supplyVoltage);
+        });
 
         var gate = b.element(primitive, e -> {
             e.connect(primitive.terminal(0), output);
@@ -148,7 +180,7 @@ public class GroundedLogicGates {
         var primitive = PrimitiveDeviceTypes.NOT;
 
         var output = b.terminal(0, "output");
-        var supply = b.terminal(1, "supply");
+        var supply = b.node();
         var input = b.terminal(2, "input");
         var ground = b.ground();
 
@@ -158,6 +190,14 @@ public class GroundedLogicGates {
                 1, "maximum_conductance", primitive.parameter(1).constraints());
         var minimumConductance = b.parameter(
                 2, "minimum_conductance", primitive.parameter(2).constraints());
+
+        var source = PrimitiveDeviceTypes.VOLTAGE_SOURCE;
+        var supplyVoltage = b.parameter(3, "supply_voltage", source.parameter(0).constraints());
+        b.element(source, e -> {
+            e.connect(source.terminal(0), supply);
+            e.connect(source.terminal(1), ground);
+            e.bind(source.parameter(0), supplyVoltage);
+        });
 
         var gate = b.element(primitive, e -> {
             e.connect(primitive.terminal(0), output);

@@ -221,6 +221,33 @@ public final class ElectricalSystem implements AutoCloseable {
     }
 
     /**
+     * Creates a device with all parameter values configured.
+     * Values follow the parameter order in the declaration.
+     * The method rejects invalid values before it allocates a device.
+     *
+     * @param type a type registered in this runtime
+     * @param parameters one value for each entry in {@link DeviceType#parameters()}, in list order
+     * @return the device handle
+     * @throws IllegalArgumentException if the value count or parameter vector is invalid
+     * @throws IllegalStateException if the system is unusable or the type is not registered
+     */
+    public Device create(DeviceType type, double... parameters) {
+        requireUsable();
+        Objects.requireNonNull(type, "type");
+        Objects.requireNonNull(parameters, "parameters");
+        if (parameters.length != type.parameterCount()) {
+            throw new IllegalArgumentException("Incorrect parameter count");
+        }
+        for (int i = 0; i < parameters.length; i++) {
+            type.parameters().get(i).constraints().validate(parameters[i]);
+        }
+        runtime.validateParameters(runtime.requireDefinition(type), parameters);
+        Device device = create(type);
+        for (int i = 0; i < parameters.length; i++) setParameter(device, i, parameters[i]);
+        return device;
+    }
+
+    /**
      * Resolves a live runtime handle for an existing device identity.
      *
      * <p>This operation does not add a native device. The supplied type must
@@ -274,6 +301,22 @@ public final class ElectricalSystem implements AutoCloseable {
         device.metadata().requireParameter(parameterId);
         device.binding().type().parameters().get(parameterId).constraints().validate(value);
         runtime.validateParameter(device.definition(), parameterId, value);
+        double[] proposed = world.parameterIntent(device.id(), device.metadata().parameterCount());
+        proposed[parameterId] = value;
+        runtime.validateParameters(device.definition(), proposed);
+    }
+
+    void validateParameters(Device device, java.util.Map<DeviceParameter, Double> updates) {
+        requireOwned(device);
+        world.requireDevice(device.id());
+        double[] proposed = world.parameterIntent(device.id(), device.metadata().parameterCount());
+        for (var update : updates.entrySet()) {
+            int index = device.binding().parameterIndex(update.getKey());
+            update.getKey().constraints().validate(update.getValue());
+            runtime.validateParameter(device.definition(), index, update.getValue());
+            proposed[index] = update.getValue();
+            runtime.validateParameters(device.definition(), proposed);
+        }
     }
 
     void attachTerminal(Device device, int terminalId, Wire wire) {

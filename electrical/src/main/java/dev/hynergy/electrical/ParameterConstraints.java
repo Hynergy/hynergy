@@ -2,7 +2,16 @@ package dev.hynergy.electrical;
 
 import org.jspecify.annotations.Nullable;
 
-/** Declared value and reciprocal constraints. Native validation can impose additional rules. */
+/**
+ * Defines constraints on finite values and their reciprocals.
+ * Native validation can apply additional rules.
+ * @param lower the lower value bound, or null for no lower bound
+ * @param upper the upper value bound, or null for no upper bound
+ * @param nonZero whether validation rejects zero
+ * @param requireFiniteReciprocal whether validation requires a finite reciprocal
+ * @param reciprocalLower the lower reciprocal bound, or null for no lower bound
+ * @param reciprocalUpper the upper reciprocal bound, or null for no upper bound
+ */
 public record ParameterConstraints(@Nullable Bound lower, @Nullable Bound upper, boolean nonZero,
                                    boolean requireFiniteReciprocal, @Nullable Bound reciprocalLower,
                                    @Nullable Bound reciprocalUpper) {
@@ -14,12 +23,20 @@ public record ParameterConstraints(@Nullable Bound lower, @Nullable Bound upper,
         if (!requireFiniteReciprocal && (reciprocalLower != null || reciprocalUpper != null))
             throw new IllegalArgumentException("Reciprocal bounds require finite reciprocal validation");
     }
+    /** Returns constraints that accept any finite value, including zero. */
     public static ParameterConstraints unconstrained() {
         return new ParameterConstraints(null, null, false, false, null, null);
     }
+    /** Returns constraints that require a finite value greater than zero. */
     public static ParameterConstraints positiveFinite() {
         return new ParameterConstraints(Bound.exclusive(0), null, false, false, null, null);
     }
+    /**
+     * Checks finiteness, value bounds, and any declared reciprocal constraints.
+     * This method does not require a runtime or check native parameter relationships.
+     * @param value the proposed value
+     * @throws IllegalArgumentException if the value violates a declared constraint
+     */
     public void validate(double value) {
         if (!Double.isFinite(value)) throw new IllegalArgumentException("Parameter must be finite");
         if (nonZero && value == 0) throw new IllegalArgumentException("Parameter must be nonzero");

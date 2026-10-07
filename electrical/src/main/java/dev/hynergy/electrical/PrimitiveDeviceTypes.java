@@ -2,7 +2,7 @@ package dev.hynergy.electrical;
 
 import java.util.List;
 
-/** Canonical primitive schemas. Native identities remain an internal protocol detail. */
+/** Defines the shared primitive schemas. Native identities are internal protocol details. */
 public final class PrimitiveDeviceTypes {
     private PrimitiveDeviceTypes() { }
     private static final ParameterConstraints FINITE = ParameterConstraints.unconstrained();
@@ -193,5 +193,88 @@ public final class PrimitiveDeviceTypes {
         b.voltageObserver(1, "input_voltage", t0, t1);
         b.voltageObserver(2, "supply_current", t0, t1);
     });
-    static final List<DeviceType> ALL = List.of(RESISTANCE, CONDUCTANCE, VOLTAGE_SOURCE, CURRENT_SOURCE, VOLTAGE_CONTROLLED_CURRENT_SOURCE, VOLTAGE_CONTROLLED_VOLTAGE_SOURCE, CAPACITOR, INDUCTOR, VOLTAGE_CONTROLLED_SWITCH, VOLTAGE_CONTROLLED_CONDUCTANCE, TICK_DELAY, DIODE, NOT, AND, NAND, OR, NOR, SCHMITT_BUFFER);
+    public static final DeviceType SWITCHED_NOT = DeviceType.define(19, b -> {
+        var t0 = b.terminal(0, "output");
+        var t1 = b.terminal(1, "vdd");
+        var t2 = b.terminal(2, "vss");
+        var t3 = b.terminal(3, "input");
+        b.parameter(0, "threshold_relative_to_vss", FINITE);
+        b.parameter(1, "maximum_conductance", POSITIVE);
+        b.parameter(2, "minimum_conductance", NONNEGATIVE);
+        b.parameter(3, "output_bias_conductance", POSITIVE);
+        b.parameter(4, "input_bias_conductance", POSITIVE);
+        b.voltageObserver(0, "output_voltage", t0, t1);
+        b.voltageObserver(1, "input_voltage", t0, t1);
+        b.voltageObserver(2, "supply_current", t0, t1);
+    });
+
+    public static final DeviceType SWITCHED_AND = DeviceType.define(20, b -> {
+        var t0 = b.terminal(0, "output");
+        var t1 = b.terminal(1, "vdd");
+        var t2 = b.terminal(2, "vss");
+        var t3 = b.terminal(3, "input_a");
+        var t4 = b.terminal(4, "input_b");
+        b.parameter(0, "threshold_relative_to_vss", FINITE);
+        b.parameter(1, "maximum_conductance", POSITIVE);
+        b.parameter(2, "minimum_conductance", NONNEGATIVE);
+        b.parameter(3, "output_bias_conductance", POSITIVE);
+        b.parameter(4, "input_bias_conductance", POSITIVE);
+        b.voltageObserver(0, "output_voltage", t0, t1);
+        b.voltageObserver(1, "input_a_voltage", t0, t1);
+        b.voltageObserver(2, "input_b_voltage", t0, t1);
+        b.voltageObserver(3, "supply_current", t0, t1);
+    });
+
+    public static final DeviceType SWITCHED_NAND = DeviceType.define(21, b -> {
+        var t0 = b.terminal(0, "output");
+        var t1 = b.terminal(1, "vdd");
+        var t2 = b.terminal(2, "vss");
+        var t3 = b.terminal(3, "input_a");
+        var t4 = b.terminal(4, "input_b");
+        b.parameter(0, "threshold_relative_to_vss", FINITE);
+        b.parameter(1, "maximum_conductance", POSITIVE);
+        b.parameter(2, "minimum_conductance", NONNEGATIVE);
+        b.parameter(3, "output_bias_conductance", POSITIVE);
+        b.parameter(4, "input_bias_conductance", POSITIVE);
+        b.voltageObserver(0, "output_voltage", t0, t1);
+        b.voltageObserver(1, "input_a_voltage", t0, t1);
+        b.voltageObserver(2, "input_b_voltage", t0, t1);
+        b.voltageObserver(3, "supply_current", t0, t1);
+    });
+
+    public static final DeviceType SWITCHED_OR = DeviceType.define(22, b -> {
+        var t0 = b.terminal(0, "output");
+        var t1 = b.terminal(1, "vdd");
+        var t2 = b.terminal(2, "vss");
+        var t3 = b.terminal(3, "input_a");
+        var t4 = b.terminal(4, "input_b");
+        b.parameter(0, "threshold_relative_to_vss", FINITE);
+        b.parameter(1, "maximum_conductance", POSITIVE);
+        b.parameter(2, "minimum_conductance", NONNEGATIVE);
+        b.parameter(3, "output_bias_conductance", POSITIVE);
+        b.parameter(4, "input_bias_conductance", POSITIVE);
+        b.voltageObserver(0, "output_voltage", t0, t1);
+        b.voltageObserver(1, "input_a_voltage", t0, t1);
+        b.voltageObserver(2, "input_b_voltage", t0, t1);
+        b.voltageObserver(3, "supply_current", t0, t1);
+    });
+
+    public static final DeviceType SWITCHED_NOR = DeviceType.define(23, b -> {
+        var t0 = b.terminal(0, "output");
+        var t1 = b.terminal(1, "vdd");
+        var t2 = b.terminal(2, "vss");
+        var t3 = b.terminal(3, "input_a");
+        var t4 = b.terminal(4, "input_b");
+        b.parameter(0, "threshold_relative_to_vss", FINITE);
+        b.parameter(1, "maximum_conductance", POSITIVE);
+        b.parameter(2, "minimum_conductance", NONNEGATIVE);
+        b.parameter(3, "output_bias_conductance", POSITIVE);
+        b.parameter(4, "input_bias_conductance", POSITIVE);
+        b.voltageObserver(0, "output_voltage", t0, t1);
+        b.voltageObserver(1, "input_a_voltage", t0, t1);
+        b.voltageObserver(2, "input_b_voltage", t0, t1);
+        b.voltageObserver(3, "supply_current", t0, t1);
+    });
+
+    static final List<DeviceType> ALL = List.of(RESISTANCE, CONDUCTANCE, VOLTAGE_SOURCE, CURRENT_SOURCE, VOLTAGE_CONTROLLED_CURRENT_SOURCE, VOLTAGE_CONTROLLED_VOLTAGE_SOURCE, CAPACITOR, INDUCTOR, VOLTAGE_CONTROLLED_SWITCH, VOLTAGE_CONTROLLED_CONDUCTANCE, TICK_DELAY, DIODE, NOT, AND, NAND, OR, NOR, SCHMITT_BUFFER, SWITCHED_NOT, SWITCHED_AND, SWITCHED_NAND, SWITCHED_OR, SWITCHED_NOR);
 }

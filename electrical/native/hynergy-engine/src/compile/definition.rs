@@ -536,7 +536,12 @@ fn compile_primitive(
         | PrimitiveElementKind::And
         | PrimitiveElementKind::Nand
         | PrimitiveElementKind::Or
-        | PrimitiveElementKind::Nor => {
+        | PrimitiveElementKind::Nor
+        | PrimitiveElementKind::SwitchedNot
+        | PrimitiveElementKind::SwitchedAnd
+        | PrimitiveElementKind::SwitchedNand
+        | PrimitiveElementKind::SwitchedOr
+        | PrimitiveElementKind::SwitchedNor => {
             compile_logic_gate(&mut builder, kind)?;
         }
 
@@ -1277,6 +1282,14 @@ fn compile_logic_gate(
     builder: &mut DefinitionTemplateBuilder,
     kind: PrimitiveElementKind,
 ) -> Result<(), DefinitionTemplateBuildError> {
+    let (kind, switched) = match kind {
+        PrimitiveElementKind::SwitchedNot => (PrimitiveElementKind::Not, true),
+        PrimitiveElementKind::SwitchedAnd => (PrimitiveElementKind::And, true),
+        PrimitiveElementKind::SwitchedNand => (PrimitiveElementKind::Nand, true),
+        PrimitiveElementKind::SwitchedOr => (PrimitiveElementKind::Or, true),
+        PrimitiveElementKind::SwitchedNor => (PrimitiveElementKind::Nor, true),
+        kind => (kind, false),
+    };
     let output = builder.terminal_voltage()?;
     let vdd = builder.terminal_voltage()?;
     let vss = builder.terminal_voltage()?;
@@ -1353,9 +1366,30 @@ fn compile_logic_gate(
     let conductance_range = builder.sub(g_max, g_min)?;
     let high_delta = builder.mul(output_high, conductance_range)?;
     let pull_up = builder.add(g_min, high_delta)?;
-    let pull_down = builder.sub(g_max, high_delta)?;
-
-    stamp_complementary_output_stage(builder, output_mode, output, vdd, vss, pull_up, pull_down);
+    if switched {
+        let output_bias = builder.parameter()?;
+        let input_bias = builder.parameter()?;
+        stamp_conductance(builder, input_a, vss, input_bias);
+        builder.register_input_bias(input_a, vss, input_bias);
+        if let Some(input_b) = input_b {
+            stamp_conductance(builder, input_b, vss, input_bias);
+            builder.register_input_bias(input_b, vss, input_bias);
+        }
+        stamp_conductance(builder, vdd, output, pull_up);
+        stamp_conductance(builder, output, vss, output_bias);
+        builder.register_switched_driver(output_mode, output, vdd, vss, pull_up, output_bias);
+    } else {
+        let pull_down = builder.sub(g_max, high_delta)?;
+        stamp_complementary_output_stage(
+            builder,
+            output_mode,
+            output,
+            vdd,
+            vss,
+            pull_up,
+            pull_down,
+        );
+    }
 
     let output_voltage = voltage_difference(builder, output, vss)?;
     let supply_branch_voltage = voltage_difference(builder, vdd, output)?;

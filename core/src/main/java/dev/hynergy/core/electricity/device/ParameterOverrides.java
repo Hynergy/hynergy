@@ -6,10 +6,10 @@ import java.util.Arrays;
 import java.util.Objects;
 
 /**
- * Compact mutable instance overrides keyed by stable parameter ID.
+ * Stores mutable instance overrides by stable parameter ID.
  *
- * <p>Device instances are expected to override only a small number of
- * parameters, so linear search avoids per-device maps and boxing.</p>
+ * <p>Device instances usually override few parameters.
+ * Linear search avoids a separate map and boxed values for each device.</p>
  */
 public final class ParameterOverrides {
     private static final int[] EMPTY_IDS = new int[0];

@@ -2,19 +2,18 @@ package dev.hynergy.electrical.primitives.logic;
 
 import dev.hynergy.electrical.*;
 
+import java.util.Objects;
+
 /**
  * Models a two-input OR gate with a finite-conductance output stage.
  *
  * <p>An input is high when its voltage relative to VSS is greater than or
  * equal to the threshold voltage. The output stage uses the maximum and
- * minimum conductances to connect the output towards VDD or VSS.</p>
+ * minimum conductances to connect the output to VDD or VSS.</p>
  *
  * <p>The output and input observation voltages use VSS as their reference.</p>
  */
-public final class Or {
-    /**
-     * The device type for {@code Or}.
-     */
+public record Or(Device device) {
     public static final DeviceType TYPE = PrimitiveDeviceTypes.OR;
 
     public static final DeviceTerminal OUTPUT = TYPE.terminal(0);
@@ -32,53 +31,50 @@ public final class Or {
     public static final DeviceObserver INPUT_B_VOLTAGE = TYPE.observer(2);
     public static final DeviceObserver SUPPLY_CURRENT = TYPE.observer(3);
 
-    private final Device device;
-
     /**
-     * Wraps a live device with this primitive definition.
+     * Uses a live device with this primitive definition.
      *
-     * @throws IllegalArgumentException if the native definition differs
-     * @throws IllegalStateException if the device is no longer usable
+     * @throws IllegalArgumentException if the device has a different type
+     * @throws IllegalStateException    if the device is no longer usable
      */
-    public Or(Device device) {
-        java.util.Objects.requireNonNull(device, "device").requireDefinition(TYPE);
-        this.device = device;
+    public Or {
+        Objects.requireNonNull(device, "device").requireDefinition(TYPE);
     }
 
-    /** Returns the underlying runtime handle. */
+    @Override
     public Device device() {
         return device;
     }
 
-    /** Returns the runtime identity. */
     public DeviceId id() {
         return device.id();
     }
 
-    /** Destroys the underlying device and its observation subscriptions. */
+    /**
+     * Destroys the device and deactivates its observation subscriptions.
+     */
     public void destroy() {
         device.destroy();
     }
 
     /**
-     * Creates a OR gate.
+     * Creates an OR gate.
      *
-     * @param system the electrical system
+     * @param system                 the electrical system
      * @param thresholdRelativeToVss the input threshold relative to VSS, in
-     *     volts; the value must be finite
-     * @param maximumConductance the active output-stage conductance, in
-     *     siemens; the value must be finite and greater than zero
-     * @param minimumConductance the inactive output-stage conductance, in
-     *     siemens; the value must be finite and non-negative, and less than
-     *     {@code maximumConductance}
-     *
+     *                               volts. The value must be finite.
+     * @param maximumConductance     the active output-stage conductance, in
+     *                               siemens. The value must be finite and greater than zero.
+     * @param minimumConductance     the inactive output-stage conductance, in
+     *                               siemens. The value must be finite and zero or greater.
+     *                               The value must be less than {@code maximumConductance}.
      * @return the gate
      */
     public static Or create(
-        ElectricalSystem system,
-        double thresholdRelativeToVss,
-        double maximumConductance,
-        double minimumConductance
+            ElectricalSystem system,
+            double thresholdRelativeToVss,
+            double maximumConductance,
+            double minimumConductance
     ) {
         Or device = new Or(system.create(TYPE));
 
@@ -92,8 +88,8 @@ public final class Or {
     /**
      * Sets the input threshold relative to VSS.
      *
-     * @param thresholdRelativeToVss the threshold voltage, in volts; the value
-     *     must be finite
+     * @param thresholdRelativeToVss the threshold voltage, in volts. The value
+     *                               must be finite.
      */
     public void setThresholdRelativeToVss(double thresholdRelativeToVss) {
         device.setParameter(THRESHOLD_RELATIVE_TO_VSS, thresholdRelativeToVss);
@@ -102,9 +98,9 @@ public final class Or {
     /**
      * Sets the maximum output-stage conductance.
      *
-     * @param maximumConductance the conductance, in siemens; the value must be
-     *     finite, greater than zero, and greater than the current minimum
-     *     conductance
+     * @param maximumConductance the conductance, in siemens. The value must be
+     *                           finite and greater than the current minimum conductance.
+     *                           The value must also be greater than zero.
      */
     public void setMaximumConductance(double maximumConductance) {
         device.setParameter(MAXIMUM_CONDUCTANCE, maximumConductance);
@@ -113,99 +109,50 @@ public final class Or {
     /**
      * Sets the minimum output-stage conductance.
      *
-     * @param minimumConductance the conductance, in siemens; the value must be
-     *     finite, non-negative, and less than the current maximum conductance
+     * @param minimumConductance the conductance, in siemens. The value must be
+     *                           finite and zero or greater.
+     *                           The value must be less than the current maximum conductance.
      */
     public void setMinimumConductance(double minimumConductance) {
         device.setParameter(MINIMUM_CONDUCTANCE, minimumConductance);
     }
 
-    /**
-     * Attaches the output terminal to a wire.
-     *
-     * @param wire the wire
-     */
     public void attachOutput(Wire wire) {
         device.attachTerminal(OUTPUT, wire);
     }
 
-    /**
-     * Detaches the output terminal from a wire.
-     *
-     * @param wire the wire
-     */
     public void detachOutput(Wire wire) {
         device.detachTerminal(OUTPUT, wire);
     }
 
-    /**
-     * Attaches the VDD terminal to a wire.
-     *
-     * @param wire the wire
-     */
     public void attachVdd(Wire wire) {
         device.attachTerminal(VDD, wire);
     }
 
-    /**
-     * Detaches the VDD terminal from a wire.
-     *
-     * @param wire the wire
-     */
     public void detachVdd(Wire wire) {
         device.detachTerminal(VDD, wire);
     }
 
-    /**
-     * Attaches the VSS terminal to a wire.
-     *
-     * @param wire the wire
-     */
     public void attachVss(Wire wire) {
         device.attachTerminal(VSS, wire);
     }
 
-    /**
-     * Detaches the VSS terminal from a wire.
-     *
-     * @param wire the wire
-     */
     public void detachVss(Wire wire) {
         device.detachTerminal(VSS, wire);
     }
 
-    /**
-     * Attaches input A to a wire.
-     *
-     * @param wire the wire
-     */
     public void attachInputA(Wire wire) {
         device.attachTerminal(INPUT_A, wire);
     }
 
-    /**
-     * Detaches input A from a wire.
-     *
-     * @param wire the wire
-     */
     public void detachInputA(Wire wire) {
         device.detachTerminal(INPUT_A, wire);
     }
 
-    /**
-     * Attaches input B to a wire.
-     *
-     * @param wire the wire
-     */
     public void attachInputB(Wire wire) {
         device.attachTerminal(INPUT_B, wire);
     }
 
-    /**
-     * Detaches input B from a wire.
-     *
-     * @param wire the wire
-     */
     public void detachInputB(Wire wire) {
         device.detachTerminal(INPUT_B, wire);
     }
@@ -214,11 +161,10 @@ public final class Or {
      * Subscribes to the output voltage relative to VSS.
      *
      * @param listener the observation listener
-     *
      * @return the observation subscription
      */
     public ObservationSubscription observeOutputVoltage(
-        ObservationListener listener
+            ObservationListener listener
     ) {
         return device.observe(OUTPUT_VOLTAGE, listener);
     }
@@ -227,11 +173,10 @@ public final class Or {
      * Subscribes to input A voltage relative to VSS.
      *
      * @param listener the observation listener
-     *
      * @return the observation subscription
      */
     public ObservationSubscription observeInputVoltageA(
-        ObservationListener listener
+            ObservationListener listener
     ) {
         return device.observe(INPUT_A_VOLTAGE, listener);
     }
@@ -240,25 +185,23 @@ public final class Or {
      * Subscribes to input B voltage relative to VSS.
      *
      * @param listener the observation listener
-     *
      * @return the observation subscription
      */
     public ObservationSubscription observeInputVoltageB(
-        ObservationListener listener
+            ObservationListener listener
     ) {
         return device.observe(INPUT_B_VOLTAGE, listener);
     }
 
     /**
-     * Subscribes to the current from VDD to the output through the pull-up
-     * branch.
+     * Subscribes to signed current from VDD to the output through the supply branch.
+     * This observation excludes input pull-down currents.
      *
      * @param listener the observation listener
-     *
      * @return the observation subscription
      */
     public ObservationSubscription observeSupplyCurrent(
-        ObservationListener listener
+            ObservationListener listener
     ) {
         return device.observe(SUPPLY_CURRENT, listener);
     }

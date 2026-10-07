@@ -3,7 +3,10 @@ package dev.hynergy.electrical;
 import java.util.IdentityHashMap;
 import java.util.function.Function;
 
-/** Assigns separate native node and member indexes and emits the existing protocol. */
+/**
+ * Assigns separate native indexes to nodes and members.
+ * Encodes the declaration in the HYDF protocol.
+ */
 final class DeviceTypeCompiler {
     private DeviceTypeCompiler() { }
     static DeviceDefinition compile(DeviceType type, ElectricalEngine engine,

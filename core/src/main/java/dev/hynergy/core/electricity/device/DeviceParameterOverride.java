@@ -5,10 +5,10 @@ import com.hypixel.hytale.codec.KeyedCodec;
 import com.hypixel.hytale.codec.record.RecordCodec;
 
 /**
- * Serialized form of one stable device parameter override.
+ * Stores one device parameter override by stable ID.
  *
- * <p>Runtime storage remains primitive in {@link ParameterOverrides}; instances
- * of this record are created only at persistence codec boundaries.</p>
+ * <p>{@link ParameterOverrides} stores runtime values in primitive arrays.
+ * The persistence codec creates these records when it reads or writes saved data.</p>
  */
 public record DeviceParameterOverride(int id, double value) {
     public static final RecordCodec<DeviceParameterOverride> CODEC =

@@ -50,17 +50,18 @@ public final class ElectricalRuntime implements AutoCloseable {
      * <p>Register custom device types before you create an electrical system.
      * Registration also resolves child device types that the definition uses.</p>
      *
-     * <p>If this runtime already contains the device type, this method returns
-     * its registered definition.</p>
+     * <p>If this runtime already contains the declaration, this method returns
+     * its existing binding, even when an electrical system is active.
+     * If parent registration fails, successful dependencies remain registered.</p>
      *
      * @param type the device type
      *
-     * @return the registered device definition
+     * @return the binding for this declaration in this runtime
      *
      * @throws NullPointerException if {@code type} is null
      * @throws IllegalStateException if the runtime is closed, if closing has
-     *     been requested, if an electrical system is active, or if registration
-     *     fails
+     *     been requested, if a new registration has an active electrical system,
+     *     or if registration fails
      */
     public synchronized RegisteredDeviceType register(DeviceType type) {
         requireOpen(); requireActive(); Objects.requireNonNull(type, "type");
@@ -120,6 +121,11 @@ public final class ElectricalRuntime implements AutoCloseable {
     synchronized void validateParameter(DeviceDefinition definition, int parameter, double value) {
         requireOpen(); engine.validateParameter(definition, parameter, value);
     }
+    synchronized void validateParameters(DeviceDefinition definition, double[] parameters) {
+        requireOpen();
+        engine.validateParameters(definition, parameters);
+    }
+
     private RegisteredDeviceType resolveBinding(DeviceType type) {
         return resolveBinding(type, "root");
     }

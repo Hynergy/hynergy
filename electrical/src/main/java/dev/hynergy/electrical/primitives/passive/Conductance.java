@@ -2,16 +2,15 @@ package dev.hynergy.electrical.primitives.passive;
 
 import dev.hynergy.electrical.*;
 
+import java.util.Objects;
+
 /**
  * Models a conductance between a positive terminal and a negative terminal.
  *
  * <p>Voltage is the positive-terminal voltage minus the negative-terminal voltage.
  * Positive current flows from the positive terminal to the negative terminal.</p>
  */
-public final class Conductance {
-    /**
-     * The device type for Conductance.
-     */
+public record Conductance(Device device) {
     public static final DeviceType TYPE = PrimitiveDeviceTypes.CONDUCTANCE;
 
     public static final DeviceTerminal POSITIVE = TYPE.terminal(0);
@@ -22,30 +21,28 @@ public final class Conductance {
     public static final DeviceObserver VOLTAGE = TYPE.observer(0);
     public static final DeviceObserver CURRENT = TYPE.observer(1);
 
-    private final Device device;
-
     /**
-     * Wraps a live device with this primitive definition.
+     * Uses a live device with this primitive definition.
      *
-     * @throws IllegalArgumentException if the native definition differs
-     * @throws IllegalStateException if the device is no longer usable
+     * @throws IllegalArgumentException if the device has a different type
+     * @throws IllegalStateException    if the device is no longer usable
      */
-    public Conductance(Device device) {
-        java.util.Objects.requireNonNull(device, "device").requireDefinition(TYPE);
-        this.device = device;
+    public Conductance {
+        Objects.requireNonNull(device, "device").requireDefinition(TYPE);
     }
 
-    /** Returns the underlying runtime handle. */
+    @Override
     public Device device() {
         return device;
     }
 
-    /** Returns the runtime identity. */
     public DeviceId id() {
         return device.id();
     }
 
-    /** Destroys the underlying device and its observation subscriptions. */
+    /**
+     * Destroys the device and deactivates its observation subscriptions.
+     */
     public void destroy() {
         device.destroy();
     }
@@ -53,9 +50,8 @@ public final class Conductance {
     /**
      * Creates a conductance element.
      *
-     * @param system the electrical system
-     * @param conductance the conductance, in siemens; the value must be finite and non-negative
-     *
+     * @param system      the electrical system
+     * @param conductance the conductance, in siemens. The value must be finite and zero or greater.
      * @return the conductance element
      */
     public static Conductance create(ElectricalSystem system, double conductance) {
@@ -69,44 +65,24 @@ public final class Conductance {
     /**
      * Sets the conductance.
      *
-     * @param conductance the conductance, in siemens; the value must be finite and non-negative
+     * @param conductance the conductance, in siemens. The value must be finite and zero or greater.
      */
     public void setConductance(double conductance) {
         device.setParameter(CONDUCTANCE, conductance);
     }
 
-    /**
-     * Attaches the positive terminal to a wire.
-     *
-     * @param wire the wire
-     */
     public void attachPositive(Wire wire) {
         device.attachTerminal(POSITIVE, wire);
     }
 
-    /**
-     * Attaches the negative terminal to a wire.
-     *
-     * @param wire the wire
-     */
     public void attachNegative(Wire wire) {
         device.attachTerminal(NEGATIVE, wire);
     }
 
-    /**
-     * Detaches the positive terminal from a wire.
-     *
-     * @param wire the wire
-     */
     public void detachPositive(Wire wire) {
         device.detachTerminal(POSITIVE, wire);
     }
 
-    /**
-     * Detaches the negative terminal from a wire.
-     *
-     * @param wire the wire
-     */
     public void detachNegative(Wire wire) {
         device.detachTerminal(NEGATIVE, wire);
     }
@@ -117,11 +93,10 @@ public final class Conductance {
      * <p>Positive voltage is measured from the positive terminal to the negative terminal.</p>
      *
      * @param listener the observation listener
-     *
      * @return the observation subscription
      */
     public ObservationSubscription observeVoltage(
-        ObservationListener listener
+            ObservationListener listener
     ) {
         return device.observe(VOLTAGE, listener);
     }
@@ -132,11 +107,10 @@ public final class Conductance {
      * <p>Positive current flows from the positive terminal to the negative terminal.</p>
      *
      * @param listener the observation listener
-     *
      * @return the observation subscription
      */
     public ObservationSubscription observeCurrent(
-        ObservationListener listener
+            ObservationListener listener
     ) {
         return device.observe(CURRENT, listener);
     }

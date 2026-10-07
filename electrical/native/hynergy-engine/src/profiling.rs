@@ -48,6 +48,7 @@ impl SolverDiscreteProfile {
     }
 
     #[inline]
+    /// Number of qualified output groups. Shared switched drivers count as one group.
     pub const fn qualified_drivers(self) -> usize {
         self.qualified_drivers
     }

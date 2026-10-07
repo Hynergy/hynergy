@@ -120,6 +120,16 @@ impl Network {
         })?;
 
         debug_assert!(value.is_finite());
+        if definition_registry.has_parameter_relations(definition_id) {
+            let mut proposed = self.device(device)?.parameters().collect::<Vec<_>>();
+            proposed[parameter.index()] = Some(value);
+            definition
+                .validate_partial_parameters(definition_registry, &proposed)
+                .map_err(|_| NetworkModelError::ParameterConstraintViolation {
+                    parameter,
+                    source: crate::parameter::ParameterConstraintError::OutOfRange,
+                })?;
+        }
 
         self.device_arena.set_parameter(device, parameter, value)
     }

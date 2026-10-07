@@ -4,7 +4,9 @@ import java.util.IdentityHashMap;
 import java.util.List;
 import java.util.Objects;
 
-/** A declaration binding owned by one runtime. */
+/**
+ * Binds one device declaration to one runtime.
+ */
 public final class RegisteredDeviceType {
     private final ElectricalRuntime runtime;
     private final DeviceType type;
@@ -29,6 +31,15 @@ public final class RegisteredDeviceType {
         if (index == null) throw new IllegalArgumentException("Foreign " + kind + " reference");
         return index;
     }
+    /**
+     * Checks one value against declared and registered native constraints.
+     * This method does not allocate a device or queue a change.
+     * It does not check pending values on a live device.
+     * @param parameter a parameter from this binding's declaration
+     * @param value the proposed value
+     * @throws IllegalArgumentException if the reference or value is invalid
+     * @throws IllegalStateException if the runtime is closed or unusable
+     */
     public void validateParameter(DeviceParameter parameter, double value) {
         int index = parameterIndex(parameter);
         parameter.constraints().validate(value);

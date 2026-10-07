@@ -5,7 +5,7 @@ import java.util.Map;
 import java.util.Objects;
 
 /**
- * Binds each child member once. Authoring order does not determine native indexes.
+ * Binds each child member once. The order of builder calls does not determine native indexes.
  */
 public final class DeviceElementBuilder {
     private final DeviceTypeBuilder parent;
@@ -28,6 +28,12 @@ public final class DeviceElementBuilder {
         open = false;
     }
 
+    /**
+     * Connects one child terminal to a parent node.
+     * @param child a terminal from this child type
+     * @param node a terminal or internal node from the parent declaration
+     * @throws IllegalArgumentException if a reference has the wrong owner or the terminal already has a binding
+     */
     public void connect(DeviceTerminal child, NodeReference node) {
         requireOpen();
         Objects.requireNonNull(child, "child");
@@ -37,6 +43,13 @@ public final class DeviceElementBuilder {
             throw new IllegalArgumentException("Duplicate child terminal " + child.id());
     }
 
+    /**
+     * Binds one child parameter to a parent parameter.
+     * Native registration checks effective child constraints.
+     * @param child a parameter from this child type
+     * @param parameter a parameter from the parent declaration
+     * @throws IllegalArgumentException if a reference has the wrong owner or the child parameter already has a binding
+     */
     public void bind(DeviceParameter child, DeviceParameter parameter) {
         requireOpen();
         Objects.requireNonNull(parameter, "parameter");
@@ -44,6 +57,13 @@ public final class DeviceElementBuilder {
         value(child, new DeviceDeclaration.ParameterValue(parameter));
     }
 
+    /**
+     * Binds one child parameter to a constant value.
+     * This method checks declared constraints. Native registration checks additional constraints and parameter relationships.
+     * @param child a parameter from this child type
+     * @param value the constant parameter value
+     * @throws IllegalArgumentException if the value or reference is invalid, or the child parameter already has a binding
+     */
     public void literal(DeviceParameter child, double value) {
         requireOpen();
         Objects.requireNonNull(child, "child");

@@ -1,6 +1,8 @@
 package dev.hynergy.electrical;
 
-/** One child instance in its enclosing declaration. */
+/**
+ * Identifies one child instance in its enclosing declaration.
+ */
 public final class DeviceElement {
     final Object owner;
     final DeviceType type;

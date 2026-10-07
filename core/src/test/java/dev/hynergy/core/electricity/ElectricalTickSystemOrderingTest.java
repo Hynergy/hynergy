@@ -5,6 +5,7 @@ import com.hypixel.hytale.component.dependency.Order;
 import com.hypixel.hytale.component.dependency.SystemDependency;
 import com.hypixel.hytale.server.core.universe.world.storage.ChunkStore;
 import dev.hynergy.core.electricity.device.ElectricalDeviceSystem;
+import dev.hynergy.core.electricity.device.LightbulbSystem;
 import dev.hynergy.core.electricity.wire.WireSystem;
 import org.junit.jupiter.api.Test;
 
@@ -21,6 +22,7 @@ final class ElectricalTickSystemOrderingTest {
 
         assertAfter(dependencies, WireSystem.class);
         assertAfter(dependencies, ElectricalDeviceSystem.class);
+        assertAfter(dependencies, LightbulbSystem.class);
     }
 
     private static void assertAfter(

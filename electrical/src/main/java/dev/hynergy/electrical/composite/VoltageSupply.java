@@ -24,7 +24,6 @@ public final class VoltageSupply {
             e.bind(source.parameter(0), voltage);
         });
 
-
         var seriesResistor = b.element(resistor, e -> {
             e.connect(resistor.terminal(0), sourcePositive);
             e.connect(resistor.terminal(1), output);

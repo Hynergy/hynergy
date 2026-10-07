@@ -27,6 +27,7 @@ import dev.hynergy.core.port.PortStandard;
 import dev.hynergy.electrical.ElectricalRuntime;
 import dev.hynergy.electrical.PrimitiveDeviceTypes;
 import dev.hynergy.electrical.composite.GroundedLogicGates;
+import dev.hynergy.electrical.composite.GroundedSwitchedLogicGates;
 import dev.hynergy.electrical.composite.ResistiveLoad;
 import dev.hynergy.electrical.composite.VoltageSupply;
 import org.joml.Vector3i;
@@ -92,6 +93,13 @@ public final class ElectricityModule extends HynergyModule {
                         DeviceComponent.class,
                         "HynergyDevice",
                         DeviceComponent.CODEC
+                );
+
+        ComponentType<ChunkStore, LightbulbComponent> lightbulbComponentType =
+                chunkStoreRegistry.registerComponent(
+                        LightbulbComponent.class,
+                        "HynergyLightbulb",
+                        LightbulbComponent.CODEC
                 );
 
         wireBlockPortDefinitions =
@@ -208,7 +216,7 @@ public final class ElectricityModule extends HynergyModule {
                         >>) event -> rebuildBlockDefinitions()
         );
 
-        registerSystems(runtime, wireComponentType, deviceComponentType);
+        registerSystems(runtime, wireComponentType, deviceComponentType, lightbulbComponentType);
     }
 
     private void registerPortProtocols() {
@@ -224,7 +232,8 @@ public final class ElectricityModule extends HynergyModule {
     private void registerSystems(
             ElectricalRuntime runtime,
             ComponentType<ChunkStore, WireComponent> wireComponentType,
-            ComponentType<ChunkStore, DeviceComponent> deviceComponentType
+            ComponentType<ChunkStore, DeviceComponent> deviceComponentType,
+            ComponentType<ChunkStore, LightbulbComponent> lightbulbComponentType
     ) {
         ResourceType<ChunkStore, ElectricalSystemResource> resourceType =
                 chunkStoreRegistry.registerResource(
@@ -260,7 +269,13 @@ public final class ElectricityModule extends HynergyModule {
         );
 
         chunkStoreRegistry.registerSystem(
+                new LightbulbSystem(deviceComponentType, lightbulbComponentType)
+        );
+        chunkStoreRegistry.registerSystem(
                 new ElectricalTickSystem(runtime, resourceType)
+        );
+        chunkStoreRegistry.registerSystem(
+                new LightbulbSystem.Visuals(deviceComponentType, lightbulbComponentType)
         );
     }
 
@@ -381,11 +396,19 @@ public final class ElectricityModule extends HynergyModule {
         devices.register("hynergy:grounded_nand", GroundedLogicGates.GROUNDED_NAND);
         devices.register("hynergy:grounded_nor", GroundedLogicGates.GROUNDED_NOR);
         devices.register("hynergy:grounded_not", GroundedLogicGates.GROUNDED_NOT);
+        devices.register("hynergy:grounded_switched_not", GroundedSwitchedLogicGates.GROUNDED_SWITCHED_NOT);
+        devices.register("hynergy:grounded_switched_and", GroundedSwitchedLogicGates.GROUNDED_SWITCHED_AND);
+        devices.register("hynergy:grounded_switched_nand", GroundedSwitchedLogicGates.GROUNDED_SWITCHED_NAND);
+        devices.register("hynergy:grounded_switched_or", GroundedSwitchedLogicGates.GROUNDED_SWITCHED_OR);
+        devices.register("hynergy:grounded_switched_nor", GroundedSwitchedLogicGates.GROUNDED_SWITCHED_NOR);
     }
 
-    /** Returns the setup-time asset registry. */
+    /**
+     * Returns the asset registry for plugin setup.
+     */
     public DeviceRegistry devices() {
-        if (deviceRegistry == null) throw new IllegalStateException("Electrical runtime must be initialized before registering a device");
+        if (deviceRegistry == null)
+            throw new IllegalStateException("Electrical runtime must be initialized before registering a device");
         return deviceRegistry;
     }
 }

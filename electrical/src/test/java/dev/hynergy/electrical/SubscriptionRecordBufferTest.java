@@ -11,41 +11,6 @@ import static org.junit.jupiter.api.Assertions.*;
 final class SubscriptionRecordBufferTest {
 
     @Test
-    void startsEmptyWithoutAllocatingNativeStorage() {
-        try (SubscriptionRecordBuffer buffer = new SubscriptionRecordBuffer()) {
-            assertEquals(0, buffer.capacity());
-            assertSame(MemorySegment.NULL, buffer.segment());
-        }
-    }
-
-    @Test
-    void firstAllocationUsesMinimumCapacity() {
-        try (SubscriptionRecordBuffer buffer = new SubscriptionRecordBuffer()) {
-            buffer.ensureCapacity(1);
-
-            assertEquals(8, buffer.capacity());
-            assertNotSame(MemorySegment.NULL, buffer.segment());
-        }
-    }
-
-    @Test
-    void capacityGrowsGeometrically() {
-        try (SubscriptionRecordBuffer buffer = new SubscriptionRecordBuffer()) {
-            buffer.ensureCapacity(1);
-
-            assertEquals(8, buffer.capacity());
-
-            buffer.ensureCapacity(9);
-
-            assertEquals(12, buffer.capacity());
-
-            buffer.ensureCapacity(13);
-
-            assertEquals(18, buffer.capacity());
-        }
-    }
-
-    @Test
     void sufficientCapacityDoesNotReallocate() {
         try (SubscriptionRecordBuffer buffer = new SubscriptionRecordBuffer()) {
             buffer.ensureCapacity(4);
@@ -63,15 +28,21 @@ final class SubscriptionRecordBufferTest {
     }
 
     @Test
-    void growingBufferReplacesAndClosesPreviousArena() {
+    void bufferAllocatesLazilyAndGrowsGeometricallyWhileClosingPreviousArenas() {
         try (SubscriptionRecordBuffer buffer = new SubscriptionRecordBuffer()) {
+            assertEquals(0, buffer.capacity());
+            assertSame(MemorySegment.NULL, buffer.segment());
+
             buffer.ensureCapacity(1);
+            assertEquals(8, buffer.capacity());
+            assertNotSame(MemorySegment.NULL, buffer.segment());
 
             MemorySegment oldRecords = buffer.segment();
 
             oldRecords.set(ValueLayout.JAVA_INT, NativeLayouts.SUBSCRIPTION_RECORD_ID_OFFSET, 123);
 
             buffer.ensureCapacity(9);
+            assertEquals(12, buffer.capacity());
 
             MemorySegment newRecords = buffer.segment();
 
@@ -81,6 +52,11 @@ final class SubscriptionRecordBufferTest {
                 IllegalStateException.class,
                 () -> oldRecords.get(ValueLayout.JAVA_INT, NativeLayouts.SUBSCRIPTION_RECORD_ID_OFFSET)
             );
+
+            buffer.ensureCapacity(13);
+            assertEquals(18, buffer.capacity());
+            assertThrows(IllegalStateException.class,
+                    () -> newRecords.get(ValueLayout.JAVA_INT, NativeLayouts.SUBSCRIPTION_RECORD_ID_OFFSET));
         }
     }
 

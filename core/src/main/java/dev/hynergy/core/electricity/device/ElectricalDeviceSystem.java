@@ -26,11 +26,12 @@ import org.jspecify.annotations.Nullable;
 import java.util.Objects;
 
 /**
- * Owns the ECS lifecycle of generic electrical devices.
+ * Manages the ECS lifecycle of generic electrical devices.
  *
- * <p>Persisted {@link DeviceId}s decide whether an entity creates a new native
- * device or resolves an existing one. Restored devices synchronize configured
- * parameter intent but deliberately do not rediscover native topology.</p>
+ * <p>The saved {@link DeviceId} determines whether the entity creates a native device
+ * or resolves an existing device.
+ * Restoration applies the configured parameter values.
+ * Restoration retains native connections and does not discover them again.</p>
  */
 public final class ElectricalDeviceSystem extends RefSystem<ChunkStore> {
     private final ElectricalRuntime runtime;
@@ -267,6 +268,10 @@ public final class ElectricalDeviceSystem extends RefSystem<ChunkStore> {
         return new BindResult(created, created || migrated);
     }
 
+    /**
+     * Applies saved parameter overrides and configured defaults.
+     * Validates every proposed transition before it queues writes to a retained device.
+     */
     static boolean synchronizeParameters(
             DeviceComponent component,
             CompiledDeviceConfig compiled,
@@ -274,23 +279,18 @@ public final class ElectricalDeviceSystem extends RefSystem<ChunkStore> {
     ) {
         ParameterOverrides overrides = component.overrides();
 
-        // Check the complete intent before queuing any writes to a restored device.
-        // A later invalid value must not leave earlier values queued for application.
+        var updates = new java.util.LinkedHashMap<dev.hynergy.electrical.DeviceParameter, Double>();
         for (var parameter : compiled.parameters()) {
             int stableId = parameter.stableId();
-            double value = overrides.getOrDefault(stableId, parameter.defaultValue());
-            device.validateParameter(parameter.parameter(), value);
+            updates.put(parameter.parameter(), overrides.getOrDefault(stableId, parameter.defaultValue()));
         }
         for (int index = 0; index < overrides.size(); index++) {
             int stableId = overrides.stableIdAt(index);
-            if (compiled.parameter(stableId) != null) {
-                continue;
-            }
+            if (compiled.parameter(stableId) != null) continue;
             var parameter = compiled.declaredParameter(stableId);
-            if (parameter != null) {
-                device.validateParameter(parameter, overrides.valueAt(index));
-            }
+            if (parameter != null) updates.put(parameter, overrides.valueAt(index));
         }
+        device.validateParameters(updates);
 
         for (var parameter : compiled.parameters()) {
             int stableId = parameter.stableId();

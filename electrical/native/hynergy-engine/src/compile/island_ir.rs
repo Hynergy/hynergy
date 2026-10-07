@@ -390,14 +390,16 @@ impl<'a> IslandIrBuilder<'a> {
 
     #[inline]
     pub(crate) fn require_iteration_stability(&mut self, value: ValueSlot) {
-        debug_assert_eq!(
-            self.values
-                .rate(value)
-                .expect("stability value must belong to its value program"),
-            EvaluationRate::Iteration,
-            "iteration stability values must be iteration-rate values",
-        );
-
+        // Binding to ground can make a dynamic predicate constant.
+        // Normal input invalidation already covers static and tick values.
+        if self
+            .values
+            .rate(value)
+            .expect("stability value must belong to value program")
+            != EvaluationRate::Iteration
+        {
+            return;
+        }
         self.iteration_stability_values.push(value);
     }
 

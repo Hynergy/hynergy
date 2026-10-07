@@ -4,13 +4,13 @@ package dev.hynergy.electrical;
  * Provides a runtime handle to a wire in an {@link ElectricalSystem}.
  *
  * <p>A wire connects device terminals to the same electrical network.
- * Each handle is bound to the electrical system that created or resolved it
- * and must not be used with another system.</p>
+ * Each handle belongs to the electrical system that created or resolved it.
+ * Do not use the handle with another system.</p>
  *
- * <p>The {@link WireId} identifies the underlying wire independently of this
- * Java handle. Persist a wire ID rather than a {@code Wire}; the handle itself
- * is valid only for the lifetime of its electrical system. After an electrical
- * world is restored, a new handle can be obtained for the persisted wire ID.</p>
+ * <p>The {@link WireId} identifies the wire independently of this Java handle.
+ * Save the wire ID to restore the wire.
+ * The handle is valid only during the lifetime of its electrical system.
+ * After restoration, use the saved wire ID to get a new handle.</p>
  */
 public final class Wire {
     private final ElectricalSystem system;
@@ -33,11 +33,6 @@ public final class Wire {
         system.remove(this);
     }
     
-    /**
-     * Returns the persistent identity of this wire.
-     *
-     * @return the wire ID
-     */
     public WireId id() {
         return wireId;
     }

@@ -1,6 +1,8 @@
 package dev.hynergy.electrical;
 
-/** A canonical terminal reference in one declaration. */
+/**
+ * Identifies a terminal in one electrical declaration.
+ */
 public final class DeviceTerminal implements NodeReference {
     final Object owner;
     private final int id;

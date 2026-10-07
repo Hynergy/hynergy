@@ -82,7 +82,7 @@ class DeviceConfigCompilationTest {
     }
 
     @Test
-    void rejectsUnknownAndDuplicateMembersAndNativeInvalidDefaults() {
+    void invalidConfigsDoNotCreateDevicesOrPoisonRuntime() {
         for (double v : new double[]{0, -1, Double.NaN, Double.POSITIVE_INFINITY})
             assertThrows(IllegalArgumentException.class, () -> config(new DeviceParameterConfig[]{new DeviceParameterConfig(1, v)}, null).compile(registry, conductorStandard()));
         assertThrows(IllegalArgumentException.class, () -> config(new DeviceParameterConfig[]{new DeviceParameterConfig(2, 10)}, null).compile(registry, conductorStandard()));
@@ -90,6 +90,11 @@ class DeviceConfigCompilationTest {
         assertThrows(IllegalArgumentException.class, () -> config(null, new DevicePortConfig[]{new DevicePortConfig(1, 0, null, new Vector3i(1, 0, 0))}).compile(registry, conductorStandard()));
         assertThrows(IllegalArgumentException.class, () -> config(null, new DevicePortConfig[]{new DevicePortConfig(1, 1, null, new Vector3i(1, 0, 0)), new DevicePortConfig(1, 2, null, new Vector3i(-1, 0, 0))}).compile(registry, conductorStandard()));
         assertThrows(IllegalArgumentException.class, () -> new DeviceConfig("test:x", "test:unknown", null, null).compile(registry, conductorStandard()));
+        assertDoesNotThrow(() -> config(new DeviceParameterConfig[]{new DeviceParameterConfig(1, 100)}, null)
+                .compile(registry, conductorStandard()));
+        try (var system = runtime.createSystem(20)) {
+            assertEquals(1, system.create(type).id().value());
+        }
     }
 
     @Test

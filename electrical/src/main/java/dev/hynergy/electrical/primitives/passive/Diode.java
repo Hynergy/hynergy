@@ -2,6 +2,8 @@ package dev.hynergy.electrical.primitives.passive;
 
 import dev.hynergy.electrical.*;
 
+import java.util.Objects;
+
 /**
  * Models a two-state conductance diode.
  *
@@ -12,10 +14,7 @@ import dev.hynergy.electrical.*;
  * is positive. It uses the minimum conductance when the voltage is zero or
  * negative.</p>
  */
-public final class Diode {
-    /**
-     * The device type for {@code Diode}.
-     */
+public record Diode(Device device) {
     public static final DeviceType TYPE = PrimitiveDeviceTypes.DIODE;
 
     public static final DeviceTerminal ANODE = TYPE.terminal(0);
@@ -27,30 +26,28 @@ public final class Diode {
     public static final DeviceObserver VOLTAGE = TYPE.observer(0);
     public static final DeviceObserver CURRENT = TYPE.observer(1);
 
-    private final Device device;
-
     /**
-     * Wraps a live device with this primitive definition.
+     * Uses a live device with this primitive definition.
      *
-     * @throws IllegalArgumentException if the native definition differs
-     * @throws IllegalStateException if the device is no longer usable
+     * @throws IllegalArgumentException if the device has a different type
+     * @throws IllegalStateException    if the device is no longer usable
      */
-    public Diode(Device device) {
-        java.util.Objects.requireNonNull(device, "device").requireDefinition(TYPE);
-        this.device = device;
+    public Diode {
+        Objects.requireNonNull(device, "device").requireDefinition(TYPE);
     }
 
-    /** Returns the underlying runtime handle. */
+    @Override
     public Device device() {
         return device;
     }
 
-    /** Returns the runtime identity. */
     public DeviceId id() {
         return device.id();
     }
 
-    /** Destroys the underlying device and its observation subscriptions. */
+    /**
+     * Destroys the device and deactivates its observation subscriptions.
+     */
     public void destroy() {
         device.destroy();
     }
@@ -58,13 +55,12 @@ public final class Diode {
     /**
      * Creates a diode.
      *
-     * @param system the electrical system
-     * @param maximumConductance the forward conductance, in siemens; the value
-     *     must be finite and greater than zero
-     * @param minimumConductance the reverse conductance, in siemens; the value
-     *     must be finite and non-negative, and less than
-     *     {@code maximumConductance}
-     *
+     * @param system             the electrical system
+     * @param maximumConductance the forward conductance, in siemens. The value
+     *                           must be finite and greater than zero.
+     * @param minimumConductance the reverse conductance, in siemens. The value
+     *                           must be finite and zero or greater.
+     *                           The value must be less than {@code maximumConductance}.
      * @return the diode
      */
     public static Diode create(ElectricalSystem system, double maximumConductance, double minimumConductance) {
@@ -79,9 +75,9 @@ public final class Diode {
     /**
      * Sets the maximum conductance.
      *
-     * @param maximumConductance the conductance, in siemens; the value must be
-     *     finite, greater than zero, and greater than the current minimum
-     *     conductance
+     * @param maximumConductance the conductance, in siemens. The value must be
+     *                           finite and greater than the current minimum conductance.
+     *                           The value must also be greater than zero.
      */
     public void setMaximumConductance(double maximumConductance) {
         device.setParameter(MAXIMUM_CONDUCTANCE, maximumConductance);
@@ -90,45 +86,26 @@ public final class Diode {
     /**
      * Sets the minimum conductance.
      *
-     * @param minimumConductance the conductance, in siemens; the value must be
-     *     finite, non-negative, and less than the current maximum conductance
+     * @param minimumConductance the conductance, in siemens. The value must be
+     *                           finite and zero or greater.
+     *                           The value must be less than the current maximum conductance.
      */
     public void setMinimumConductance(double minimumConductance) {
         device.setParameter(MINIMUM_CONDUCTANCE, minimumConductance);
     }
 
-    /**
-     * Attaches the anode to a wire.
-     *
-     * @param wire the wire
-     */
     public void attachAnode(Wire wire) {
         device.attachTerminal(ANODE, wire);
     }
 
-    /**
-     * Attaches the cathode to a wire.
-     *
-     * @param wire the wire
-     */
     public void attachCathode(Wire wire) {
         device.attachTerminal(CATHODE, wire);
     }
 
-    /**
-     * Detaches the anode from a wire.
-     *
-     * @param wire the wire
-     */
     public void detachAnode(Wire wire) {
         device.detachTerminal(ANODE, wire);
     }
 
-    /**
-     * Detaches the cathode from a wire.
-     *
-     * @param wire the wire
-     */
     public void detachCathode(Wire wire) {
         device.detachTerminal(CATHODE, wire);
     }
@@ -139,11 +116,10 @@ public final class Diode {
      * <p>Positive voltage is measured from the anode to the cathode.</p>
      *
      * @param listener the observation listener
-     *
      * @return the observation subscription
      */
     public ObservationSubscription observeVoltage(
-        ObservationListener listener
+            ObservationListener listener
     ) {
         return device.observe(VOLTAGE, listener);
     }
@@ -154,11 +130,10 @@ public final class Diode {
      * <p>Positive current flows from the anode to the cathode.</p>
      *
      * @param listener the observation listener
-     *
      * @return the observation subscription
      */
     public ObservationSubscription observeCurrent(
-        ObservationListener listener
+            ObservationListener listener
     ) {
         return device.observe(CURRENT, listener);
     }

@@ -2,16 +2,15 @@ package dev.hynergy.electrical.primitives.sources;
 
 import dev.hynergy.electrical.*;
 
+import java.util.Objects;
+
 /**
  * Models an ideal current source between a positive terminal and a negative terminal.
  *
  * <p>Voltage is the positive-terminal voltage minus the negative-terminal voltage.
  * Positive current flows from the positive terminal to the negative terminal.</p>
  */
-public final class CurrentSource {
-    /**
-     * The device type for CurrentSource.
-     */
+public record CurrentSource(Device device) {
     public static final DeviceType TYPE = PrimitiveDeviceTypes.CURRENT_SOURCE;
 
     public static final DeviceTerminal POSITIVE = TYPE.terminal(0);
@@ -22,30 +21,28 @@ public final class CurrentSource {
     public static final DeviceObserver VOLTAGE = TYPE.observer(0);
     public static final DeviceObserver CURRENT_OBSERVER = TYPE.observer(1);
 
-    private final Device device;
-
     /**
-     * Wraps a live device with this primitive definition.
+     * Uses a live device with this primitive definition.
      *
-     * @throws IllegalArgumentException if the native definition differs
-     * @throws IllegalStateException if the device is no longer usable
+     * @throws IllegalArgumentException if the device has a different type
+     * @throws IllegalStateException    if the device is no longer usable
      */
-    public CurrentSource(Device device) {
-        java.util.Objects.requireNonNull(device, "device").requireDefinition(TYPE);
-        this.device = device;
+    public CurrentSource {
+        Objects.requireNonNull(device, "device").requireDefinition(TYPE);
     }
 
-    /** Returns the underlying runtime handle. */
+    @Override
     public Device device() {
         return device;
     }
 
-    /** Returns the runtime identity. */
     public DeviceId id() {
         return device.id();
     }
 
-    /** Destroys the underlying device and its observation subscriptions. */
+    /**
+     * Destroys the device and deactivates its observation subscriptions.
+     */
     public void destroy() {
         device.destroy();
     }
@@ -53,9 +50,8 @@ public final class CurrentSource {
     /**
      * Creates a current source.
      *
-     * @param system the electrical system
-     * @param current the source current, in amperes; the value must be finite
-     *
+     * @param system  the electrical system
+     * @param current the source current, in amperes. The value must be finite.
      * @return the current source
      */
     public static CurrentSource create(ElectricalSystem system, double current) {
@@ -69,44 +65,24 @@ public final class CurrentSource {
     /**
      * Sets the current.
      *
-     * @param current the source current, in amperes; the value must be finite
+     * @param current the source current, in amperes. The value must be finite.
      */
     public void setCurrent(double current) {
         device.setParameter(CURRENT, current);
     }
 
-    /**
-     * Attaches the positive terminal to a wire.
-     *
-     * @param wire the wire
-     */
     public void attachPositive(Wire wire) {
         device.attachTerminal(POSITIVE, wire);
     }
 
-    /**
-     * Attaches the negative terminal to a wire.
-     *
-     * @param wire the wire
-     */
     public void attachNegative(Wire wire) {
         device.attachTerminal(NEGATIVE, wire);
     }
 
-    /**
-     * Detaches the positive terminal from a wire.
-     *
-     * @param wire the wire
-     */
     public void detachPositive(Wire wire) {
         device.detachTerminal(POSITIVE, wire);
     }
 
-    /**
-     * Detaches the negative terminal from a wire.
-     *
-     * @param wire the wire
-     */
     public void detachNegative(Wire wire) {
         device.detachTerminal(NEGATIVE, wire);
     }
@@ -117,11 +93,10 @@ public final class CurrentSource {
      * <p>Positive voltage is measured from the positive terminal to the negative terminal.</p>
      *
      * @param listener the observation listener
-     *
      * @return the observation subscription
      */
     public ObservationSubscription observeVoltage(
-        ObservationListener listener
+            ObservationListener listener
     ) {
         return device.observe(VOLTAGE, listener);
     }
@@ -132,11 +107,10 @@ public final class CurrentSource {
      * <p>Positive current flows from the positive terminal to the negative terminal.</p>
      *
      * @param listener the observation listener
-     *
      * @return the observation subscription
      */
     public ObservationSubscription observeCurrent(
-        ObservationListener listener
+            ObservationListener listener
     ) {
         return device.observe(CURRENT_OBSERVER, listener);
     }

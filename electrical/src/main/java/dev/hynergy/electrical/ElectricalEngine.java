@@ -93,6 +93,20 @@ final class ElectricalEngine implements AutoCloseable {
         }
     }
 
+    void validateParameters(DeviceDefinition definition, double[] parameters) {
+        try (var values = Arena.ofConfined()) {
+            int code = NativeBindings.validateParameters(requireOpen(), definition.id(),
+                    values.allocateFrom(ValueLayout.JAVA_DOUBLE, parameters), parameters.length);
+            switch (code) {
+                case ParameterValidationCode.SUCCESS -> { }
+                case ParameterValidationCode.UNKNOWN_DEFINITION, ParameterValidationCode.INVALID_PARAMETER,
+                     ParameterValidationCode.CONSTRAINT_VIOLATION ->
+                        throw new IllegalArgumentException("Invalid effective parameter vector: code=" + code);
+                default -> throw new IllegalStateException("Native parameter validation failed: code=" + code);
+            }
+        }
+    }
+
     private static final class ParameterValidationCode {
         private static final int SUCCESS = 0;
         private static final int UNKNOWN_DEFINITION = 2;

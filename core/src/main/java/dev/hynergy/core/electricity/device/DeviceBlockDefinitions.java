@@ -20,9 +20,8 @@ import java.util.concurrent.atomic.AtomicReferenceArray;
 /**
  * Publishes immutable compiled device configurations for runtime block indexes.
  *
- * <p>Asset scanning and compilation are cold-path work. Every rebuild compiles
- * each distinct {@link DeviceConfig} once, publishes all replacement mappings,
- * and only then clears indexes that disappeared from the new snapshot.</p>
+ * <p>Each rebuild scans assets and compiles each distinct {@link DeviceConfig} once.
+ * The rebuild publishes all replacement mappings before it clears obsolete indexes.</p>
  */
 public final class DeviceBlockDefinitions {
     private final ComponentType<ChunkStore, DeviceComponent> deviceComponentType;
@@ -39,9 +38,6 @@ public final class DeviceBlockDefinitions {
         this.publisher = new Publisher(devices, portModule, conductorStandard);
     }
 
-    /**
-     * Returns the published configuration for a runtime block type.
-     */
     public @Nullable CompiledDeviceConfig get(int blockTypeId) {
         return publisher.get(blockTypeId);
     }
@@ -123,7 +119,7 @@ public final class DeviceBlockDefinitions {
                 for (int index = 0; index < current.length(); index++) {
                     grown.set(index, current.get(index));
                 }
-                // Publish the new entry before readers can observe the grown table.
+
                 grown.set(blockTypeId, compiled);
                 definitions = grown;
             } else {

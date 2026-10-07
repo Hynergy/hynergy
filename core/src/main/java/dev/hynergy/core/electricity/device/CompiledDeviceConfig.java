@@ -9,7 +9,8 @@ import java.util.List;
 import java.util.Objects;
 
 /**
- * Immutable asset configuration. Persistence uses the declaration's stable member IDs.
+ * Stores immutable asset configuration.
+ * Persistence uses the declaration's stable member IDs.
  */
 public final class CompiledDeviceConfig {
     private final DeviceRegistration registration;

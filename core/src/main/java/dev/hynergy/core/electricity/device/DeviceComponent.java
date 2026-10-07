@@ -20,7 +20,7 @@ import org.jspecify.annotations.Nullable;
 import java.util.Objects;
 
 /**
- * Generic ECS component for one Hytale entity participating as an electrical device.
+ * Represents one Hytale entity that acts as an electrical device.
  */
 public final class DeviceComponent implements Component<ChunkStore> {
     private static final ArrayCodec<DeviceParameterOverride> OVERRIDES_CODEC =
@@ -78,11 +78,11 @@ public final class DeviceComponent implements Component<ChunkStore> {
     /**
      * Sets a configured parameter by stable parameter ID.
      *
-     * <p>Native constraints are checked before the mutation is queued. A rejected
-     * value does not change the override. An accepted value is queued intent;
-     * the electrical system applies it during its next tick. Changes to the
-     * persisted override mark the block for saving. Setting the exact configured
-     * default removes the override.</p>
+     * <p>The method checks native constraints before it queues a change.
+     * A rejected value does not change the override.
+     * The electrical system applies an accepted value during its next tick.
+     * Changes to saved overrides mark the block for saving.
+     * If the value equals the configured default, the method removes the override.</p>
      */
     public void setParameter(int stableParameterId, double value) {
         if (!Double.isFinite(value)) {

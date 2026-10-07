@@ -325,33 +325,28 @@ impl DiscreteClosureContext<'_> {
 
             for frontier_index in 0..scratch.current_frontier.len() {
                 let driver_index = scratch.current_frontier[frontier_index] as usize;
-                let driver = self.plan.drivers()[driver_index];
+                let driver = &self.plan.drivers()[driver_index];
 
                 #[cfg(feature = "solver-profiling")]
                 {
                     scratch.profile.driver_scans += 1;
                 }
 
-                let pull_up = workspace.value(driver.pull_up());
-                let pull_down = workspace.value(driver.pull_down());
-
-                let high = unknown_voltage(predicted, driver.high_rail());
-                let low = unknown_voltage(predicted, driver.low_rail());
-
-                let denominator = pull_up + pull_down;
-
-                if !pull_up.is_finite()
-                    || !pull_down.is_finite()
-                    || !high.is_finite()
-                    || !low.is_finite()
-                    || !denominator.is_finite()
-                    || denominator == 0.0
-                {
+                let mut numerator = 0.0;
+                let mut denominator = 0.0;
+                for branch in driver.branches() {
+                    let conductance = workspace.value(branch.conductance);
+                    let voltage = unknown_voltage(predicted, branch.neighbor);
+                    if !conductance.is_finite() || conductance < 0.0 || !voltage.is_finite() {
+                        return ClosureOutcome::InvalidPrediction;
+                    }
+                    numerator += conductance * voltage;
+                    denominator += conductance;
+                }
+                if !denominator.is_finite() || denominator <= 0.0 {
                     return ClosureOutcome::InvalidPrediction;
                 }
-
-                let predicted_output = (pull_up * high + pull_down * low) / denominator;
-
+                let predicted_output = numerator / denominator;
                 if !predicted_output.is_finite() {
                     return ClosureOutcome::InvalidPrediction;
                 }
@@ -365,7 +360,7 @@ impl DiscreteClosureContext<'_> {
 
             for frontier_index in 0..scratch.current_frontier.len() {
                 let driver_index = scratch.current_frontier[frontier_index] as usize;
-                let driver = self.plan.drivers()[driver_index];
+                let driver = &self.plan.drivers()[driver_index];
                 let output = scratch.driver_outputs[driver_index];
 
                 #[cfg(feature = "solver-profiling")]
