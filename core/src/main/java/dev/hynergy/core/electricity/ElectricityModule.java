@@ -15,18 +15,21 @@ import com.hypixel.hytale.server.core.asset.type.blocktype.config.BlockType;
 import com.hypixel.hytale.server.core.plugin.registry.AssetRegistry;
 import com.hypixel.hytale.server.core.universe.world.storage.ChunkStore;
 import dev.hynergy.core.HynergyModule;
-import dev.hynergy.core.electricity.wires.WireBlockPortDefinitions;
-import dev.hynergy.core.electricity.wires.WireComponent;
-import dev.hynergy.core.electricity.wires.WireConfig;
-import dev.hynergy.core.electricity.wires.WireSystem;
+import dev.hynergy.core.electricity.device.*;
+import dev.hynergy.core.electricity.wire.WireBlockPortDefinitions;
+import dev.hynergy.core.electricity.wire.WireComponent;
+import dev.hynergy.core.electricity.wire.WireConfig;
+import dev.hynergy.core.electricity.wire.WireSystem;
 import dev.hynergy.core.port.PortDomain;
 import dev.hynergy.core.port.PortGeometry;
 import dev.hynergy.core.port.PortModule;
 import dev.hynergy.core.port.PortStandard;
-import dev.hynergy.electrical.Device;
-import dev.hynergy.electrical.DeviceDefinition;
-import dev.hynergy.electrical.DeviceType;
 import dev.hynergy.electrical.ElectricalRuntime;
+import dev.hynergy.electrical.PrimitiveDeviceTypes;
+import dev.hynergy.electrical.composite.GroundedLogicGates;
+import dev.hynergy.electrical.composite.GroundedSwitchedLogicGates;
+import dev.hynergy.electrical.composite.ResistiveLoad;
+import dev.hynergy.electrical.composite.VoltageSupply;
 import org.joml.Vector3i;
 import org.jspecify.annotations.Nullable;
 
@@ -38,16 +41,20 @@ public final class ElectricityModule extends HynergyModule {
 
     private static final HytaleLogger LOGGER = HytaleLogger.forEnclosingClass();
 
+    static final String RESISTANCE_ID = "hynergy:resistance";
+
     private final PortModule portModule;
     private final ComponentRegistryProxy<ChunkStore> chunkStoreRegistry;
     private final AssetRegistry assetRegistry;
     private final EventRegistry eventRegistry;
+    private @Nullable DeviceRegistry deviceRegistry;
 
     private @Nullable ElectricalRuntime runtime;
     private @Nullable PortDomain<ElectricalPortConnection> electricalPortDomain;
     private @Nullable PortStandard<ElectricalPortProfile, ElectricalPortConnection> conductorPortStandard;
 
     private @Nullable WireBlockPortDefinitions wireBlockPortDefinitions;
+    private @Nullable DeviceBlockDefinitions deviceBlockDefinitions;
 
     private boolean started;
 
@@ -67,7 +74,12 @@ public final class ElectricityModule extends HynergyModule {
     public void setup() {
         LOGGER.at(Level.INFO).log("Setting up electricity module");
 
+        ElectricalRuntime runtime = ElectricalRuntime.create();
+        this.runtime = runtime;
+        this.deviceRegistry = new DeviceRegistry(runtime);
+
         registerPortProtocols();
+        registerBuiltinDevices(devices());
 
         ComponentType<ChunkStore, WireComponent> wireComponentType =
                 chunkStoreRegistry.registerComponent(
@@ -76,12 +88,26 @@ public final class ElectricityModule extends HynergyModule {
                         WireComponent.CODEC
                 );
 
+        ComponentType<ChunkStore, DeviceComponent> deviceComponentType =
+                chunkStoreRegistry.registerComponent(
+                        DeviceComponent.class,
+                        "HynergyDevice",
+                        DeviceComponent.CODEC
+                );
+
         wireBlockPortDefinitions =
                 new WireBlockPortDefinitions(
                         portModule,
                         conductorPortStandard(),
                         wireComponentType
                 );
+
+        deviceBlockDefinitions = new DeviceBlockDefinitions(
+                devices(),
+                portModule,
+                conductorPortStandard(),
+                deviceComponentType
+        );
 
         assetRegistry.register(
                 HytaleAssetStore.builder(
@@ -94,12 +120,34 @@ public final class ElectricityModule extends HynergyModule {
                                 .build()
         );
 
+        assetRegistry.register(
+                HytaleAssetStore.builder(
+                                        DeviceConfig.class,
+                                        new DefaultAssetMap<>()
+                                )
+                                .setPath("Hynergy/Electricity/Devices")
+                                .setCodec(DeviceConfig.createCodec(devices()))
+                                .setKeyFunction(DeviceConfig::getId)
+                                .build()
+        );
+
         eventRegistry.register(
                 AssetEditorRequestDataSetEvent.class,
                 WireConfig.DATA_SET,
                 WireConfig::populateDataSet
         );
 
+        eventRegistry.register(
+                AssetEditorRequestDataSetEvent.class,
+                DeviceConfig.DATA_SET,
+                DeviceConfig::populateDataSet
+        );
+
+        eventRegistry.register(
+                AssetEditorRequestDataSetEvent.class,
+                DeviceRegistry.DATA_SET,
+                devices()::populateDataSet
+        );
 
         eventRegistry.register(
                 LoadedAssetsEvent.class,
@@ -121,6 +169,25 @@ public final class ElectricityModule extends HynergyModule {
                         >>) event -> rebuildWireBlockPorts()
         );
 
+        eventRegistry.register(
+                LoadedAssetsEvent.class,
+                DeviceConfig.class,
+                (Consumer<LoadedAssetsEvent<
+                        String,
+                        DeviceConfig,
+                        DefaultAssetMap<String, DeviceConfig>
+                        >>) event -> rebuildDeviceBlockDefinitions()
+        );
+
+        eventRegistry.register(
+                RemovedAssetsEvent.class,
+                DeviceConfig.class,
+                (Consumer<RemovedAssetsEvent<
+                        String,
+                        DeviceConfig,
+                        DefaultAssetMap<String, DeviceConfig>
+                        >>) event -> rebuildDeviceBlockDefinitions()
+        );
 
         eventRegistry.register(
                 LoadedAssetsEvent.class,
@@ -129,7 +196,7 @@ public final class ElectricityModule extends HynergyModule {
                         String,
                         BlockType,
                         BlockTypeAssetMap<String, BlockType>
-                        >>) event -> rebuildWireBlockPorts()
+                        >>) event -> rebuildBlockDefinitions()
         );
 
         eventRegistry.register(
@@ -139,10 +206,10 @@ public final class ElectricityModule extends HynergyModule {
                         String,
                         BlockType,
                         BlockTypeAssetMap<String, BlockType>
-                        >>) event -> rebuildWireBlockPorts()
+                        >>) event -> rebuildBlockDefinitions()
         );
 
-        registerSystems(wireComponentType);
+        registerSystems(runtime, wireComponentType, deviceComponentType);
     }
 
     private void registerPortProtocols() {
@@ -156,15 +223,15 @@ public final class ElectricityModule extends HynergyModule {
     }
 
     private void registerSystems(
-            ComponentType<ChunkStore, WireComponent> wireComponentType
+            ElectricalRuntime runtime,
+            ComponentType<ChunkStore, WireComponent> wireComponentType,
+            ComponentType<ChunkStore, DeviceComponent> deviceComponentType
     ) {
         ResourceType<ChunkStore, ElectricalSystemResource> resourceType =
                 chunkStoreRegistry.registerResource(
                         ElectricalSystemResource.class,
                         ElectricalSystemResource::new
                 );
-
-        runtime = ElectricalRuntime.create();
 
         chunkStoreRegistry.registerSystem(
                 new ElectricalSystemLifecycleSystem(resourceType)
@@ -175,6 +242,19 @@ public final class ElectricityModule extends HynergyModule {
                         runtime,
                         resourceType,
                         wireComponentType,
+                        deviceComponentType,
+                        portModule,
+                        electricalPortDomain()
+                )
+        );
+
+        chunkStoreRegistry.registerSystem(
+                new ElectricalDeviceSystem(
+                        runtime,
+                        resourceType,
+                        deviceComponentType,
+                        wireComponentType,
+                        Objects.requireNonNull(deviceBlockDefinitions, "deviceBlockDefinitions"),
                         portModule,
                         electricalPortDomain()
                 )
@@ -186,21 +266,38 @@ public final class ElectricityModule extends HynergyModule {
     }
 
     private void rebuildWireBlockPorts() {
-        WireBlockPortDefinitions definitions =
-                wireBlockPortDefinitions;
-
+        WireBlockPortDefinitions definitions = wireBlockPortDefinitions;
         if (definitions == null) {
             throw new IllegalStateException(
                     "Wire block port definitions are unavailable before module setup"
             );
         }
-
         definitions.rebuild();
+    }
+
+    private void rebuildDeviceBlockDefinitions() {
+        if (!devices().isFrozen()) {
+            return;
+        }
+
+        DeviceBlockDefinitions definitions = deviceBlockDefinitions;
+        if (definitions == null) {
+            throw new IllegalStateException(
+                    "Device block definitions are unavailable before module setup"
+            );
+        }
+        definitions.rebuild();
+    }
+
+    private void rebuildBlockDefinitions() {
+        rebuildWireBlockPorts();
+        rebuildDeviceBlockDefinitions();
     }
 
     @Override
     public void start() {
-        rebuildWireBlockPorts();
+        devices().freeze();
+        rebuildBlockDefinitions();
         started = true;
     }
 
@@ -258,17 +355,46 @@ public final class ElectricityModule extends HynergyModule {
         return ElectricalPortConnection.DIRECT;
     }
 
-    public <T extends Device> DeviceDefinition register(
-            DeviceType<T> type
-    ) {
-        if (started) {
-            throw new IllegalStateException("Electrical device types must be registered during setup");
-        }
+    static void registerBuiltinDevices(DeviceRegistry devices) {
+        devices.register(RESISTANCE_ID, PrimitiveDeviceTypes.RESISTANCE);
+        devices.register("hynergy:conductance", PrimitiveDeviceTypes.CONDUCTANCE);
+        devices.register("hynergy:voltage_source", PrimitiveDeviceTypes.VOLTAGE_SOURCE);
+        devices.register("hynergy:current_source", PrimitiveDeviceTypes.CURRENT_SOURCE);
+        devices.register("hynergy:voltage_controlled_current_source", PrimitiveDeviceTypes.VOLTAGE_CONTROLLED_CURRENT_SOURCE);
+        devices.register("hynergy:voltage_controlled_voltage_source", PrimitiveDeviceTypes.VOLTAGE_CONTROLLED_VOLTAGE_SOURCE);
+        devices.register("hynergy:capacitor", PrimitiveDeviceTypes.CAPACITOR);
+        devices.register("hynergy:inductor", PrimitiveDeviceTypes.INDUCTOR);
+        devices.register("hynergy:voltage_controlled_switch", PrimitiveDeviceTypes.VOLTAGE_CONTROLLED_SWITCH);
+        devices.register("hynergy:voltage_controlled_conductance", PrimitiveDeviceTypes.VOLTAGE_CONTROLLED_CONDUCTANCE);
+        devices.register("hynergy:tick_delay", PrimitiveDeviceTypes.TICK_DELAY);
+        devices.register("hynergy:diode", PrimitiveDeviceTypes.DIODE);
+        devices.register("hynergy:not", PrimitiveDeviceTypes.NOT);
+        devices.register("hynergy:and", PrimitiveDeviceTypes.AND);
+        devices.register("hynergy:nand", PrimitiveDeviceTypes.NAND);
+        devices.register("hynergy:or", PrimitiveDeviceTypes.OR);
+        devices.register("hynergy:nor", PrimitiveDeviceTypes.NOR);
+        devices.register("hynergy:schmitt_buffer", PrimitiveDeviceTypes.SCHMITT_BUFFER);
 
-        if (runtime == null) {
-            throw new IllegalStateException("Electrical runtime must be initialized before registering a device.");
-        }
+        devices.register("hynergy:voltage_supply", VoltageSupply.TYPE);
+        devices.register("hynergy:resistive_load", ResistiveLoad.RESISTIVE_LOAD);
+        devices.register("hynergy:grounded_and", GroundedLogicGates.GROUNDED_AND);
+        devices.register("hynergy:grounded_or", GroundedLogicGates.GROUNDED_OR);
+        devices.register("hynergy:grounded_nand", GroundedLogicGates.GROUNDED_NAND);
+        devices.register("hynergy:grounded_nor", GroundedLogicGates.GROUNDED_NOR);
+        devices.register("hynergy:grounded_not", GroundedLogicGates.GROUNDED_NOT);
+        devices.register("hynergy:grounded_switched_not", GroundedSwitchedLogicGates.GROUNDED_SWITCHED_NOT);
+        devices.register("hynergy:grounded_switched_and", GroundedSwitchedLogicGates.GROUNDED_SWITCHED_AND);
+        devices.register("hynergy:grounded_switched_nand", GroundedSwitchedLogicGates.GROUNDED_SWITCHED_NAND);
+        devices.register("hynergy:grounded_switched_or", GroundedSwitchedLogicGates.GROUNDED_SWITCHED_OR);
+        devices.register("hynergy:grounded_switched_nor", GroundedSwitchedLogicGates.GROUNDED_SWITCHED_NOR);
+    }
 
-        return runtime.register(type);
+    /**
+     * Returns the asset registry for plugin setup.
+     */
+    public DeviceRegistry devices() {
+        if (deviceRegistry == null)
+            throw new IllegalStateException("Electrical runtime must be initialized before registering a device");
+        return deviceRegistry;
     }
 }

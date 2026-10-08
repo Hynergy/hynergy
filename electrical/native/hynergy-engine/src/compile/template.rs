@@ -1,4 +1,4 @@
-use crate::compile::discrete::{BoundComplementaryDriver, BoundDiscreteMetadata};
+use crate::compile::discrete::{BoundComplementaryDriver, BoundDiscreteMetadata, BoundInputBias};
 use crate::compile::island_ir::IslandIrBuilder;
 use crate::compile::state::BoundStateSlots;
 use crate::compile::unknown::{UnknownAllocationError, UnknownRange};
@@ -52,6 +52,7 @@ enum LocalUnknownKind {
 enum LocalUnknownBinding {
     Terminal(u32),
     Allocated(u32),
+    Ground,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -150,6 +151,7 @@ impl LocalDiscreteMode {
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub(crate) struct LocalComplementaryDriver {
+    switched: bool,
     mode: LocalDiscreteMode,
     output: LocalUnknownId,
     high_rail: LocalUnknownId,
@@ -251,6 +253,7 @@ pub(crate) struct DefinitionTemplateBuilder {
 
     discrete_modes: Vec<LocalValueId>,
     complementary_drivers: Vec<LocalComplementaryDriver>,
+    input_biases: Vec<(LocalUnknownId, LocalUnknownId, LocalValueId)>,
 
     outputs: Vec<LocalValueId>,
 }
@@ -416,6 +419,15 @@ impl DefinitionTemplateBuilder {
         &mut self,
     ) -> Result<LocalUnknownId, DefinitionTemplateBuildError> {
         self.allocated_unknown(LocalUnknownKind::Voltage)
+    }
+
+    pub(crate) fn ground_voltage_unknown(
+        &mut self,
+    ) -> Result<LocalUnknownId, DefinitionTemplateBuildError> {
+        self.allocate_unknown(LocalUnknownInfo {
+            kind: LocalUnknownKind::Voltage,
+            binding: LocalUnknownBinding::Ground,
+        })
     }
 
     pub(crate) fn branch_current_unknown(
@@ -668,6 +680,7 @@ impl DefinitionTemplateBuilder {
 
             discrete_modes: self.discrete_modes.into_boxed_slice(),
             complementary_drivers: self.complementary_drivers.into_boxed_slice(),
+            input_biases: self.input_biases.into_boxed_slice(),
 
             outputs: self.outputs.into_boxed_slice(),
         })
@@ -824,6 +837,7 @@ impl DefinitionTemplateBuilder {
         );
 
         self.complementary_drivers.push(LocalComplementaryDriver {
+            switched: false,
             mode,
             output,
             high_rail,
@@ -834,6 +848,28 @@ impl DefinitionTemplateBuilder {
     }
 
     #[inline]
+    pub(crate) fn register_switched_driver(
+        &mut self,
+        mode: LocalDiscreteMode,
+        output: LocalUnknownId,
+        high_rail: LocalUnknownId,
+        low_rail: LocalUnknownId,
+        pull_up: LocalValueId,
+        pull_down: LocalValueId,
+    ) {
+        self.register_complementary_driver(mode, output, high_rail, low_rail, pull_up, pull_down);
+        self.complementary_drivers.last_mut().unwrap().switched = true;
+    }
+
+    pub(crate) fn register_input_bias(
+        &mut self,
+        input: LocalUnknownId,
+        reference: LocalUnknownId,
+        conductance: LocalValueId,
+    ) {
+        self.input_biases.push((input, reference, conductance));
+    }
+
     pub(crate) fn require_iteration_stability(&mut self, value: LocalValueId) {
         debug_assert!(value.index() < self.values.len());
 
@@ -868,6 +904,7 @@ pub(crate) struct CompiledDefinitionTemplate {
     iteration_latches: Box<[(LocalValueId, LocalValueId)]>,
     discrete_modes: Box<[LocalValueId]>,
     complementary_drivers: Box<[LocalComplementaryDriver]>,
+    input_biases: Box<[(LocalUnknownId, LocalUnknownId, LocalValueId)]>,
     outputs: Box<[LocalValueId]>,
 }
 
@@ -902,6 +939,7 @@ impl CompiledDefinitionTemplate {
         for info in &self.unknowns {
             let unknown = match info.binding {
                 LocalUnknownBinding::Terminal(index) => terminals[index as usize],
+                LocalUnknownBinding::Ground => builder.ground_voltage_unknown()?,
 
                 LocalUnknownBinding::Allocated(_) => match info.kind {
                     LocalUnknownKind::Voltage => builder.allocated_voltage_unknown()?,
@@ -993,6 +1031,14 @@ impl CompiledDefinitionTemplate {
                 unknowns[driver.low_rail.index()],
                 values[driver.pull_up.index()],
                 values[driver.pull_down.index()],
+            );
+            builder.complementary_drivers.last_mut().unwrap().switched = driver.switched;
+        }
+        for &(input, reference, conductance) in &self.input_biases {
+            builder.register_input_bias(
+                unknowns[input.index()],
+                unknowns[reference.index()],
+                values[conductance.index()],
             );
         }
 
@@ -1137,17 +1183,29 @@ impl CompiledDefinitionTemplate {
         );
 
         for &driver in &self.complementary_drivers {
-            complementary_drivers.push(BoundComplementaryDriver::new(
+            let mut bound = BoundComplementaryDriver::new(
                 values[driver.mode().value().index()],
                 unknowns.get(driver.output()),
                 unknowns.get(driver.high_rail()),
                 unknowns.get(driver.low_rail()),
                 values[driver.pull_up().index()],
                 values[driver.pull_down().index()],
-            ));
+            );
+            bound.switched = driver.switched;
+            complementary_drivers.push(bound);
         }
 
-        BoundDiscreteMetadata::new(modes, complementary_drivers)
+        let mut metadata = BoundDiscreteMetadata::new(modes, complementary_drivers);
+        metadata.input_biases = self
+            .input_biases
+            .iter()
+            .map(|&(input, reference, conductance)| BoundInputBias {
+                input: unknowns.get(input),
+                reference: unknowns.get(reference),
+                conductance: values[conductance.index()],
+            })
+            .collect();
+        metadata
     }
 
     fn bind_values(
@@ -1249,6 +1307,7 @@ impl CompiledDefinitionTemplate {
         for (local_index, info) in self.unknowns.iter().enumerate() {
             values[local_index] = match info.binding {
                 LocalUnknownBinding::Terminal(terminal) => terminals[terminal as usize],
+                LocalUnknownBinding::Ground => None,
 
                 LocalUnknownBinding::Allocated(index) => Some(
                     allocated
@@ -1294,6 +1353,12 @@ impl CompiledDefinitionTemplate {
     #[inline]
     pub(crate) const fn allocated_unknown_count(&self) -> usize {
         self.allocated_unknown_count
+    }
+
+    pub(crate) fn has_explicit_ground(&self) -> bool {
+        self.unknowns
+            .iter()
+            .any(|info| info.binding == LocalUnknownBinding::Ground)
     }
 
     #[inline]
@@ -1475,6 +1540,38 @@ mod tests {
     use crate::compile::state::BoundStateSlots;
     use crate::compile::unknown::UnknownAllocator;
     use hynergy_ir::StateSlot;
+
+    #[test]
+    fn ground_bindings_do_not_shift_allocated_unknowns() {
+        let mut builder = DefinitionTemplateBuilder::default();
+        let ground = builder.ground_voltage_unknown().unwrap();
+        let internal = builder.allocated_voltage_unknown().unwrap();
+        let other_ground = builder.ground_voltage_unknown().unwrap();
+        let branch = builder.branch_current_unknown().unwrap();
+        let ground_read = builder.unknown_value(ground).unwrap();
+        builder.output(ground_read).unwrap();
+        let template = builder.finish().unwrap();
+        assert!(template.has_explicit_ground());
+        assert_eq!(template.allocated_unknown_count(), 2);
+        let mut allocator = UnknownAllocator::new(1).unwrap();
+        let bound = template
+            .bind_unknowns(&[], allocator.allocate(2).unwrap())
+            .unwrap();
+        assert_eq!(bound.get(ground), None);
+        assert_eq!(bound.get(other_ground), None);
+        assert_eq!(bound.get(internal), Some(UnknownIndex::new(1)));
+        assert_eq!(bound.get(branch), Some(UnknownIndex::new(2)));
+        let pattern = PatternBuilder::new(3).unwrap().finish().unwrap();
+        let mut ir_builder = IslandIrBuilder::new(&pattern);
+        let inputs = template
+            .bind(&bound, &state_slots(&[]), &mut ir_builder)
+            .unwrap();
+        let ir = ir_builder.finish().unwrap();
+        assert!(ir.solution_inputs().is_empty());
+        let mut workspace = ir.value_program().new_workspace();
+        ir.value_program().execute_tick(&mut workspace);
+        assert_eq!(workspace.value(inputs.output(0).unwrap()), 0.0);
+    }
 
     fn state_slots(indices: &[u32]) -> BoundStateSlots {
         BoundStateSlots::new(indices.iter().copied().map(StateSlot::new).collect())

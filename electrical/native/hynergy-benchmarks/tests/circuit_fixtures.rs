@@ -9,6 +9,45 @@ use hynergy_benchmarks::fixtures::{
 };
 
 #[test]
+fn switched_logic_fixtures_follow_analog_contract_on_repeated_transitions() {
+    use hynergy_benchmarks::fixtures::{SwitchedLogicScenario, SwitchedLogicTopology};
+    for topology in [
+        SwitchedLogicTopology::Chain,
+        SwitchedLogicTopology::FanOut,
+        SwitchedLogicTopology::SharedOutput,
+    ] {
+        for size in [1, 8, 32] {
+            let mut scenario = SwitchedLogicScenario::new(topology, size);
+            for high in [false, true, false, true] {
+                scenario.drive(high);
+                scenario.tick().unwrap();
+                let expected_high = match topology {
+                    SwitchedLogicTopology::Chain => high != (size % 2 == 1),
+                    SwitchedLogicTopology::FanOut => high,
+                    SwitchedLogicTopology::SharedOutput => !high,
+                };
+                let expected = if expected_high {
+                    5.0 / (1.0
+                        + if topology == SwitchedLogicTopology::SharedOutput {
+                            size as f64
+                        } else {
+                            1.0
+                        } * 1e-6)
+                } else {
+                    0.0
+                };
+                for voltage in scenario.output_voltages() {
+                    assert!(
+                        (voltage - expected).abs() < 1e-9,
+                        "{topology:?}/{size}/{high}: {voltage}"
+                    );
+                }
+            }
+        }
+    }
+}
+
+#[test]
 fn benchmark_suites_keep_core_representative_and_full_complete() {
     assert_eq!(BenchSuite::Core.counts(CircuitFamily::Simple), &[256]);
     assert_eq!(BenchSuite::Core.counts(CircuitFamily::Medium), &[32]);

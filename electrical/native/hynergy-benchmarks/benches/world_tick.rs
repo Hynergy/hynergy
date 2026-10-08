@@ -144,6 +144,7 @@ fn bench_mixed(c: &mut Criterion, suite: BenchSuite) {
 }
 
 fn bench_world_tick(c: &mut Criterion) {
+    bench_switched_logic(c);
     let suite = BenchSuite::from_env();
     bench_cold(c, suite);
     bench_warm_sleep(c, suite);
@@ -151,6 +152,31 @@ fn bench_world_tick(c: &mut Criterion) {
     bench_dirty(c, suite, false);
     bench_dirty(c, suite, true);
     bench_mixed(c, suite);
+}
+
+fn bench_switched_logic(c: &mut Criterion) {
+    use hynergy_benchmarks::fixtures::{SwitchedLogicScenario, SwitchedLogicTopology};
+    let sizes: &[usize] = match BenchSuite::from_env() {
+        BenchSuite::Core => &[32],
+        BenchSuite::Full => &[8, 32, 128],
+    };
+    for topology in SwitchedLogicTopology::ALL {
+        let mut group = c.benchmark_group(format!("world/tick/switched_logic/{}", topology.name()));
+        for &size in sizes {
+            group.bench_function(format!("size_{size}"), |b| {
+                let mut scenario = SwitchedLogicScenario::new(topology, size);
+                scenario.tick().unwrap();
+                let mut high = false;
+                b.iter(|| {
+                    high = !high;
+                    scenario.drive(high);
+                    scenario.tick().unwrap();
+                    black_box(scenario.output_voltages());
+                });
+            });
+        }
+        group.finish();
+    }
 }
 
 criterion_group! {

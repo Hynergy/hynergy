@@ -7,54 +7,27 @@ import static org.junit.jupiter.api.Assertions.*;
 final class ElectricalEngineTest {
 
     @Test
-    void onlyOneEngineMayBeLiveAtATime() {
+    void engineOwnershipIsExclusiveAndReleasedByIdempotentClose() {
         try (ElectricalEngine first = ElectricalEngine.create()) {
             assertThrows(IllegalStateException.class, ElectricalEngine::create);
             assertThrows(IllegalStateException.class, ElectricalEngine::create);
+            first.close();
+            assertDoesNotThrow(first::close);
         }
-    }
-
-    @Test
-    void newEngineMayBeCreatedAfterPreviousEngineCloses() {
-        ElectricalEngine first = ElectricalEngine.create();
-
-        first.close();
-
         try (ElectricalEngine second = ElectricalEngine.create()) {
-            assertNotNull(second);
+            assertThrows(IllegalStateException.class, ElectricalEngine::create);
         }
     }
 
     @Test
-    void repeatedCloseDoesNotBreakEngineOwnership() {
-        ElectricalEngine first = ElectricalEngine.create();
-
-        first.close();
-        first.close();
-
-        try (ElectricalEngine second = ElectricalEngine.create()) {
-            assertNotNull(second);
-        }
-    }
-
-    @Test
-    void registerDefinitionReturnsAssignedDefinition() {
-        try (ElectricalEngine engine = ElectricalEngine.create();
-            DeviceDefinitionBuilder builder = new DeviceDefinitionBuilder()) {
-            DeviceDefinition definition = engine.registerDefinition(builder);
-
-            assertNotNull(definition);
-            assertNotEquals(0, definition.id());
-        }
-    }
-
-    @Test
-    void registrationsReceiveDistinctDefinitionIds() {
+    void registrationsReceiveNonZeroDistinctDefinitionIds() {
         try (ElectricalEngine engine = ElectricalEngine.create();
             DeviceDefinitionBuilder builder = new DeviceDefinitionBuilder()) {
             DeviceDefinition first = engine.registerDefinition(builder);
             DeviceDefinition second = engine.registerDefinition(builder);
 
+            assertNotEquals(0, first.id());
+            assertNotEquals(0, second.id());
             assertNotEquals(first.id(), second.id());
         }
     }

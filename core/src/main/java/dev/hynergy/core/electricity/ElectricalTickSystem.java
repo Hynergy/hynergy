@@ -2,22 +2,39 @@ package dev.hynergy.core.electricity;
 
 import com.hypixel.hytale.component.ResourceType;
 import com.hypixel.hytale.component.Store;
+import com.hypixel.hytale.component.dependency.Dependency;
+import com.hypixel.hytale.component.dependency.Order;
+import com.hypixel.hytale.component.dependency.SystemDependency;
 import com.hypixel.hytale.component.system.tick.TickingSystem;
 import com.hypixel.hytale.server.core.universe.world.World;
 import com.hypixel.hytale.server.core.universe.world.storage.ChunkStore;
+import dev.hynergy.core.electricity.device.ElectricalDeviceSystem;
+import dev.hynergy.core.electricity.wire.WireSystem;
 import dev.hynergy.electrical.ElectricalRuntime;
 import dev.hynergy.electrical.ElectricalSystem;
 
-final class ElectricalTickSystem extends TickingSystem<ChunkStore> {
+import java.util.Set;
+
+public final class ElectricalTickSystem extends TickingSystem<ChunkStore> {
+    private static final Set<Dependency<ChunkStore>> DEPENDENCIES = Set.of(
+            new SystemDependency<>(Order.AFTER, WireSystem.class),
+            new SystemDependency<>(Order.AFTER, ElectricalDeviceSystem.class)
+    );
+
     private final ElectricalRuntime runtime;
     private final ResourceType<ChunkStore, ElectricalSystemResource> resourceType;
 
     public ElectricalTickSystem(
-        ElectricalRuntime runtime,
-        ResourceType<ChunkStore, ElectricalSystemResource> resourceType
+            ElectricalRuntime runtime,
+            ResourceType<ChunkStore, ElectricalSystemResource> resourceType
     ) {
         this.runtime = runtime;
         this.resourceType = resourceType;
+    }
+
+    @Override
+    public Set<Dependency<ChunkStore>> getDependencies() {
+        return DEPENDENCIES;
     }
 
     @Override

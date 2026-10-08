@@ -2,58 +2,79 @@ package dev.hynergy.electrical.primitives.logic;
 
 import dev.hynergy.electrical.*;
 
+import java.util.Objects;
+
 /**
  * Models a NOT gate with a finite-conductance output stage.
  *
  * <p>The input is high when its voltage relative to VSS is greater than or
  * equal to the threshold voltage. The output stage uses the maximum and
- * minimum conductances to connect the output towards VDD or VSS.</p>
+ * minimum conductances to connect the output to VDD or VSS.</p>
  *
  * <p>The output and input observation voltages use VSS as their reference.</p>
  */
-public final class Not extends Device {
+public record Not(Device device) {
+    public static final DeviceType TYPE = PrimitiveDeviceTypes.NOT;
+
+    public static final DeviceTerminal OUTPUT = TYPE.terminal(0);
+    public static final DeviceTerminal VDD = TYPE.terminal(1);
+    public static final DeviceTerminal VSS = TYPE.terminal(2);
+    public static final DeviceTerminal INPUT = TYPE.terminal(3);
+
+    public static final DeviceParameter THRESHOLD_RELATIVE_TO_VSS = TYPE.parameter(0);
+    public static final DeviceParameter MAXIMUM_CONDUCTANCE = TYPE.parameter(1);
+    public static final DeviceParameter MINIMUM_CONDUCTANCE = TYPE.parameter(2);
+
+    public static final DeviceObserver OUTPUT_VOLTAGE = TYPE.observer(0);
+    public static final DeviceObserver INPUT_VOLTAGE = TYPE.observer(1);
+    public static final DeviceObserver SUPPLY_CURRENT = TYPE.observer(2);
+
     /**
-     * The device type for {@code Not}.
+     * Uses a live device with this primitive definition.
+     *
+     * @throws IllegalArgumentException if the device has a different type
+     * @throws IllegalStateException    if the device is no longer usable
      */
-    public static final DeviceType<Not> TYPE = DeviceType.primitive(13, Not::new);
+    public Not {
+        Objects.requireNonNull(device, "device").requireDefinition(TYPE);
+    }
 
-    private static final int TERMINAL_OUTPUT = 0;
-    private static final int TERMINAL_VDD = 1;
-    private static final int TERMINAL_VSS = 2;
-    private static final int TERMINAL_INPUT = 3;
+    @Override
+    public Device device() {
+        return device;
+    }
 
-    private static final int PARAMETER_THRESHOLD_RELATIVE_TO_VSS = 0;
-    private static final int PARAMETER_MAXIMUM_CONDUCTANCE = 1;
-    private static final int PARAMETER_MINIMUM_CONDUCTANCE = 2;
+    public DeviceId id() {
+        return device.id();
+    }
 
-    private static final int OBSERVER_OUTPUT_VOLTAGE = 0;
-    private static final int OBSERVER_INPUT_VOLTAGE = 1;
-    private static final int OBSERVER_SUPPLY_CURRENT = 2;
-
-    private Not() {
+    /**
+     * Destroys the device and deactivates its observation subscriptions.
+     */
+    public void destroy() {
+        device.destroy();
     }
 
     /**
      * Creates a NOT gate.
      *
-     * @param system the electrical system
+     * @param system                 the electrical system
      * @param thresholdRelativeToVss the input threshold relative to VSS, in
-     *     volts; the value must be finite
-     * @param maximumConductance the active output-stage conductance, in
-     *     siemens; the value must be finite and greater than zero
-     * @param minimumConductance the inactive output-stage conductance, in
-     *     siemens; the value must be finite and non-negative, and less than
-     *     {@code maximumConductance}
-     *
+     *                               volts. The value must be finite.
+     * @param maximumConductance     the active output-stage conductance, in
+     *                               siemens. The value must be finite and greater than zero.
+     * @param minimumConductance     the inactive output-stage conductance, in
+     *                               siemens. The value must be finite and zero or greater.
+     *                               The value must be less than {@code maximumConductance}.
      * @return the NOT gate
      */
     public static Not create(
-        ElectricalSystem system,
-        double thresholdRelativeToVss,
-        double maximumConductance,
-        double minimumConductance
+            ElectricalSystem system,
+            double thresholdRelativeToVss,
+            double maximumConductance,
+            double minimumConductance
     ) {
-        Not device = system.create(TYPE);
+        Not device = new Not(system.create(TYPE));
 
         device.setThresholdRelativeToVss(thresholdRelativeToVss);
         device.setMaximumConductance(maximumConductance);
@@ -65,143 +86,101 @@ public final class Not extends Device {
     /**
      * Sets the input threshold relative to VSS.
      *
-     * @param thresholdRelativeToVss the threshold voltage, in volts; the value
-     *     must be finite
+     * @param thresholdRelativeToVss the threshold voltage, in volts. The value
+     *                               must be finite.
      */
     public void setThresholdRelativeToVss(double thresholdRelativeToVss) {
-        setParameter(PARAMETER_THRESHOLD_RELATIVE_TO_VSS, thresholdRelativeToVss);
+        device.setParameter(THRESHOLD_RELATIVE_TO_VSS, thresholdRelativeToVss);
     }
 
     /**
      * Sets the maximum output-stage conductance.
      *
-     * @param maximumConductance the conductance, in siemens; the value must be
-     *     finite, greater than zero, and greater than the current minimum
-     *     conductance
+     * @param maximumConductance the conductance, in siemens. The value must be
+     *                           finite and greater than the current minimum conductance.
+     *                           The value must also be greater than zero.
      */
     public void setMaximumConductance(double maximumConductance) {
-        setParameter(PARAMETER_MAXIMUM_CONDUCTANCE, maximumConductance);
+        device.setParameter(MAXIMUM_CONDUCTANCE, maximumConductance);
     }
 
     /**
      * Sets the minimum output-stage conductance.
      *
-     * @param minimumConductance the conductance, in siemens; the value must be
-     *     finite, non-negative, and less than the current maximum conductance
+     * @param minimumConductance the conductance, in siemens. The value must be
+     *                           finite and zero or greater.
+     *                           The value must be less than the current maximum conductance.
      */
     public void setMinimumConductance(double minimumConductance) {
-        setParameter(PARAMETER_MINIMUM_CONDUCTANCE, minimumConductance);
+        device.setParameter(MINIMUM_CONDUCTANCE, minimumConductance);
     }
 
-    /**
-     * Attaches the output terminal to a wire.
-     *
-     * @param wire the wire
-     */
     public void attachOutput(Wire wire) {
-        attachTerminal(TERMINAL_OUTPUT, wire);
+        device.attachTerminal(OUTPUT, wire);
     }
 
-    /**
-     * Detaches the output terminal from a wire.
-     *
-     * @param wire the wire
-     */
     public void detachOutput(Wire wire) {
-        detachTerminal(TERMINAL_OUTPUT, wire);
+        device.detachTerminal(OUTPUT, wire);
     }
 
-    /**
-     * Attaches the VDD terminal to a wire.
-     *
-     * @param wire the wire
-     */
     public void attachVdd(Wire wire) {
-        attachTerminal(TERMINAL_VDD, wire);
+        device.attachTerminal(VDD, wire);
     }
 
-    /**
-     * Detaches the VDD terminal from a wire.
-     *
-     * @param wire the wire
-     */
     public void detachVdd(Wire wire) {
-        detachTerminal(TERMINAL_VDD, wire);
+        device.detachTerminal(VDD, wire);
     }
 
-    /**
-     * Attaches the VSS terminal to a wire.
-     *
-     * @param wire the wire
-     */
     public void attachVss(Wire wire) {
-        attachTerminal(TERMINAL_VSS, wire);
+        device.attachTerminal(VSS, wire);
     }
 
-    /**
-     * Detaches the VSS terminal from a wire.
-     *
-     * @param wire the wire
-     */
     public void detachVss(Wire wire) {
-        detachTerminal(TERMINAL_VSS, wire);
+        device.detachTerminal(VSS, wire);
     }
 
-    /**
-     * Attaches the input terminal to a wire.
-     *
-     * @param wire the wire
-     */
     public void attachInput(Wire wire) {
-        attachTerminal(TERMINAL_INPUT, wire);
+        device.attachTerminal(INPUT, wire);
     }
 
-    /**
-     * Detaches the input terminal from a wire.
-     *
-     * @param wire the wire
-     */
     public void detachInput(Wire wire) {
-        detachTerminal(TERMINAL_INPUT, wire);
+        device.detachTerminal(INPUT, wire);
     }
 
     /**
      * Subscribes to the output voltage relative to VSS.
      *
      * @param listener the observation listener
-     *
      * @return the observation subscription
      */
     public ObservationSubscription observeOutputVoltage(
-        ObservationListener listener
+            ObservationListener listener
     ) {
-        return observe(OBSERVER_OUTPUT_VOLTAGE, listener);
+        return device.observe(OUTPUT_VOLTAGE, listener);
     }
 
     /**
      * Subscribes to the input voltage relative to VSS.
      *
      * @param listener the observation listener
-     *
      * @return the observation subscription
      */
     public ObservationSubscription observeInputVoltage(
-        ObservationListener listener
+            ObservationListener listener
     ) {
-        return observe(OBSERVER_INPUT_VOLTAGE, listener);
+        return device.observe(INPUT_VOLTAGE, listener);
     }
 
     /**
-     * Subscribes to the current from VDD to the output through the pull-up
-     * branch.
+     * Subscribes to signed current from VDD to the output through the supply branch.
+     * This observation excludes input pull-down currents.
      *
      * @param listener the observation listener
-     *
      * @return the observation subscription
      */
     public ObservationSubscription observeSupplyCurrent(
-        ObservationListener listener
+            ObservationListener listener
     ) {
-        return observe(OBSERVER_SUPPLY_CURRENT, listener);
+        return device.observe(SUPPLY_CURRENT, listener);
     }
 }

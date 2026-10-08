@@ -47,3 +47,7 @@ harness = false
 [[example]]
 name = "cpu_solver_profile"
 required-features = ["solver-profiling"]
+
+[[example]]
+name = "switched_logic_solver_profile"
+required-features = ["solver-profiling"]

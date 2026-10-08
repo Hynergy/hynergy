@@ -7,12 +7,12 @@ import java.util.Objects;
 /**
  * Controls one electrical observation subscription.
  *
- * <p>A subscription stays active until it is unsubscribed, until its
- * device is removed, or until its electrical system closes.</p>
+ * <p>A subscription stays active until you call {@link #unsubscribe()}, remove its
+ * device, or close its electrical system.</p>
  *
- * <p>An inactive subscription cannot receive a record from a future
- * tick. A completed tick can still contain a record for a subscription
- * that becomes inactive during publication.</p>
+ * <p>An inactive subscription cannot receive a record from a future tick.
+ * A completed tick can still contain a record for a subscription that becomes
+ * inactive during publication.</p>
  */
 public final class ObservationSubscription {
     private final int nativeId;
@@ -41,8 +41,8 @@ public final class ObservationSubscription {
      *
      * <p>If the subscription is inactive, this method has no effect.</p>
      *
-     * <p>If this method is called during observation publication, the
-     * completed tick can still contain a record for this subscription.</p>
+     * <p>If you call this method during observation publication, the completed tick
+     * can still contain a record for this subscription.</p>
      */
     public void unsubscribe() {
         ElectricalSystem system = this.system;

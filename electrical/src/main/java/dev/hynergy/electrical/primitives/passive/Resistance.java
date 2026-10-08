@@ -2,39 +2,60 @@ package dev.hynergy.electrical.primitives.passive;
 
 import dev.hynergy.electrical.*;
 
+import java.util.Objects;
+
 /**
  * Models a resistor between a positive terminal and a negative terminal.
  *
  * <p>Voltage is the positive-terminal voltage minus the negative-terminal voltage.
  * Positive current flows from the positive terminal to the negative terminal.</p>
  */
-public final class Resistance extends Device {
+public record Resistance(Device device) {
+    public static final DeviceType TYPE = PrimitiveDeviceTypes.RESISTANCE;
+
+    public static final DeviceTerminal POSITIVE = TYPE.terminal(0);
+    public static final DeviceTerminal NEGATIVE = TYPE.terminal(1);
+
+    public static final DeviceParameter RESISTANCE = TYPE.parameter(0);
+
+    public static final DeviceObserver VOLTAGE = TYPE.observer(0);
+    public static final DeviceObserver CURRENT = TYPE.observer(1);
+
     /**
-     * The device type for Resistance.
+     * Uses a live device with this primitive definition.
+     *
+     * @throws IllegalArgumentException if the device has a different type
+     * @throws IllegalStateException    if the device is no longer usable
      */
-    public static final DeviceType<Resistance> TYPE = DeviceType.primitive(1, Resistance::new);
+    public Resistance {
+        Objects.requireNonNull(device, "device").requireDefinition(TYPE);
+    }
 
-    private static final int TERMINAL_POSITIVE = 0;
-    private static final int TERMINAL_NEGATIVE = 1;
+    @Override
+    public Device device() {
+        return device;
+    }
 
-    private static final int PARAMETER_RESISTANCE = 0;
+    public DeviceId id() {
+        return device.id();
+    }
 
-    private static final int OBSERVER_VOLTAGE = 0;
-    private static final int OBSERVER_CURRENT = 1;
-
-    private Resistance() {
+    /**
+     * Destroys the device and deactivates its observation subscriptions.
+     */
+    public void destroy() {
+        device.destroy();
     }
 
     /**
      * Creates a resistor.
      *
-     * @param system the electrical system
-     * @param resistance the resistance, in ohms; the value must be finite and greater than zero
-     *
+     * @param system     the electrical system
+     * @param resistance the resistance, in ohms. The value must be finite and greater than zero.
      * @return the resistor
      */
     public static Resistance create(ElectricalSystem system, double resistance) {
-        Resistance device = system.create(TYPE);
+        Resistance device = new Resistance(system.create(TYPE));
 
         device.setResistance(resistance);
 
@@ -44,46 +65,26 @@ public final class Resistance extends Device {
     /**
      * Sets the resistance.
      *
-     * @param resistance the resistance, in ohms; the value must be finite and greater than zero
+     * @param resistance the resistance, in ohms. The value must be finite and greater than zero.
      */
     public void setResistance(double resistance) {
-        setParameter(PARAMETER_RESISTANCE, resistance);
+        device.setParameter(RESISTANCE, resistance);
     }
 
-    /**
-     * Attaches the positive terminal to a wire.
-     *
-     * @param wire the wire
-     */
     public void attachPositive(Wire wire) {
-        attachTerminal(TERMINAL_POSITIVE, wire);
+        device.attachTerminal(POSITIVE, wire);
     }
 
-    /**
-     * Attaches the negative terminal to a wire.
-     *
-     * @param wire the wire
-     */
     public void attachNegative(Wire wire) {
-        attachTerminal(TERMINAL_NEGATIVE, wire);
+        device.attachTerminal(NEGATIVE, wire);
     }
 
-    /**
-     * Detaches the positive terminal from a wire.
-     *
-     * @param wire the wire
-     */
     public void detachPositive(Wire wire) {
-        detachTerminal(TERMINAL_POSITIVE, wire);
+        device.detachTerminal(POSITIVE, wire);
     }
 
-    /**
-     * Detaches the negative terminal from a wire.
-     *
-     * @param wire the wire
-     */
     public void detachNegative(Wire wire) {
-        detachTerminal(TERMINAL_NEGATIVE, wire);
+        device.detachTerminal(NEGATIVE, wire);
     }
 
     /**
@@ -92,13 +93,12 @@ public final class Resistance extends Device {
      * <p>Positive voltage is measured from the positive terminal to the negative terminal.</p>
      *
      * @param listener the observation listener
-     *
      * @return the observation subscription
      */
     public ObservationSubscription observeVoltage(
-        ObservationListener listener
+            ObservationListener listener
     ) {
-        return observe(OBSERVER_VOLTAGE, listener);
+        return device.observe(VOLTAGE, listener);
     }
 
     /**
@@ -107,12 +107,11 @@ public final class Resistance extends Device {
      * <p>Positive current flows from the positive terminal to the negative terminal.</p>
      *
      * @param listener the observation listener
-     *
      * @return the observation subscription
      */
     public ObservationSubscription observeCurrent(
-        ObservationListener listener
+            ObservationListener listener
     ) {
-        return observe(OBSERVER_CURRENT, listener);
+        return device.observe(CURRENT, listener);
     }
 }

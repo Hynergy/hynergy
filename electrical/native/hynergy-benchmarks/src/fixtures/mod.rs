@@ -1,4 +1,6 @@
 pub mod circuits;
+mod switched_logic;
+pub use switched_logic::{SwitchedLogicScenario, SwitchedLogicTopology};
 pub mod digital;
 pub mod workloads;
 

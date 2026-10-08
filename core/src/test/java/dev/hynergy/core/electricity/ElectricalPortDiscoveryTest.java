@@ -6,44 +6,28 @@ import dev.hynergy.core.port.*;
 import org.joml.Vector3i;
 import org.jspecify.annotations.Nullable;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.CsvSource;
 
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 
-import static org.junit.jupiter.api.Assertions.*;
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertThrows;
 
 final class ElectricalPortDiscoveryTest {
 
-    @Test
-    void opposingConductorFacesConnectDirectly() {
+    @ParameterizedTest(name = "target normal ({0}, {1}, {2}): {3} connections")
+    @CsvSource({"-1, 0, 0, 1", "1, 0, 0, 0", "0, 0, 1, 0"})
+    void onlyOpposingConductorFacesConnectDirectly(int normalX, int normalY, int normalZ, int expectedCount) {
         Fixture fixture = Fixture.create(
                 1, 0, 0, RotationTuple.NONE,
-                -1, 0, 0, RotationTuple.NONE
+                normalX, normalY, normalZ, RotationTuple.NONE
         );
 
-        assertEquals(List.of(ElectricalPortConnection.DIRECT), fixture.discover());
-    }
-
-    @Test
-    void sameFacingConductorFacesDoNotConnect() {
-        Fixture fixture = Fixture.create(
-                1, 0, 0, RotationTuple.NONE,
-                1, 0, 0, RotationTuple.NONE
-        );
-
-        assertTrue(fixture.discover().isEmpty());
-    }
-
-    @Test
-    void perpendicularConductorFacesDoNotConnect() {
-        Fixture fixture = Fixture.create(
-                1, 0, 0, RotationTuple.NONE,
-                0, 0, 1, RotationTuple.NONE
-        );
-
-        assertTrue(fixture.discover().isEmpty());
+        assertEquals(expectedCount == 0 ? List.of() : List.of(ElectricalPortConnection.DIRECT), fixture.discover());
     }
 
     @Test

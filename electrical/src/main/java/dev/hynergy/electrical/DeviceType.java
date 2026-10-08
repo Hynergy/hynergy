@@ -1,148 +1,140 @@
 package dev.hynergy.electrical;
 
-import org.jspecify.annotations.Nullable;
-
+import java.util.List;
 import java.util.Objects;
 import java.util.function.Consumer;
-import java.util.function.Supplier;
 
 /**
- * Describes one type of electrical device.
- *
- * <p>Define one shared device type for each custom device class.</p>
- *
- * <p>Use {@link #create(Supplier, Consumer)} to define a custom device
- * type. Register the type in an {@link ElectricalRuntime} before an
- * {@link ElectricalSystem} creates a device of that type.</p>
- *
- * @param <T> the device class
+ * Defines an immutable electrical declaration.
+ * Stable member IDs are independent of native indexes.
  */
-public final class DeviceType<T extends Device> {
-    private final Supplier<T> constructor;
-    private final @Nullable DeviceDefinition primitiveDefinition;
-    private final @Nullable Consumer<DeviceDefinitionBuilder> definitionBuilder;
+public final class DeviceType {
+    private final DeviceDeclaration declaration;
+    private final int primitiveId;
 
-    private volatile @Nullable Registration registration;
-
-    private DeviceType(
-        Supplier<T> constructor,
-        @Nullable DeviceDefinition primitiveDefinition,
-        @Nullable Consumer<DeviceDefinitionBuilder> definitionBuilder
-    ) {
-        this.constructor = Objects.requireNonNull(constructor, "constructor");
-        this.primitiveDefinition = primitiveDefinition;
-        this.definitionBuilder = definitionBuilder;
+    private DeviceType(DeviceDeclaration declaration, int primitiveId) {
+        this.declaration = declaration;
+        this.primitiveId = primitiveId;
     }
 
     /**
-     * Creates a custom device type.
+     * Creates an immutable declaration without allocating native memory.
+     * The callback runs immediately and exactly once.
+     * The builder rejects changes after the callback ends.
      *
-     * <p>The constructor must return a new, unbound device on each call.</p>
-     *
-     * <p>The runtime calls {@code definitionBuilder} when it registers the
-     * type. The runtime owns the builder that it supplies to the callback.
-     * Do not close the builder. Do not keep a reference to the builder after
-     * the callback returns.</p>
-     *
-     * @param constructor the function that creates a device
-     * @param definitionBuilder the function that builds the electrical
-     *     definition
-     * @param <T> the device class
-     *
-     * @return the device type
-     *
-     * @throws NullPointerException if an argument is null
+     * @param definition the callback that declares members and child elements
+     * @return the completed declaration
+     * @throws NullPointerException if the callback is null
+     * @throws IllegalArgumentException if the declaration has invalid members or bindings
      */
-    public static <T extends Device> DeviceType<T> create(
-        Supplier<T> constructor,
-        Consumer<DeviceDefinitionBuilder> definitionBuilder
-    ) {
-        return new DeviceType<>(constructor, null, Objects.requireNonNull(definitionBuilder, "definitionBuilder"));
+    public static DeviceType define(Consumer<DeviceTypeBuilder> definition) {
+        return define(0, definition);
     }
 
-    public static <T extends Device> DeviceType<T> primitive(int definitionId, Supplier<T> constructor) {
-        return new DeviceType<>(constructor, new DeviceDefinition(definitionId), null);
-    }
-
-    T construct() {
-        return Objects.requireNonNull(constructor.get(), "Device constructor returned null");
-    }
-
-    void buildDefinition(DeviceDefinitionBuilder builder) {
-        Consumer<DeviceDefinitionBuilder> definitionBuilder = this.definitionBuilder;
-
-        if (definitionBuilder == null) {
-            throw new IllegalStateException("Primitive device type does not have a composite definition");
-        }
-
-        definitionBuilder.accept(Objects.requireNonNull(builder, "builder"));
-    }
-
-    @Nullable DeviceDefinition currentDefinition() {
-        DeviceDefinition primitiveDefinition = this.primitiveDefinition;
-
-        if (primitiveDefinition != null) {
-            return primitiveDefinition;
-        }
-
-        Registration registration = this.registration;
-
-        return registration == null ? null : registration.definition();
-    }
-
-    @Nullable DeviceDefinition existingDefinition(ElectricalRuntime runtime) {
-        Objects.requireNonNull(runtime, "runtime");
-
-        DeviceDefinition primitiveDefinition = this.primitiveDefinition;
-
-        if (primitiveDefinition != null) {
-            return primitiveDefinition;
-        }
-
-        Registration registration = this.registration;
-
-        if (registration == null || registration.runtime() != runtime) {
-            return null;
-        }
-
-        return registration.definition();
-    }
-
-    DeviceDefinition requireDefinition(ElectricalRuntime runtime) {
-        DeviceDefinition definition = existingDefinition(runtime);
-
-        if (definition == null) {
-            throw new IllegalStateException("Device type is not registered for this electrical runtime");
-        }
-
-        return definition;
-    }
-
-    synchronized void bind(ElectricalRuntime runtime, DeviceDefinition definition) {
-        Objects.requireNonNull(runtime, "runtime");
+    static DeviceType define(int primitiveId, Consumer<DeviceTypeBuilder> definition) {
         Objects.requireNonNull(definition, "definition");
-
-        if (primitiveDefinition != null) {
-            throw new IllegalStateException("Primitive device type cannot be runtime-bound");
-        }
-
-        Registration registration = this.registration;
-
-        if (registration != null && registration.runtime() == runtime) {
-            throw new IllegalStateException("Device type is already bound to this electrical runtime");
-        }
-
-        this.registration = new Registration(runtime, definition);
-    }
-
-    synchronized void unbind(ElectricalRuntime runtime) {
-        Registration registration = this.registration;
-
-        if (registration != null && registration.runtime() == runtime) {
-            this.registration = null;
+        var builder = new DeviceTypeBuilder();
+        try {
+            definition.accept(builder);
+            return new DeviceType(builder.finish(), primitiveId);
+        } finally {
+            builder.close();
         }
     }
 
-    private record Registration(ElectricalRuntime runtime, DeviceDefinition definition) {
+    DeviceDeclaration declaration() {
+        return declaration;
+    }
+
+    int primitiveId() {
+        return primitiveId;
+    }
+
+    /** Returns immutable parameter references in declaration order. */
+    public List<DeviceParameter> parameters() {
+        return declaration.parameters();
+    }
+
+    /** Returns immutable terminal references in declaration order. */
+    public List<DeviceTerminal> terminals() {
+        return declaration.terminals();
+    }
+
+    /** Returns immutable observer references in declaration order. */
+    public List<DeviceObserver> observers() {
+        return declaration.observers();
+    }
+
+    /**
+     * Returns a parameter by stable ID.
+     * @param id the stable parameter ID, not a list position
+     * @return the parameter reference
+     * @throws IllegalArgumentException if the ID is unknown
+     */
+    public DeviceParameter parameter(int id) {
+        return parameters().stream().filter(p -> p.id() == id).findFirst()
+                           .orElseThrow(() -> new IllegalArgumentException("Unknown parameter ID: " + id));
+    }
+
+    /**
+     * Returns a terminal by stable ID.
+     * @param id the stable terminal ID, not a list position
+     * @return the terminal reference
+     * @throws IllegalArgumentException if the ID is unknown
+     */
+    public DeviceTerminal terminal(int id) {
+        return terminals().stream().filter(p -> p.id() == id).findFirst()
+                          .orElseThrow(() -> new IllegalArgumentException("Unknown terminal ID: " + id));
+    }
+
+    /**
+     * Returns an observer by stable ID.
+     * @param id the stable observer ID, not a list position
+     * @return the observer reference
+     * @throws IllegalArgumentException if the ID is unknown
+     */
+    public DeviceObserver observer(int id) {
+        return observers().stream().filter(p -> p.id() == id).findFirst()
+                          .orElseThrow(() -> new IllegalArgumentException("Unknown observer ID: " + id));
+    }
+
+    /** Returns member counts without requiring a runtime or registration. */
+    public Metadata metadata() {
+        return new Metadata(parameterCount(), terminalCount(), observerCount());
+    }
+
+    public int parameterCount() {
+        return parameters().size();
+    }
+
+    public int terminalCount() {
+        return terminals().size();
+    }
+
+    public int observerCount() {
+        return observers().size();
+    }
+
+    public record Metadata(int parameterCount, int terminalCount, int observerCount) {
+        public Metadata {
+            if (parameterCount < 0 || terminalCount < 0 || observerCount < 0)
+                throw new IllegalArgumentException("Device member counts must be non-negative");
+        }
+
+        void requireParameter(int index) {
+            require(index, parameterCount, "parameter");
+        }
+
+        void requireTerminal(int index) {
+            require(index, terminalCount, "terminal");
+        }
+
+        void requireObserver(int index) {
+            require(index, observerCount, "observer");
+        }
+
+        private static void require(int index, int count, String kind) {
+            if (index < 0 || index >= count) throw new IllegalArgumentException("Invalid " + kind + " index: " + index);
+        }
     }
 }

@@ -1,14 +1,14 @@
 package dev.hynergy.core.electricity;
 
 /**
- * Runtime compatibility data for one direct electrical conductor port.
+ * Provides compatibility data for one direct electrical conductor port.
  *
- * <p>The normal is block-local and is transformed by port discovery using the
- * owning block's exact rotation.</p>
+ * <p>The normal uses the block's local coordinates.
+ * Port discovery transforms the normal with the owning block's rotation.</p>
  *
- * @param normalX outward cardinal normal X component
- * @param normalY outward cardinal normal Y component
- * @param normalZ outward cardinal normal Z component
+ * @param normalX the X component of the outward cardinal normal
+ * @param normalY the Y component of the outward cardinal normal
+ * @param normalZ the Z component of the outward cardinal normal
  */
 public record ElectricalPortProfile(int normalX, int normalY, int normalZ) {
     public ElectricalPortProfile {

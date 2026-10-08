@@ -5,6 +5,7 @@ use smallvec::SmallVec;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub(crate) struct BoundComplementaryDriver {
+    pub(crate) switched: bool,
     mode: ValueSlot,
 
     output: Option<UnknownIndex>,
@@ -27,6 +28,7 @@ impl BoundComplementaryDriver {
     ) -> Self {
         Self {
             mode,
+            switched: false,
             output,
             high_rail,
             low_rail,
@@ -69,6 +71,7 @@ impl BoundComplementaryDriver {
 
 #[derive(Debug, Default)]
 pub(crate) struct BoundDiscreteMetadata {
+    pub(crate) input_biases: Vec<BoundInputBias>,
     modes: SmallVec<[ValueSlot; 2]>,
     complementary_drivers: SmallVec<[BoundComplementaryDriver; 1]>,
 }
@@ -81,6 +84,7 @@ impl BoundDiscreteMetadata {
     ) -> Self {
         Self {
             modes,
+            input_biases: Vec::new(),
             complementary_drivers,
         }
     }
@@ -99,25 +103,30 @@ impl BoundDiscreteMetadata {
 
     #[inline]
     pub(crate) fn extend(&mut self, other: Self) {
-        let (modes, complementary_drivers) = other.into_parts();
+        self.input_biases.extend(other.input_biases);
+        let (modes, complementary_drivers) = (other.modes, other.complementary_drivers);
 
         self.modes.extend(modes);
         self.complementary_drivers.extend(complementary_drivers);
     }
+}
 
-    #[inline]
-    pub(crate) fn into_parts(
-        self,
-    ) -> (
-        SmallVec<[ValueSlot; 2]>,
-        SmallVec<[BoundComplementaryDriver; 1]>,
-    ) {
-        (self.modes, self.complementary_drivers)
-    }
+#[derive(Debug, Clone, Copy)]
+pub(crate) struct BoundInputBias {
+    pub(crate) input: Option<UnknownIndex>,
+    pub(crate) reference: Option<UnknownIndex>,
+    pub(crate) conductance: ValueSlot,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub(crate) struct QualifiedOutputBranch {
+    pub(crate) neighbor: Option<UnknownIndex>,
+    pub(crate) conductance: ValueSlot,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
 pub(crate) struct QualifiedComplementaryDriver {
+    additional_branches: Vec<QualifiedOutputBranch>,
     output: UnknownIndex,
 
     high_rail: Option<UnknownIndex>,
@@ -128,28 +137,43 @@ pub(crate) struct QualifiedComplementaryDriver {
 }
 
 impl QualifiedComplementaryDriver {
+    pub(crate) fn branches(&self) -> impl Iterator<Item = QualifiedOutputBranch> + '_ {
+        [
+            QualifiedOutputBranch {
+                neighbor: self.high_rail,
+                conductance: self.pull_up,
+            },
+            QualifiedOutputBranch {
+                neighbor: self.low_rail,
+                conductance: self.pull_down,
+            },
+        ]
+        .into_iter()
+        .chain(self.additional_branches.iter().copied())
+        .filter(|branch| branch.neighbor != Some(self.output))
+    }
     #[inline]
-    pub(crate) const fn output(self) -> UnknownIndex {
+    pub(crate) const fn output(&self) -> UnknownIndex {
         self.output
     }
 
-    #[inline]
-    pub(crate) const fn high_rail(self) -> Option<UnknownIndex> {
+    #[cfg(test)]
+    pub(crate) const fn high_rail(&self) -> Option<UnknownIndex> {
         self.high_rail
     }
 
-    #[inline]
-    pub(crate) const fn low_rail(self) -> Option<UnknownIndex> {
+    #[cfg(test)]
+    pub(crate) const fn low_rail(&self) -> Option<UnknownIndex> {
         self.low_rail
     }
 
-    #[inline]
-    pub(crate) const fn pull_up(self) -> ValueSlot {
+    #[cfg(test)]
+    pub(crate) const fn pull_up(&self) -> ValueSlot {
         self.pull_up
     }
 
-    #[inline]
-    pub(crate) const fn pull_down(self) -> ValueSlot {
+    #[cfg(test)]
+    pub(crate) const fn pull_down(&self) -> ValueSlot {
         self.pull_down
     }
 }
@@ -254,6 +278,86 @@ impl CanonicalMatrixTerm {
     }
 }
 
+fn compile_switched_output_groups(
+    pattern: &MnaPattern,
+    ir: &CompiledIslandIr,
+    metadata: &BoundDiscreteMetadata,
+) -> Vec<QualifiedComplementaryDriver> {
+    let candidates = &metadata.complementary_drivers;
+    let mut outputs = candidates
+        .iter()
+        .filter(|driver| driver.switched)
+        .filter_map(|driver| driver.output)
+        .collect::<Vec<_>>();
+    outputs.sort_unstable();
+    outputs.dedup();
+    let (mut rows, _) = collect_matrix_terms(pattern, ir.matrix_program(), &outputs);
+    rows.sort_unstable_by_key(|term| (term.row, term.column, term.source));
+    let mut groups = Vec::new();
+    for output in outputs {
+        if rhs_has_destination(ir.rhs_program(), output)
+            || candidates
+                .iter()
+                .any(|driver| driver.output == Some(output) && !driver.switched)
+        {
+            continue;
+        }
+        let mut branches = Vec::new();
+        for driver in candidates
+            .iter()
+            .filter(|driver| driver.output == Some(output))
+        {
+            branches.push(QualifiedOutputBranch {
+                neighbor: driver.high_rail,
+                conductance: driver.pull_up,
+            });
+            branches.push(QualifiedOutputBranch {
+                neighbor: driver.low_rail,
+                conductance: driver.pull_down,
+            });
+        }
+        for bias in &metadata.input_biases {
+            if bias.input == Some(output) {
+                branches.push(QualifiedOutputBranch {
+                    neighbor: bias.reference,
+                    conductance: bias.conductance,
+                });
+            } else if bias.reference == Some(output) {
+                branches.push(QualifiedOutputBranch {
+                    neighbor: bias.input,
+                    conductance: bias.conductance,
+                });
+            }
+        }
+        let mut expected = Vec::new();
+        for branch in &branches {
+            push_conductance_footprint(
+                &mut expected,
+                Some(output),
+                branch.neighbor,
+                branch.conductance,
+            );
+        }
+        canonicalize_matrix_terms(&mut expected);
+        expected.retain(|term| term.row == output);
+        expected.sort_unstable_by_key(|term| (term.row, term.column, term.source));
+        if row_terms(&rows, output) != expected.as_slice() {
+            continue;
+        }
+        // Keep the compact two-branch representation for the common case.
+        // Extra entries preserve each physical branch on shared outputs.
+        groups.push(QualifiedComplementaryDriver {
+            output,
+            high_rail: branches[0].neighbor,
+            low_rail: branches[1].neighbor,
+            pull_up: branches[0].conductance,
+            pull_down: branches[1].conductance,
+            additional_branches: branches[2..].to_vec(),
+        });
+    }
+    groups
+}
+
 pub(crate) fn compile_discrete_plan(
     pattern: &MnaPattern,
     ir: &CompiledIslandIr,
@@ -263,7 +367,7 @@ pub(crate) fn compile_discrete_plan(
         return None;
     }
 
-    let (_, candidates) = metadata.into_parts();
+    let candidates = &metadata.complementary_drivers;
 
     if candidates.is_empty() {
         return None;
@@ -292,7 +396,7 @@ pub(crate) fn compile_discrete_plan(
 
     let mut qualified = Vec::with_capacity(candidates.len());
 
-    for candidate in candidates {
+    for candidate in candidates.iter().filter(|candidate| !candidate.switched) {
         let Some(output) = candidate.output() else {
             continue;
         };
@@ -336,6 +440,7 @@ pub(crate) fn compile_discrete_plan(
         }
 
         qualified.push(QualifiedComplementaryDriver {
+            additional_branches: Vec::new(),
             output,
             high_rail: candidate.high_rail(),
             low_rail: candidate.low_rail(),
@@ -344,6 +449,7 @@ pub(crate) fn compile_discrete_plan(
         });
     }
 
+    qualified.extend(compile_switched_output_groups(pattern, ir, &metadata));
     if qualified.is_empty() {
         return None;
     }
@@ -351,19 +457,14 @@ pub(crate) fn compile_discrete_plan(
     let mut expected_footprints = Vec::with_capacity(qualified.len() * 8);
 
     for driver in &qualified {
-        push_conductance_footprint(
-            &mut expected_footprints,
-            driver.high_rail(),
-            Some(driver.output()),
-            driver.pull_up(),
-        );
-
-        push_conductance_footprint(
-            &mut expected_footprints,
-            Some(driver.output()),
-            driver.low_rail(),
-            driver.pull_down(),
-        );
+        for branch in driver.branches() {
+            push_conductance_footprint(
+                &mut expected_footprints,
+                Some(driver.output()),
+                branch.neighbor,
+                branch.conductance,
+            );
+        }
     }
 
     canonicalize_matrix_terms(&mut expected_footprints);
@@ -476,13 +577,10 @@ fn compile_driver_dependencies(
     let mut visited = vec![0u32; value_count];
     let mut generation = 0u32;
 
-    for (dependent, &driver) in drivers.iter().enumerate() {
+    for (dependent, driver) in drivers.iter().enumerate() {
         let dependent = u32::try_from(dependent).expect("discrete driver index must fit u32");
 
-        for rail in [driver.high_rail(), driver.low_rail()]
-            .into_iter()
-            .flatten()
-        {
+        for rail in driver.branches().filter_map(|branch| branch.neighbor) {
             if let Ok(position) =
                 producers_by_output.binary_search_by_key(&rail, |&(output, _)| output)
             {
@@ -498,8 +596,7 @@ fn compile_driver_dependencies(
         }
 
         stack.clear();
-        stack.push(driver.pull_up());
-        stack.push(driver.pull_down());
+        stack.extend(driver.branches().map(|branch| branch.conductance));
 
         while let Some(value) = stack.pop() {
             if visited[value.index()] == generation {
@@ -566,7 +663,7 @@ fn compile_initial_frontier_dependencies(
     let mut visited = vec![0u32; value_count];
     let mut generation = 0u32;
 
-    for (dependent, &driver) in drivers.iter().enumerate() {
+    for (dependent, driver) in drivers.iter().enumerate() {
         let dependent = u32::try_from(dependent).expect("discrete driver index must fit u32");
 
         generation = generation.wrapping_add(1);
@@ -577,8 +674,7 @@ fn compile_initial_frontier_dependencies(
         }
 
         stack.clear();
-        stack.push(driver.pull_up());
-        stack.push(driver.pull_down());
+        stack.extend(driver.branches().map(|branch| branch.conductance));
 
         let mut conservative = false;
 
@@ -781,6 +877,7 @@ mod tests {
         pull_down: ValueSlot,
     ) -> QualifiedComplementaryDriver {
         QualifiedComplementaryDriver {
+            additional_branches: Vec::new(),
             output,
             high_rail,
             low_rail,
@@ -1067,6 +1164,123 @@ mod tests {
         assert!(plan.matrix_barriers().is_empty());
         assert!(plan.rhs_barriers().is_empty());
         assert!(plan.dependents_for(0).is_empty());
+    }
+
+    #[test]
+    fn switched_groups_account_for_each_bias_and_reject_foreign_terms() {
+        for count in [1, 2, 3] {
+            for foreign in [false, true] {
+                let output = UnknownIndex::new(0);
+                let high = UnknownIndex::new(1);
+                let input = UnknownIndex::new(2);
+                let mut pattern = PatternBuilder::new(3).unwrap();
+                request_conductance(&mut pattern, Some(high), Some(output));
+                request_conductance(&mut pattern, Some(output), None);
+                let pattern = pattern.finish().unwrap();
+                let mut ir = IslandIrBuilder::new(&pattern);
+                let mode = ir.unknown_value(Some(input)).unwrap();
+                let bias = ir.constant_value(1e-6).unwrap();
+                let mut metadata = BoundDiscreteMetadata::default();
+                for _ in 0..count {
+                    add_conductance(&mut ir, Some(high), Some(output), mode);
+                    add_conductance(&mut ir, Some(output), None, bias);
+                    let mut driver = BoundComplementaryDriver::new(
+                        mode,
+                        Some(output),
+                        Some(high),
+                        None,
+                        mode,
+                        bias,
+                    );
+                    driver.switched = true;
+                    metadata.complementary_drivers.push(driver);
+                }
+                // Binding and grouping must preserve both equal physical input loads.
+                for _ in 0..2 {
+                    add_conductance(&mut ir, Some(output), None, bias);
+                    if !foreign {
+                        metadata.input_biases.push(BoundInputBias {
+                            input: Some(output),
+                            reference: None,
+                            conductance: bias,
+                        });
+                    }
+                }
+                let ir = ir.finish().unwrap();
+                let plan = compile_discrete_plan(&pattern, &ir, metadata);
+                if foreign {
+                    assert!(plan.is_none());
+                } else {
+                    let plan = plan.unwrap();
+                    assert_eq!(plan.drivers().len(), 1);
+                    assert_eq!(plan.drivers()[0].branches().count(), count * 2 + 2);
+                    assert!(plan.matrix_barriers().is_empty());
+                }
+            }
+        }
+    }
+
+    #[test]
+    fn switched_group_preserves_extra_row_barriers_and_unrelated_eligible_output() {
+        let output = UnknownIndex::new(0);
+        let other = UnknownIndex::new(1);
+        let high = UnknownIndex::new(2);
+        let input = UnknownIndex::new(3);
+        let foreign_row = UnknownIndex::new(4);
+        let mut pattern = PatternBuilder::new(5).unwrap();
+        for node in [output, other] {
+            request_conductance(&mut pattern, Some(high), Some(node));
+            request_conductance(&mut pattern, Some(node), None);
+        }
+        pattern.request(foreign_row, foreign_row).unwrap();
+        let pattern = pattern.finish().unwrap();
+        let mut ir = IslandIrBuilder::new(&pattern);
+        let mode = ir.unknown_value(Some(input)).unwrap();
+        let bias = ir.constant_value(1e-6).unwrap();
+        let mut metadata = BoundDiscreteMetadata::default();
+        for node in [output, output, other] {
+            add_conductance(&mut ir, Some(high), Some(node), mode);
+            add_conductance(&mut ir, Some(node), None, bias);
+            let mut driver =
+                BoundComplementaryDriver::new(mode, Some(node), Some(high), None, mode, bias);
+            driver.switched = true;
+            metadata.complementary_drivers.push(driver);
+        }
+        // The shared group's row matches, but its source also affects an unrelated row.
+        let slot = ir.pattern().slot(foreign_row, foreign_row).unwrap();
+        ir.add_matrix(slot, mode, 1.0);
+        // Only the second output has an unsupported physical load.
+        add_conductance(&mut ir, Some(other), None, bias);
+        let plan = compile_discrete_plan(&pattern, &ir.finish().unwrap(), metadata).unwrap();
+        assert_eq!(plan.drivers().len(), 1);
+        assert_eq!(plan.drivers()[0].output(), output);
+        assert_eq!(plan.drivers()[0].branches().count(), 4);
+        assert_eq!(plan.matrix_barriers().len(), 1);
+        assert_eq!(plan.matrix_barriers()[0].source(), mode);
+    }
+
+    #[test]
+    fn switched_and_push_pull_on_one_output_do_not_qualify() {
+        let output = UnknownIndex::new(0);
+        let high = UnknownIndex::new(1);
+        let input = UnknownIndex::new(2);
+        let mut pattern = PatternBuilder::new(3).unwrap();
+        request_conductance(&mut pattern, Some(high), Some(output));
+        request_conductance(&mut pattern, Some(output), None);
+        let pattern = pattern.finish().unwrap();
+        let mut ir = IslandIrBuilder::new(&pattern);
+        let mode = ir.unknown_value(Some(input)).unwrap();
+        let bias = ir.constant_value(1e-6).unwrap();
+        let mut metadata = BoundDiscreteMetadata::default();
+        for switched in [false, true] {
+            add_conductance(&mut ir, Some(high), Some(output), mode);
+            add_conductance(&mut ir, Some(output), None, bias);
+            let mut driver =
+                BoundComplementaryDriver::new(mode, Some(output), Some(high), None, mode, bias);
+            driver.switched = switched;
+            metadata.complementary_drivers.push(driver);
+        }
+        assert!(compile_discrete_plan(&pattern, &ir.finish().unwrap(), metadata).is_none());
     }
 
     #[test]

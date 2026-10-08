@@ -1,4 +1,4 @@
-package dev.hynergy.core.electricity.wires;
+package dev.hynergy.core.electricity.wire;
 
 import com.hypixel.hytale.assetstore.AssetExtraInfo;
 import com.hypixel.hytale.assetstore.AssetKeyValidator;

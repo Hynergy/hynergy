@@ -228,6 +228,112 @@ mod tests {
     }
 
     #[test]
+    fn switched_parameter_relation_rejects_before_mutation() {
+        let definitions = DefinitionRegistry::new();
+        for kind in PrimitiveElementKind::ALL.into_iter().filter(|kind| {
+            matches!(
+                kind,
+                PrimitiveElementKind::SwitchedNot
+                    | PrimitiveElementKind::SwitchedAnd
+                    | PrimitiveElementKind::SwitchedNand
+                    | PrimitiveElementKind::SwitchedOr
+                    | PrimitiveElementKind::SwitchedNor
+            )
+        }) {
+            let mut model = Network::new();
+            let device = device_id(1);
+            model.add_device(&definitions, device, kind.into()).unwrap();
+            // Partial initialization is valid in either order.
+            model
+                .set_device_parameter(&definitions, device, ParameterId::new(2), 0.5)
+                .unwrap();
+            model
+                .set_device_parameter(&definitions, device, ParameterId::new(1), 1.0)
+                .unwrap();
+            for (parameter, value) in [(1, 0.5), (2, 1.0), (2, 2.0)] {
+                assert!(
+                    model
+                        .set_device_parameter(
+                            &definitions,
+                            device,
+                            ParameterId::new(parameter),
+                            value
+                        )
+                        .is_err()
+                );
+                assert_eq!(
+                    model.device(device).unwrap().parameter(ParameterId::new(1)),
+                    Some(Some(1.0))
+                );
+                assert_eq!(
+                    model.device(device).unwrap().parameter(ParameterId::new(2)),
+                    Some(Some(0.5))
+                );
+            }
+        }
+    }
+
+    #[test]
+    fn switched_nested_parameter_bindings_reject_before_mutation() {
+        use crate::circuit::{Element, ValueRef};
+        use crate::device::builder::DeviceDefinitionBuilder;
+        let mut definitions = DefinitionRegistry::new();
+        let kind = PrimitiveElementKind::SwitchedNot;
+        let mut child = DeviceDefinitionBuilder::new(&definitions);
+        let terminals = (0..4)
+            .map(|_| child.add_terminal().unwrap())
+            .collect::<Vec<_>>();
+        let on = child
+            .add_parameter(kind.definition().parameters()[1])
+            .unwrap();
+        child
+            .add_element(Element::new(
+                kind.into(),
+                terminals,
+                vec![
+                    ValueRef::Literal(2.5),
+                    ValueRef::Parameter(on),
+                    ValueRef::Literal(0.5),
+                    ValueRef::Literal(1e-6),
+                    ValueRef::Literal(1e-6),
+                ],
+            ))
+            .unwrap();
+        let child = definitions
+            .register(child.build_definition().unwrap())
+            .unwrap();
+        let mut parent = DeviceDefinitionBuilder::new(&definitions);
+        let terminals = (0..4)
+            .map(|_| parent.add_terminal().unwrap())
+            .collect::<Vec<_>>();
+        let on = parent
+            .add_parameter(kind.definition().parameters()[1])
+            .unwrap();
+        parent
+            .add_element(Element::new(
+                child,
+                terminals,
+                vec![ValueRef::Parameter(on)],
+            ))
+            .unwrap();
+        let parent = definitions
+            .register(parent.build_definition().unwrap())
+            .unwrap();
+        let mut model = Network::new();
+        let device = device_id(1);
+        model.add_device(&definitions, device, parent).unwrap();
+        model
+            .set_device_parameter(&definitions, device, on, 1.0)
+            .unwrap();
+        assert!(
+            model
+                .set_device_parameter(&definitions, device, on, 0.5)
+                .is_err()
+        );
+        assert_eq!(model.device(device).unwrap().parameter(on), Some(Some(1.0)));
+    }
+
+    #[test]
     fn device_parameter_validation_preserves_previous_value() {
         let definitions = DefinitionRegistry::new();
         let mut model = Network::new();

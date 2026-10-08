@@ -10,7 +10,7 @@
  * {@link ElectricalSystem#tick()} to advance the
  * simulation.</p>
  *
- * <p>An electrical system is thread-confined. Call its methods only from
+ * <p>An electrical system is restricted to one thread. Call its methods only from
  * the thread that created the system.</p>
  *
  * <p>Observation callbacks run during a system tick. A callback can change

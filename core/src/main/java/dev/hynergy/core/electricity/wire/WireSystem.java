@@ -1,4 +1,4 @@
-package dev.hynergy.core.electricity.wires;
+package dev.hynergy.core.electricity.wire;
 
 import com.hypixel.hytale.component.*;
 import com.hypixel.hytale.component.query.Query;
@@ -11,6 +11,8 @@ import com.hypixel.hytale.server.core.universe.world.chunk.section.ChunkSection;
 import com.hypixel.hytale.server.core.universe.world.storage.ChunkStore;
 import dev.hynergy.core.electricity.ElectricalPortConnection;
 import dev.hynergy.core.electricity.ElectricalSystemResource;
+import dev.hynergy.core.electricity.device.DeviceComponent;
+import dev.hynergy.core.electricity.device.DeviceWireConnections;
 import dev.hynergy.core.port.*;
 import dev.hynergy.electrical.ElectricalRuntime;
 import dev.hynergy.electrical.ElectricalSystem;
@@ -24,6 +26,7 @@ public final class WireSystem extends RefSystem<ChunkStore> {
     private final ElectricalRuntime runtime;
     private final ResourceType<ChunkStore, ElectricalSystemResource> electricalSystemResourceType;
     private final ComponentType<ChunkStore, WireComponent> wireComponentType;
+    private final ComponentType<ChunkStore, DeviceComponent> deviceComponentType;
     private final PortModule portModule;
     private final PortDomain<ElectricalPortConnection> electricalPortDomain;
     private final Query<ChunkStore> query;
@@ -31,10 +34,8 @@ public final class WireSystem extends RefSystem<ChunkStore> {
     private final ComponentType<ChunkStore, BlockModule.BlockStateInfo> blockStateInfoComponentType =
             BlockModule.BlockStateInfo.getComponentType();
 
-    private final ThreadLocal<LongOpenHashSet> connectionScratch =
-            ThreadLocal.withInitial(
-                    () -> new LongOpenHashSet(8)
-            );
+    private final ThreadLocal<ConnectionScratch> connectionScratch =
+            ThreadLocal.withInitial(ConnectionScratch::new);
 
     public WireSystem(
             ElectricalRuntime runtime,
@@ -46,6 +47,7 @@ public final class WireSystem extends RefSystem<ChunkStore> {
                     ChunkStore,
                     WireComponent
                     > wireComponentType,
+            ComponentType<ChunkStore, DeviceComponent> deviceComponentType,
             PortModule portModule,
             PortDomain<
                     ElectricalPortConnection
@@ -55,6 +57,7 @@ public final class WireSystem extends RefSystem<ChunkStore> {
         this.electricalSystemResourceType =
                 electricalSystemResourceType;
         this.wireComponentType = wireComponentType;
+        this.deviceComponentType = deviceComponentType;
         this.portModule = portModule;
         this.electricalPortDomain = electricalPortDomain;
 
@@ -255,10 +258,11 @@ public final class WireSystem extends RefSystem<ChunkStore> {
         HytalePortWorldView worldView =
                 new HytalePortWorldView(world, portModule::blockPorts);
 
-        LongOpenHashSet connectedWires =
-                connectionScratch.get();
+        ConnectionScratch scratch = connectionScratch.get();
+        LongOpenHashSet connectedWires = scratch.connectedWires;
 
         connectedWires.clear();
+        scratch.attachedTerminals.clear();
         connectedWires.add(sourceWire.id().packed());
 
         PortConnectionConsumer<ElectricalPortConnection> connectionConsumer =
@@ -306,24 +310,16 @@ public final class WireSystem extends RefSystem<ChunkStore> {
                                     wireComponentType
                             );
 
-                    if (targetComponent == null) {
-                        return;
+                    if (targetComponent != null) {
+                        Wire targetWire = targetComponent.getWire();
+                        if (targetWire != null && connectedWires.add(targetWire.id().packed())) {
+                            sourceWire.connect(targetWire);
+                        }
                     }
-
-                    Wire targetWire =
-                            targetComponent.getWire();
-
-                    if (targetWire == null) {
-                        return;
-                    }
-
-                    if (!connectedWires.add(
-                            targetWire.id().packed()
-                    )) {
-                        return;
-                    }
-
-                    sourceWire.connect(targetWire);
+                    DeviceComponent targetDevice = commandBuffer.getComponent(targetRef, deviceComponentType);
+                    DeviceWireConnections.attachPortIfNew(
+                            targetDevice, targetPortId, sourceWire, scratch.attachedTerminals
+                    );
                 };
 
         try {
@@ -345,6 +341,13 @@ public final class WireSystem extends RefSystem<ChunkStore> {
             }
         } finally {
             connectedWires.clear();
+            scratch.attachedTerminals.clear();
         }
+    }
+
+    private static final class ConnectionScratch {
+        private final LongOpenHashSet connectedWires = new LongOpenHashSet(8);
+        private final DeviceWireConnections.AttachmentDedup attachedTerminals =
+                new DeviceWireConnections.AttachmentDedup();
     }
 }

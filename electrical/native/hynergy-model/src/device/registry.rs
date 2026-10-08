@@ -25,6 +25,7 @@ pub enum RegisterDeviceError {
 #[derive(Clone)]
 pub struct DefinitionRegistry {
     definitions: Vec<DeviceDefinition>,
+    parameter_relations: Vec<bool>,
 }
 
 impl Default for DefinitionRegistry {
@@ -38,6 +39,19 @@ impl DefinitionRegistry {
 
     pub fn new() -> Self {
         Self {
+            parameter_relations: PrimitiveElementKind::ALL
+                .into_iter()
+                .map(|kind| {
+                    matches!(
+                        kind,
+                        PrimitiveElementKind::SwitchedNot
+                            | PrimitiveElementKind::SwitchedAnd
+                            | PrimitiveElementKind::SwitchedNand
+                            | PrimitiveElementKind::SwitchedOr
+                            | PrimitiveElementKind::SwitchedNor
+                    )
+                })
+                .collect(),
             definitions: PrimitiveElementKind::ALL
                 .into_iter()
                 .map(PrimitiveElementKind::definition)
@@ -82,9 +96,24 @@ impl DefinitionRegistry {
             }
         }
 
+        let has_relations = match definition.body() {
+            DeviceBody::Composite(circuit) => circuit
+                .elements()
+                .iter()
+                .any(|element| self.has_parameter_relations(element.definition())),
+            DeviceBody::Primitive(_) => unreachable!("custom primitives are rejected"),
+        };
+        self.parameter_relations.push(has_relations);
         self.definitions.push(definition);
 
         Ok(id)
+    }
+
+    pub fn has_parameter_relations(&self, id: DefinitionId) -> bool {
+        self.parameter_relations
+            .get(id.index())
+            .copied()
+            .unwrap_or(false)
     }
 
     pub fn get(&self, id: DefinitionId) -> Option<&DeviceDefinition> {
@@ -107,6 +136,7 @@ mod tests {
             Vec::new(),
             DevicePartitionLayout::try_new(vec![0.into(), 0.into()]).unwrap(),
             0,
+            Vec::new(),
             Vec::new(),
         )
     }

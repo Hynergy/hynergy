@@ -1,6 +1,8 @@
 package dev.hynergy.electrical;
 
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.ValueSource;
 
 import static org.junit.jupiter.api.Assertions.*;
 
@@ -12,53 +14,32 @@ final class WorldIdAllocatorTest {
     }
 
     @Test
-    void preparingCommitDoesNotCommitPendingState() {
-        WorldIdAllocator ids = new WorldIdAllocator();
-
-        int id = ids.reserve();
-        int generation = ids.generation(id);
-
-        ids.prepareCommitBatch();
-
-        assertEquals(0, ids.committedHighWaterMark());
-
-        assertDoesNotThrow(() -> ids.requireUsable(id, generation));
-
-        ids.commitBatch();
-
-        assertEquals(1, ids.committedHighWaterMark());
-    }
-
-    @Test
-    void freshIdsAreSequentialAndCommitHighWaterMark() {
+    void freshIdsAreSequentialAndUsableBeforeCommitAdvancesHighWaterMark() {
         WorldIdAllocator ids = new WorldIdAllocator();
 
         int first = ids.reserve();
         int second = ids.reserve();
+        int firstGeneration = ids.generation(first);
+        int secondGeneration = ids.generation(second);
 
         assertEquals(1, first);
         assertEquals(2, second);
 
         assertEquals(2, ids.highWaterMark());
         assertEquals(0, ids.committedHighWaterMark());
+        assertDoesNotThrow(() -> ids.requireUsable(first, firstGeneration));
+        assertDoesNotThrow(() -> ids.requireUsable(second, secondGeneration));
 
-        commit(ids);
+        ids.prepareCommitBatch();
+        assertEquals(0, ids.committedHighWaterMark());
+        assertDoesNotThrow(() -> ids.requireUsable(first, firstGeneration));
+        ids.commitBatch();
 
         assertEquals(2, ids.highWaterMark());
         assertEquals(2, ids.committedHighWaterMark());
 
-        assertDoesNotThrow(() -> ids.requireUsable(first, ids.generation(first)));
-        assertDoesNotThrow(() -> ids.requireUsable(second, ids.generation(second)));
-    }
-
-    @Test
-    void pendingAddIsUsableBeforeCommit() {
-        WorldIdAllocator ids = new WorldIdAllocator();
-
-        int id = ids.reserve();
-        int generation = ids.generation(id);
-
-        assertDoesNotThrow(() -> ids.requireUsable(id, generation));
+        assertDoesNotThrow(() -> ids.requireUsable(first, firstGeneration));
+        assertDoesNotThrow(() -> ids.requireUsable(second, secondGeneration));
     }
 
     @Test
@@ -100,23 +81,7 @@ final class WorldIdAllocatorTest {
     }
 
     @Test
-    void reusingSlotIncrementsGeneration() {
-        WorldIdAllocator ids = new WorldIdAllocator();
-
-        int id = ids.reserve();
-        int oldGeneration = ids.generation(id);
-
-        commit(ids);
-
-        ids.remove(id, oldGeneration);
-        commit(ids);
-
-        assertEquals(id, ids.reserve());
-        assertEquals(oldGeneration + 1, ids.generation(id));
-    }
-
-    @Test
-    void staleGenerationIsRejectedAfterReuse() {
+    void slotReuseIncrementsGenerationAndRejectsStaleIdentity() {
         WorldIdAllocator ids = new WorldIdAllocator();
 
         int id = ids.reserve();
@@ -131,14 +96,14 @@ final class WorldIdAllocatorTest {
 
         int newGeneration = ids.generation(id);
 
-        assertNotEquals(oldGeneration, newGeneration);
+        assertEquals(oldGeneration + 1, newGeneration);
         assertThrows(IllegalStateException.class, () -> ids.requireUsable(id, oldGeneration));
 
         assertDoesNotThrow(() -> ids.requireUsable(id, newGeneration));
     }
 
     @Test
-    void removalMakesWrapperImmediatelyUnusable() {
+    void removalImmediatelyRejectsUseAndRepeatedRemoval() {
         WorldIdAllocator ids = new WorldIdAllocator();
 
         int id = ids.reserve();
@@ -148,19 +113,6 @@ final class WorldIdAllocatorTest {
         ids.remove(id, generation);
 
         assertThrows(IllegalStateException.class, () -> ids.requireUsable(id, generation));
-    }
-
-    @Test
-    void removingSameObjectTwiceFailsBeforeAnotherNativeCommand() {
-        WorldIdAllocator ids = new WorldIdAllocator();
-
-        int id = ids.reserve();
-        int generation = ids.generation(id);
-
-        commit(ids);
-
-        ids.remove(id, generation);
-
         assertThrows(IllegalStateException.class, () -> ids.remove(id, generation));
     }
 
@@ -202,34 +154,17 @@ final class WorldIdAllocatorTest {
         assertEquals(id, ids.reserve());
     }
 
-    @Test
-    void cancelledLiveRemovalRestoresUsability() {
+    @ParameterizedTest(name = "cancel removal: initially committed={0}")
+    @ValueSource(booleans = {false, true})
+    void cancelledRemovalRestoresUsabilityBeforeAndAfterCommit(boolean initiallyCommitted) {
         WorldIdAllocator ids = new WorldIdAllocator();
 
         int id = ids.reserve();
         int generation = ids.generation(id);
 
-        commit(ids);
-        ids.remove(id, generation);
-
-        assertThrows(IllegalStateException.class, () -> ids.requireUsable(id, generation));
-
-        ids.cancelPendingRemove(id, generation);
-
-        assertDoesNotThrow(() -> ids.requireUsable(id, generation));
-
-        commit(ids);
-
-        assertDoesNotThrow(() -> ids.requireUsable(id, generation));
-    }
-
-    @Test
-    void cancelledPendingAddRemovalRestoresPendingAdd() {
-        WorldIdAllocator ids = new WorldIdAllocator();
-
-        int id = ids.reserve();
-        int generation = ids.generation(id);
-
+        if (initiallyCommitted) {
+            commit(ids);
+        }
         ids.remove(id, generation);
 
         assertThrows(IllegalStateException.class, () -> ids.requireUsable(id, generation));

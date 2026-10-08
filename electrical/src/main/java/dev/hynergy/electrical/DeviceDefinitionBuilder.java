@@ -7,30 +7,9 @@ import java.lang.foreign.MemorySegment;
 import java.lang.foreign.ValueLayout;
 import java.nio.ByteOrder;
 import java.util.Objects;
-import java.util.function.Consumer;
-import java.util.function.Function;
-import java.util.function.Supplier;
 
-/**
- * Builds a composite electrical device definition.
- *
- * <p>Plugin code receives this builder from the definition callback of
- * {@link DeviceType#create(Supplier, Consumer)}.</p>
- *
- * <p>The runtime owns the builder that it supplies to the callback.
- * Do not close that builder. Do not keep a reference to it after the
- * callback returns.</p>
- *
- * <p>Add terminals, internal nodes, parameters, child elements, and
- * observers to the definition. IDs are zero-based. The builder assigns
- * IDs in the order in which objects are added.</p>
- *
- * <p>For each child element, add all terminal mappings before you add
- * parameter values.</p>
- *
- * <p>This class is not thread-safe.</p>
- */
-public final class DeviceDefinitionBuilder implements AutoCloseable {
+/** Internal HYDF command encoder. */
+final class DeviceDefinitionBuilder implements AutoCloseable {
 
     /**
      * Specifies one parameter bound.
@@ -78,6 +57,7 @@ public final class DeviceDefinitionBuilder implements AutoCloseable {
     private static final int COMMAND_ADD_ELEMENT = 4;
     private static final int COMMAND_ADD_VOLTAGE_OBSERVER = 5;
     private static final int COMMAND_ADD_CHILD_OBSERVER = 6;
+    private static final int COMMAND_ADD_GROUND_NODE = 7;
 
     private static final int VALUE_LITERAL = 0;
     private static final int VALUE_PARAMETER = 1;
@@ -105,7 +85,6 @@ public final class DeviceDefinitionBuilder implements AutoCloseable {
     private static final ValueLayout.OfDouble F64 =
         ValueLayout.JAVA_DOUBLE_UNALIGNED.withOrder(ByteOrder.LITTLE_ENDIAN);
 
-    private final @Nullable Function<DeviceType<?>, DeviceDefinition> definitionResolver;
 
     private @Nullable Arena arena;
     private MemorySegment buffer;
@@ -114,6 +93,7 @@ public final class DeviceDefinitionBuilder implements AutoCloseable {
     private long commandCount;
 
     private long nodeCount;
+    private int terminalCount;
     private long parameterCount;
     private long elementCount;
     private long observerCount;
@@ -128,39 +108,17 @@ public final class DeviceDefinitionBuilder implements AutoCloseable {
     private long elementTerminalCount;
     private long elementParameterCount;
 
-    /**
-     * Creates a builder with the default initial buffer capacity.
-     */
     DeviceDefinitionBuilder() {
-        this(DEFAULT_INITIAL_CAPACITY, null);
+        this(DEFAULT_INITIAL_CAPACITY);
     }
 
     /**
      * Creates a builder with the specified initial buffer capacity.
      *
-     * <p>This constructor has package access to support tests that must force
-     * buffer growth.</p>
-     *
      * @param initialCapacity the initial capacity in bytes
-     *
-     * @throws IllegalArgumentException if the capacity is smaller than the
-     *     HYDF header
+     * @throws IllegalArgumentException if the capacity is smaller than the HYDF header
      */
     DeviceDefinitionBuilder(int initialCapacity) {
-        this(initialCapacity, null);
-    }
-
-    DeviceDefinitionBuilder(
-        Function<DeviceType<?>, DeviceDefinition> definitionResolver
-    ) {
-        this(DEFAULT_INITIAL_CAPACITY, Objects.requireNonNull(definitionResolver, "definitionResolver"));
-    }
-
-    private DeviceDefinitionBuilder(
-        int initialCapacity,
-        @Nullable Function<DeviceType<?>, DeviceDefinition> definitionResolver
-    ) {
-        this.definitionResolver = definitionResolver;
 
         if (initialCapacity < HEADER_SIZE) {
             throw new IllegalArgumentException("Initial capacity must be at least " + HEADER_SIZE + " bytes");
@@ -201,20 +159,24 @@ public final class DeviceDefinitionBuilder implements AutoCloseable {
         return this;
     }
 
-    /**
-     * Resets the encoded definition state and writes an empty HYDF header.
-     */
     private void resetState() {
         position = HEADER_SIZE;
         commandCount = 0;
 
         nodeCount = 0;
+        terminalCount = 0;
         parameterCount = 0;
         elementCount = 0;
         observerCount = 0;
 
         clearElementState();
         writeHeader();
+    }
+
+    DeviceType.Metadata metadata() {
+        requireTopLevel();
+        return new DeviceType.Metadata(Math.toIntExact(parameterCount), terminalCount,
+                Math.toIntExact(observerCount));
     }
 
     /**
@@ -238,6 +200,7 @@ public final class DeviceDefinitionBuilder implements AutoCloseable {
         commitCommand(payload);
 
         nodeCount++;
+        terminalCount++;
 
         return nodeId;
     }
@@ -261,6 +224,27 @@ public final class DeviceDefinitionBuilder implements AutoCloseable {
 
         nodeCount++;
 
+        return nodeId;
+    }
+
+    /**
+     * Adds one internal ideal 0 V reference node.
+     *
+     * <p>This method does not add an external terminal. Distinct ground nodes
+     * do not create topology connections. Reuse a node ID to connect branches
+     * within the definition.</p>
+     *
+     * @return the node ID
+     * @throws IllegalStateException if a child element is open or the builder
+     *                              is closed
+     */
+    public int addGroundNode() {
+        requireTopLevel();
+
+        int nodeId = nextNodeId();
+        long payload = prepareCommand(COMMAND_ADD_GROUND_NODE, 0);
+        commitCommand(payload);
+        nodeCount++;
         return nodeId;
     }
 
@@ -311,49 +295,6 @@ public final class DeviceDefinitionBuilder implements AutoCloseable {
         @Nullable Bound reciprocalUpper
     ) {
         return addParameter(lower, upper, nonZero, true, reciprocalLower, reciprocalUpper);
-    }
-
-    /**
-     * Starts one child element.
-     *
-     * <p>The runtime resolves and registers the child device type if
-     * necessary.</p>
-     *
-     * <p>Add one terminal mapping for each terminal in the child definition.
-     * Use the terminal order of the child definition. Then add one value for
-     * each child parameter. Use the parameter order of the child definition.
-     * Call {@link #endElement()} when the child element is complete.</p>
-     *
-     * @param type the child device type
-     *
-     * @return this builder
-     *
-     * @throws NullPointerException if {@code type} is null
-     * @throws IllegalStateException if another child element is open, if the
-     *     builder is closed, or if the child type cannot be resolved
-     */
-    public DeviceDefinitionBuilder beginElement(
-        DeviceType<?> type
-    ) {
-        requireTopLevel();
-        Objects.requireNonNull(type, "type");
-
-        Function<DeviceType<?>, DeviceDefinition> definitionResolver = this.definitionResolver;
-
-        DeviceDefinition definition;
-
-        if (definitionResolver != null) {
-            definition = Objects.requireNonNull(definitionResolver.apply(type), "Device type resolver returned null");
-        } else {
-            definition = type.currentDefinition();
-
-            if (definition == null) {
-                throw new IllegalStateException(
-                    "Device type is not registered and this builder cannot resolve device types");
-            }
-        }
-
-        return beginElement(definition);
     }
 
     /**
@@ -626,33 +567,18 @@ public final class DeviceDefinitionBuilder implements AutoCloseable {
         return (int) position;
     }
 
-    /**
-     * Returns the encoded size in bytes.
-     *
-     * @return the encoded size
-     */
     long byteSize() {
         requireComplete();
 
         return position;
     }
 
-    /**
-     * Returns the current buffer capacity.
-     *
-     * @return the capacity in bytes
-     */
     long capacity() {
         requireOpen();
 
         return buffer.byteSize();
     }
 
-    /**
-     * Returns the current HYDF command count.
-     *
-     * @return the command count
-     */
     long commandCount() {
         requireComplete();
 
@@ -714,15 +640,6 @@ public final class DeviceDefinitionBuilder implements AutoCloseable {
         return parameterId;
     }
 
-    /**
-     * Returns the HYDF flags for one optional bound.
-     *
-     * @param bound the bound, or {@code null}
-     * @param presentFlag the flag that marks the bound as present
-     * @param inclusiveFlag the flag that marks the bound as inclusive
-     *
-     * @return the encoded flags
-     */
     private static int boundFlags(@Nullable Bound bound, int presentFlag, int inclusiveFlag) {
         if (bound == null) {
             return 0;
@@ -731,27 +648,12 @@ public final class DeviceDefinitionBuilder implements AutoCloseable {
         return presentFlag | (bound.inclusive() ? inclusiveFlag : 0);
     }
 
-    /**
-     * Returns the number of values for one optional bound.
-     *
-     * @param bound the bound, or {@code null}
-     *
-     * @return {@code 1} when the bound is present, otherwise {@code 0}
-     */
     private static int countBound(
         @Nullable Bound bound
     ) {
         return bound == null ? 0 : 1;
     }
 
-    /**
-     * Writes one optional bound.
-     *
-     * @param cursor the current write offset
-     * @param bound the bound, or {@code null}
-     *
-     * @return the next write offset
-     */
     private long writeBound(long cursor, @Nullable Bound bound) {
         if (bound == null) {
             return cursor;
@@ -762,9 +664,6 @@ public final class DeviceDefinitionBuilder implements AutoCloseable {
         return cursor + Double.BYTES;
     }
 
-    /**
-     * Starts the parameter section of the current element.
-     */
     private void beginElementParameters() {
         if (elementParametersStarted) {
             return;
@@ -782,14 +681,6 @@ public final class DeviceDefinitionBuilder implements AutoCloseable {
         elementParametersStarted = true;
     }
 
-    /**
-     * Writes one command header.
-     *
-     * @param tag the command tag
-     * @param payloadLength the payload size
-     *
-     * @return the payload offset
-     */
     private long prepareCommand(int tag, long payloadLength) {
         requireTopLevel();
         requireCommandAvailable();
@@ -811,11 +702,6 @@ public final class DeviceDefinitionBuilder implements AutoCloseable {
         return position + COMMAND_HEADER_SIZE;
     }
 
-    /**
-     * Commits one prepared command.
-     *
-     * @param end the offset after the command
-     */
     private void commitCommand(long end) {
         long nextCommandCount = commandCount + 1;
 
@@ -825,9 +711,6 @@ public final class DeviceDefinitionBuilder implements AutoCloseable {
         commandCount = nextCommandCount;
     }
 
-    /**
-     * Writes the HYDF header for an empty definition.
-     */
     private void writeHeader() {
         buffer.set(ValueLayout.JAVA_BYTE, 0, (byte) 'H');
         buffer.set(ValueLayout.JAVA_BYTE, 1, (byte) 'Y');
@@ -841,22 +724,12 @@ public final class DeviceDefinitionBuilder implements AutoCloseable {
         putU32(COMMAND_COUNT_OFFSET, 0);
     }
 
-    /**
-     * Makes sure that the buffer has space for more bytes.
-     *
-     * @param additionalBytes the required additional size
-     */
     private void ensureWritable(long additionalBytes) {
         long required = checkedEnd(position, additionalBytes);
 
         ensureCapacity(required);
     }
 
-    /**
-     * Makes sure that the buffer has at least the specified capacity.
-     *
-     * @param required the required capacity
-     */
     private void ensureCapacity(long required) {
         if (required <= buffer.byteSize()) {
             return;
@@ -915,55 +788,30 @@ public final class DeviceDefinitionBuilder implements AutoCloseable {
         return start + length;
     }
 
-    /**
-     * Checks that another HYDF command can be added.
-     */
     private void requireCommandAvailable() {
         if (commandCount >= UINT32_MAX) {
             throw new IllegalStateException("HYDF command count is exhausted");
         }
     }
 
-    /**
-     * Returns the next node ID.
-     *
-     * @return the node ID
-     */
     private int nextNodeId() {
         requireCommandAvailable();
 
         return (int) nodeCount;
     }
 
-    /**
-     * Returns the next parameter ID.
-     *
-     * @return the parameter ID
-     */
     private int nextParameterId() {
         requireCommandAvailable();
 
         return (int) parameterCount;
     }
 
-    /**
-     * Returns the next observer ID.
-     *
-     * @return the observer ID
-     */
     private int nextObserverId() {
         requireCommandAvailable();
 
         return (int) observerCount;
     }
 
-    /**
-     * Checks that an ID refers to an existing item.
-     *
-     * @param id the ID
-     * @param count the number of existing items
-     * @param name the item name for the error message
-     */
     private static void requireExistingId(int id, long count, String name) {
         long unsigned = Integer.toUnsignedLong(id);
 
@@ -972,9 +820,6 @@ public final class DeviceDefinitionBuilder implements AutoCloseable {
         }
     }
 
-    /**
-     * Checks that no element is open.
-     */
     private void requireTopLevel() {
         requireOpen();
 
@@ -983,9 +828,6 @@ public final class DeviceDefinitionBuilder implements AutoCloseable {
         }
     }
 
-    /**
-     * Checks that an element is open.
-     */
     private void requireElementOpen() {
         requireOpen();
 
@@ -994,9 +836,6 @@ public final class DeviceDefinitionBuilder implements AutoCloseable {
         }
     }
 
-    /**
-     * Checks that the current definition is complete.
-     */
     private void requireComplete() {
         requireOpen();
 
@@ -1005,18 +844,12 @@ public final class DeviceDefinitionBuilder implements AutoCloseable {
         }
     }
 
-    /**
-     * Checks that the builder is open.
-     */
     private void requireOpen() {
         if (arena == null) {
             throw new IllegalStateException("Device definition builder is closed");
         }
     }
 
-    /**
-     * Clears the state for the current element.
-     */
     private void clearElementState() {
         elementOpen = false;
         elementParametersStarted = false;
@@ -1029,42 +862,18 @@ public final class DeviceDefinitionBuilder implements AutoCloseable {
         elementParameterCount = 0;
     }
 
-    /**
-     * Writes an unsigned 16-bit value.
-     *
-     * @param offset the write offset
-     * @param value the value
-     */
     private void putU16(long offset, long value) {
         buffer.set(U16, offset, (short) value);
     }
 
-    /**
-     * Writes an unsigned 32-bit value.
-     *
-     * @param offset the write offset
-     * @param value the value
-     */
     private void putU32(long offset, long value) {
         buffer.set(U32, offset, (int) value);
     }
 
-    /**
-     * Writes the raw bits of a Java {@code int} as an unsigned 32-bit value.
-     *
-     * @param offset the write offset
-     * @param value the value
-     */
     private void putU32Raw(long offset, int value) {
         buffer.set(U32, offset, value);
     }
 
-    /**
-     * Writes one 64-bit floating-point value.
-     *
-     * @param offset the write offset
-     * @param value the value
-     */
     private void putF64(long offset, double value) {
         buffer.set(F64, offset, value);
     }

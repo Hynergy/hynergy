@@ -15,7 +15,7 @@ use std::panic::{AssertUnwindSafe, catch_unwind};
 use std::sync::{Arc, Mutex, RwLock};
 
 pub const ABI_VERSION: u32 = 6;
-pub const ABI_REVISION: u32 = 0;
+pub const ABI_REVISION: u32 = 1;
 
 #[derive(Clone)]
 struct DefinitionStore {
@@ -202,6 +202,108 @@ pub unsafe extern "C" fn hynergy_engine_destroy(engine: *mut EngineHandle) {
             drop(Box::from_raw(engine));
         }
     }
+}
+
+#[repr(u32)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum ParameterValidationCode {
+    Success = 0,
+    NullEngine = 1,
+    UnknownDefinition = 2,
+    InvalidParameter = 3,
+    ConstraintViolation = 4,
+    InternalPanic = u32::MAX,
+}
+
+/// Checks a parameter against the registered definition without changing a world.
+///
+/// This uses the same constraints as world parameter commands. It also works
+/// before the world applies the device's AddDevice command.
+///
+/// # Safety
+///
+/// `engine` must point to a live [`EngineHandle`]. The caller must prevent
+/// destruction of the handle during this call.
+#[unsafe(no_mangle)]
+pub unsafe extern "C" fn hynergy_engine_validate_parameter(
+    engine: *const EngineHandle,
+    definition_id: u32,
+    parameter: u32,
+    value: f64,
+) -> u32 {
+    if engine.is_null() {
+        return ParameterValidationCode::NullEngine as u32;
+    }
+    let validation = catch_unwind(AssertUnwindSafe(|| {
+        let engine = unsafe { &*engine };
+        let definitions = engine.definitions.snapshot();
+        let Ok(definition_id) =
+            hynergy_model::device::definition::DefinitionId::try_from(definition_id)
+        else {
+            return ParameterValidationCode::UnknownDefinition;
+        };
+        let Some(definition) = definitions.get(definition_id) else {
+            return ParameterValidationCode::UnknownDefinition;
+        };
+        let Some(constraints) = definition.parameters().get(parameter as usize) else {
+            return ParameterValidationCode::InvalidParameter;
+        };
+        match constraints.validate(value) {
+            Ok(()) => ParameterValidationCode::Success,
+            Err(_) => ParameterValidationCode::ConstraintViolation,
+        }
+    }));
+    validation.unwrap_or(ParameterValidationCode::InternalPanic) as u32
+}
+
+/// Validates a pending parameter vector without changing a world.
+/// NaN identifies an unassigned value. Assigned values must be finite.
+///
+/// # Safety
+/// `engine` must point to a live engine. The caller must not destroy it during this call.
+/// `values` must point to `count` aligned doubles that the caller can read.
+/// If `count` is zero, `values` can be null.
+#[unsafe(no_mangle)]
+pub unsafe extern "C" fn hynergy_engine_validate_parameters(
+    engine: *const EngineHandle,
+    definition_id: u32,
+    values: *const f64,
+    count: u32,
+) -> u32 {
+    if engine.is_null() {
+        return ParameterValidationCode::NullEngine as u32;
+    }
+    if values.is_null() && count != 0 {
+        return ParameterValidationCode::InvalidParameter as u32;
+    }
+    catch_unwind(AssertUnwindSafe(|| {
+        let engine = unsafe { &*engine };
+        let definitions = engine.definitions.snapshot();
+        let Ok(id) = hynergy_model::device::definition::DefinitionId::try_from(definition_id)
+        else {
+            return ParameterValidationCode::UnknownDefinition;
+        };
+        let Some(definition) = definitions.get(id) else {
+            return ParameterValidationCode::UnknownDefinition;
+        };
+        if count as usize != definition.parameters().len() {
+            return ParameterValidationCode::InvalidParameter;
+        }
+        let values = if count == 0 {
+            &[]
+        } else {
+            unsafe { std::slice::from_raw_parts(values, count as usize) }
+        };
+        let parameters = values
+            .iter()
+            .map(|&value| (!value.is_nan()).then_some(value))
+            .collect::<Vec<_>>();
+        match definition.validate_partial_parameters(&definitions, &parameters) {
+            Ok(()) => ParameterValidationCode::Success,
+            Err(_) => ParameterValidationCode::ConstraintViolation,
+        }
+    }))
+    .unwrap_or(ParameterValidationCode::InternalPanic) as u32
 }
 
 /// Registers the device definition in a definition command buffer.
@@ -990,6 +1092,96 @@ mod tests {
     use super::*;
     use hynergy_model::device::definition::{DefinitionId, PrimitiveElementKind};
     use std::mem::{align_of, offset_of, size_of};
+
+    #[test]
+    fn parameter_preflight_checks_registered_constraints_without_a_world() {
+        let engine = hynergy_engine_create(1);
+        let validate = |definition, parameter, value| unsafe {
+            hynergy_engine_validate_parameter(engine, definition, parameter, value)
+        };
+        assert_eq!(
+            validate(1, 0, 10.0),
+            ParameterValidationCode::Success as u32
+        );
+        for value in [0.0, -1.0, f64::NAN, f64::INFINITY] {
+            assert_eq!(
+                validate(1, 0, value),
+                ParameterValidationCode::ConstraintViolation as u32
+            );
+        }
+        assert_eq!(
+            validate(3, 0, -5.0),
+            ParameterValidationCode::Success as u32
+        );
+        assert_eq!(
+            validate(1, 1, 1.0),
+            ParameterValidationCode::InvalidParameter as u32
+        );
+        assert_eq!(
+            validate(1, u32::MAX, 1.0),
+            ParameterValidationCode::InvalidParameter as u32
+        );
+        assert_eq!(
+            validate(0, 0, 1.0),
+            ParameterValidationCode::UnknownDefinition as u32
+        );
+        assert_eq!(
+            validate(u32::MAX, 0, 1.0),
+            ParameterValidationCode::UnknownDefinition as u32
+        );
+        assert_eq!(
+            unsafe { hynergy_engine_validate_parameter(std::ptr::null(), 1, 0, 1.0) },
+            ParameterValidationCode::NullEngine as u32
+        );
+        // A rejected value must not invalidate the registry or later checks.
+        assert_eq!(
+            validate(1, 0, 20.0),
+            ParameterValidationCode::Success as u32
+        );
+        unsafe { hynergy_engine_destroy(engine) };
+    }
+    #[test]
+    fn switched_parameter_vector_preflight_handles_partial_invalid_and_boundary_inputs() {
+        let engine = hynergy_engine_create(1);
+        assert!(!engine.is_null());
+        let validate = |id, values: &[f64]| unsafe {
+            hynergy_engine_validate_parameters(engine, id, values.as_ptr(), values.len() as u32)
+        };
+        for id in 19..=23 {
+            assert_eq!(validate(id, &[2.5, 1.0, 0.0, 1e-6, 1e-6]), 0);
+            assert_eq!(validate(id, &[2.5, f64::NAN, 0.5, 1e-6, 1e-6]), 0);
+            for values in [
+                [2.5, 1.0, 1.0, 1e-6, 1e-6],
+                [2.5, 1.0, 2.0, 1e-6, 1e-6],
+                [2.5, 1.0, 0.0, 0.0, 1e-6],
+                [2.5, 1.0, f64::INFINITY, 1e-6, 1e-6],
+            ] {
+                assert_eq!(
+                    validate(id, &values),
+                    ParameterValidationCode::ConstraintViolation as u32
+                );
+            }
+            assert_eq!(
+                validate(id, &[]),
+                ParameterValidationCode::InvalidParameter as u32
+            );
+        }
+        assert_eq!(
+            validate(0, &[]),
+            ParameterValidationCode::UnknownDefinition as u32
+        );
+        assert_eq!(
+            unsafe { hynergy_engine_validate_parameters(engine, 19, std::ptr::null(), 5) },
+            ParameterValidationCode::InvalidParameter as u32
+        );
+        assert_eq!(
+            unsafe {
+                hynergy_engine_validate_parameters(std::ptr::null(), 19, std::ptr::null(), 0)
+            },
+            ParameterValidationCode::NullEngine as u32
+        );
+        unsafe { hynergy_engine_destroy(engine) };
+    }
 
     fn assert_send<T: Send>() {}
     fn assert_sync<T: Sync>() {}
@@ -1803,6 +1995,8 @@ mod tests {
 
     #[test]
     fn abi_function_signatures_are_stable() {
+        let _: unsafe extern "C" fn(*const EngineHandle, u32, u32, f64) -> u32 =
+            hynergy_engine_validate_parameter;
         let _: extern "C" fn() -> u32 = hynergy_abi_version;
 
         let _: extern "C" fn() -> u32 = hynergy_abi_revision;
@@ -1921,6 +2115,14 @@ mod tests {
             InternalPanic = u32::MAX,
         });
 
+        assert_codes!(ParameterValidationCode {
+            Success = 0,
+            NullEngine = 1,
+            UnknownDefinition = 2,
+            InvalidParameter = 3,
+            ConstraintViolation = 4,
+            InternalPanic = u32::MAX,
+        });
         assert_codes!(WorldCode {
             Success = 0,
             NullEngine = 1,
@@ -2035,7 +2237,7 @@ mod tests {
         assert_eq!(ABI_VERSION, 6);
 
         assert_eq!(hynergy_abi_revision(), ABI_REVISION);
-        assert_eq!(ABI_REVISION, 0);
+        assert_eq!(ABI_REVISION, 1);
     }
 
     #[test]

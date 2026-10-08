@@ -536,7 +536,12 @@ fn compile_primitive(
         | PrimitiveElementKind::And
         | PrimitiveElementKind::Nand
         | PrimitiveElementKind::Or
-        | PrimitiveElementKind::Nor => {
+        | PrimitiveElementKind::Nor
+        | PrimitiveElementKind::SwitchedNot
+        | PrimitiveElementKind::SwitchedAnd
+        | PrimitiveElementKind::SwitchedNand
+        | PrimitiveElementKind::SwitchedOr
+        | PrimitiveElementKind::SwitchedNor => {
             compile_logic_gate(&mut builder, kind)?;
         }
 
@@ -1011,6 +1016,7 @@ fn compile_composite_partition(
                     &mut builder,
                     &mut node_unknowns,
                     node,
+                    definition,
                 )?);
             }
 
@@ -1111,12 +1117,17 @@ fn composite_node_unknown(
     builder: &mut DefinitionTemplateBuilder,
     node_unknowns: &mut [Option<LocalUnknownId>],
     node: NodeId,
+    definition: &DeviceDefinition,
 ) -> Result<LocalUnknownId, DefinitionTemplateBuildError> {
     if let Some(unknown) = node_unknowns[node.index()] {
         return Ok(unknown);
     }
 
-    let unknown = builder.allocated_voltage_unknown()?;
+    let unknown = if definition.is_ground_node(node) {
+        builder.ground_voltage_unknown()?
+    } else {
+        builder.allocated_voltage_unknown()?
+    };
 
     node_unknowns[node.index()] = Some(unknown);
 
@@ -1271,6 +1282,14 @@ fn compile_logic_gate(
     builder: &mut DefinitionTemplateBuilder,
     kind: PrimitiveElementKind,
 ) -> Result<(), DefinitionTemplateBuildError> {
+    let (kind, switched) = match kind {
+        PrimitiveElementKind::SwitchedNot => (PrimitiveElementKind::Not, true),
+        PrimitiveElementKind::SwitchedAnd => (PrimitiveElementKind::And, true),
+        PrimitiveElementKind::SwitchedNand => (PrimitiveElementKind::Nand, true),
+        PrimitiveElementKind::SwitchedOr => (PrimitiveElementKind::Or, true),
+        PrimitiveElementKind::SwitchedNor => (PrimitiveElementKind::Nor, true),
+        kind => (kind, false),
+    };
     let output = builder.terminal_voltage()?;
     let vdd = builder.terminal_voltage()?;
     let vss = builder.terminal_voltage()?;
@@ -1347,9 +1366,30 @@ fn compile_logic_gate(
     let conductance_range = builder.sub(g_max, g_min)?;
     let high_delta = builder.mul(output_high, conductance_range)?;
     let pull_up = builder.add(g_min, high_delta)?;
-    let pull_down = builder.sub(g_max, high_delta)?;
-
-    stamp_complementary_output_stage(builder, output_mode, output, vdd, vss, pull_up, pull_down);
+    if switched {
+        let output_bias = builder.parameter()?;
+        let input_bias = builder.parameter()?;
+        stamp_conductance(builder, input_a, vss, input_bias);
+        builder.register_input_bias(input_a, vss, input_bias);
+        if let Some(input_b) = input_b {
+            stamp_conductance(builder, input_b, vss, input_bias);
+            builder.register_input_bias(input_b, vss, input_bias);
+        }
+        stamp_conductance(builder, vdd, output, pull_up);
+        stamp_conductance(builder, output, vss, output_bias);
+        builder.register_switched_driver(output_mode, output, vdd, vss, pull_up, output_bias);
+    } else {
+        let pull_down = builder.sub(g_max, high_delta)?;
+        stamp_complementary_output_stage(
+            builder,
+            output_mode,
+            output,
+            vdd,
+            vss,
+            pull_up,
+            pull_down,
+        );
+    }
 
     let output_voltage = voltage_difference(builder, output, vss)?;
     let supply_branch_voltage = voltage_difference(builder, vdd, output)?;
@@ -1613,6 +1653,91 @@ struct ControlledSwitchValues {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn ground_node_lowering_reuses_its_cached_binding() {
+        let registry = DefinitionRegistry::new();
+        let mut definition_builder = DeviceDefinitionBuilder::new(&registry);
+        let output = definition_builder.add_terminal().unwrap();
+        let ground = definition_builder.add_ground_node().unwrap();
+        definition_builder
+            .add_element(Element::new(
+                PrimitiveElementKind::Resistance.into(),
+                vec![output, ground],
+                vec![ValueRef::Literal(1000.0)],
+            ))
+            .unwrap();
+        let definition = definition_builder.build_definition().unwrap();
+        let mut builder = DefinitionTemplateBuilder::default();
+        let mut nodes = vec![None; 2];
+        let first = composite_node_unknown(&mut builder, &mut nodes, ground, &definition).unwrap();
+        let second = composite_node_unknown(&mut builder, &mut nodes, ground, &definition).unwrap();
+        assert_eq!(first, second);
+        let template = builder.finish().unwrap();
+        assert!(template.has_explicit_ground());
+        assert_eq!(template.allocated_unknown_count(), 0);
+    }
+
+    #[test]
+    fn nested_ground_is_local_to_its_partition() {
+        let mut registry = DefinitionRegistry::new();
+        let mut builder = DeviceDefinitionBuilder::new(&registry);
+        let output = builder.add_terminal().unwrap();
+        let ground = builder.add_ground_node().unwrap();
+        for kind in [
+            PrimitiveElementKind::VoltageSource,
+            PrimitiveElementKind::Resistance,
+        ] {
+            builder
+                .add_element(Element::new(
+                    DefinitionId::from(kind),
+                    vec![output, ground],
+                    vec![ValueRef::Literal(10.0)],
+                ))
+                .unwrap();
+        }
+        let mut child = registry
+            .register(builder.build_definition().unwrap())
+            .unwrap();
+        for _ in 0..2 {
+            let mut builder = DeviceDefinitionBuilder::new(&registry);
+            let output = builder.add_terminal().unwrap();
+            builder
+                .add_element(Element::new(child, vec![output], vec![]))
+                .unwrap();
+            child = registry
+                .register(builder.build_definition().unwrap())
+                .unwrap();
+        }
+        let mut builder = DeviceDefinitionBuilder::new(&registry);
+        let output = builder.add_terminal().unwrap();
+        let a = builder.add_terminal().unwrap();
+        let b = builder.add_terminal().unwrap();
+        builder
+            .add_element(Element::new(child, vec![output], vec![]))
+            .unwrap();
+        builder
+            .add_element(Element::new(
+                DefinitionId::from(PrimitiveElementKind::Resistance),
+                vec![a, b],
+                vec![ValueRef::Literal(1000.0)],
+            ))
+            .unwrap();
+        let definition = builder.build_definition().unwrap();
+        let compiled = CompiledDefinition::compile(&registry, &definition).unwrap();
+        let grounded = compiled
+            .partition(DevicePartitionId::new(0))
+            .unwrap()
+            .template();
+        let floating = compiled
+            .partition(DevicePartitionId::new(1))
+            .unwrap()
+            .template();
+        assert!(grounded.has_explicit_ground());
+        assert_eq!(grounded.allocated_unknown_count(), 1);
+        assert!(!floating.has_explicit_ground());
+        assert_eq!(floating.allocated_unknown_count(), 0);
+    }
     use hynergy_ir::StateSlot;
 
     use crate::compile::{island_ir::IslandIrBuilder, unknown::UnknownAllocator};

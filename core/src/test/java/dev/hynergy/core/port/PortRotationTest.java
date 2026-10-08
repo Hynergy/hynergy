@@ -101,8 +101,6 @@ final class PortRotationTest {
                             0, sourceAnchor, PortReach.single(1, 0, 0), standard, new Profile("source")
                     )
             ));
-            // Reach is the inverse in the target's local coordinates. For tests with
-            // target rotation we derive it exactly from Hytale's transform.
             module.setBlockPorts(2, BlockPortDefinition.of(
                     new PortDefinition<>(
                             1, targetAnchor, PortReach.of(

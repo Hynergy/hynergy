@@ -155,6 +155,7 @@ pub struct DeviceDefinitionBuilder<'a> {
     node_count: u32,
     elements: Vec<Element>,
     observers: Vec<PendingDefinitionObserver>,
+    ground_nodes: Vec<NodeId>,
 }
 
 impl<'a> DeviceDefinitionBuilder<'a> {
@@ -166,6 +167,7 @@ impl<'a> DeviceDefinitionBuilder<'a> {
             node_count: 0,
             elements: Vec::new(),
             observers: Vec::new(),
+            ground_nodes: Vec::new(),
         }
     }
 
@@ -192,6 +194,12 @@ impl<'a> DeviceDefinitionBuilder<'a> {
 
         self.terminals.push(node);
 
+        Ok(node)
+    }
+
+    pub fn add_ground_node(&mut self) -> Result<NodeId, DeviceDefinitionBuilderError> {
+        let node = self.add_node()?;
+        self.ground_nodes.push(node);
         Ok(node)
     }
 
@@ -418,6 +426,7 @@ impl<'a> DeviceDefinitionBuilder<'a> {
             partition_layout,
             state_count,
             observers,
+            self.ground_nodes,
         ))
     }
 
@@ -796,6 +805,89 @@ mod tests {
     use crate::device::registry::DefinitionRegistry;
 
     use crate::parameter::{Bound, ParameterConstraintError, ParameterConstraints, ParameterId};
+
+    #[test]
+    fn ground_nodes_preserve_node_and_terminal_order() {
+        let registry = DefinitionRegistry::new();
+        let mut builder = DeviceDefinitionBuilder::new(&registry);
+        let a = builder.add_terminal().unwrap();
+        let internal = builder.add_node().unwrap();
+        let ground = builder.add_ground_node().unwrap();
+        let b = builder.add_terminal().unwrap();
+        let other_ground = builder.add_ground_node().unwrap();
+        assert_eq!(
+            [a, internal, ground, b, other_ground].map(NodeId::id),
+            [0, 1, 2, 3, 4]
+        );
+        for pair in [[a, internal], [internal, ground], [b, other_ground]] {
+            builder
+                .add_element(Element::new(
+                    DefinitionId::from(PrimitiveElementKind::Resistance),
+                    pair.to_vec(),
+                    vec![ValueRef::Literal(1.0)],
+                ))
+                .unwrap();
+        }
+        let definition = builder.build_definition().unwrap();
+        assert_eq!(definition.terminals(), &[a, b]);
+        assert_eq!(definition.ground_nodes(), &[ground, other_ground]);
+        assert!(definition.is_ground_node(ground));
+        assert!(!definition.is_ground_node(internal));
+        assert_eq!(definition.partition_count(), 2);
+        assert!(
+            registry
+                .get(DefinitionId::from(PrimitiveElementKind::Resistance))
+                .unwrap()
+                .ground_nodes()
+                .is_empty()
+        );
+    }
+
+    #[test]
+    fn voltage_observer_cannot_cross_distinct_ground_partitions() {
+        let registry = DefinitionRegistry::new();
+        let mut builder = DeviceDefinitionBuilder::new(&registry);
+        let a = builder.add_terminal().unwrap();
+        let b = builder.add_terminal().unwrap();
+        let ground_a = builder.add_ground_node().unwrap();
+        let ground_b = builder.add_ground_node().unwrap();
+        for pair in [[a, ground_a], [b, ground_b]] {
+            builder
+                .add_element(Element::new(
+                    PrimitiveElementKind::Resistance.into(),
+                    pair.to_vec(),
+                    vec![ValueRef::Literal(1000.0)],
+                ))
+                .unwrap();
+        }
+        builder.add_voltage_observer(a, ground_b).unwrap();
+        assert!(matches!(
+            builder.build_definition(),
+            Err(DeviceDefinitionBuilderError::ObserverCrossesPartitions { .. })
+        ));
+    }
+
+    #[test]
+    fn shared_ground_connects_branches_but_unused_ground_is_rejected() {
+        let registry = DefinitionRegistry::new();
+        let mut builder = DeviceDefinitionBuilder::new(&registry);
+        let ground = builder.add_ground_node().unwrap();
+        assert!(matches!(builder.build_definition(),
+            Err(DeviceDefinitionBuilderError::UnusedInternalNode { node }) if node == ground));
+        let mut builder = DeviceDefinitionBuilder::new(&registry);
+        let ground = builder.add_ground_node().unwrap();
+        for _ in 0..2 {
+            let terminal = builder.add_terminal().unwrap();
+            builder
+                .add_element(Element::new(
+                    DefinitionId::from(PrimitiveElementKind::Resistance),
+                    vec![terminal, ground],
+                    vec![ValueRef::Literal(1.0)],
+                ))
+                .unwrap();
+        }
+        assert_eq!(builder.build_definition().unwrap().partition_count(), 1);
+    }
 
     fn terminals<const N: usize>(builder: &mut DeviceDefinitionBuilder<'_>) -> [NodeId; N] {
         std::array::from_fn(|_| builder.add_terminal().unwrap())

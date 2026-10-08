@@ -66,36 +66,18 @@ public final class PortModule extends HynergyModule {
         blockPorts.set(blockTypeId, definition);
     }
 
-    /**
-     * Removes the port layout assigned to a block type.
-     */
     public void clearBlockPorts(int blockTypeId) {
         blockPorts.clear(blockTypeId);
     }
 
-    /**
-     * Returns the layout assigned to the block type.
-     *
-     * @return the assigned layout, or {@code null} if no layout is assigned
-     */
     public BlockPortDefinition blockPorts(int blockTypeId) {
         return blockPorts.get(blockTypeId);
     }
 
-    /**
-     * Returns the registered standard with the specified ID.
-     *
-     * @return the standard, or {@code null} if the ID is not registered
-     */
     public PortStandard<?, ?> standard(String id) {
         return registry.standard(Objects.requireNonNull(id, "id"));
     }
 
-    /**
-     * Returns the discovery service.
-     *
-     * @throws IllegalStateException if this module has not started
-     */
     public PortDiscovery discovery() {
         PortDiscovery discovery = this.discovery;
         if (discovery == null) {

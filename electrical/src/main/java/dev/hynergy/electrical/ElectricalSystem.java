@@ -197,49 +197,146 @@ public final class ElectricalSystem implements AutoCloseable {
      * this system.</p>
      *
      * @param type the device type
-     * @param <T>  the device class
      * @return the new device
      * @throws NullPointerException  if {@code type} is null
      * @throws IllegalStateException if the system is closed or unusable, or
      *                               if the device type is not registered in this runtime
      */
-    public <T extends Device> T create(DeviceType<T> type) {
+    public Device create(DeviceType type) {
         requireUsable();
 
         Objects.requireNonNull(type, "type");
 
         DeviceDefinition definition = runtime.requireDefinition(type);
 
-        T device = type.construct();
-
-        device.requireUnbound();
+        Device device = new Device();
 
         int id = world.addDevice(definition);
         int generation = world.deviceGeneration(id);
+        DeviceId deviceId = new DeviceId(id, generation);
 
-        device.bind(this, id, generation);
+        device.bind(this, deviceId, definition, runtime.requireBinding(type));
 
         return device;
     }
 
-    void setParameter(Device device, int parameterId, double value) {
-        requireOwned(device);
+    /**
+     * Creates a device with all parameter values configured.
+     * Values follow the parameter order in the declaration.
+     * The method rejects invalid values before it allocates a device.
+     *
+     * @param type a type registered in this runtime
+     * @param parameters one value for each entry in {@link DeviceType#parameters()}, in list order
+     * @return the device handle
+     * @throws IllegalArgumentException if the value count or parameter vector is invalid
+     * @throws IllegalStateException if the system is unusable or the type is not registered
+     */
+    public Device create(DeviceType type, double... parameters) {
+        requireUsable();
+        Objects.requireNonNull(type, "type");
+        Objects.requireNonNull(parameters, "parameters");
+        if (parameters.length != type.parameterCount()) {
+            throw new IllegalArgumentException("Incorrect parameter count");
+        }
+        for (int i = 0; i < parameters.length; i++) {
+            type.parameters().get(i).constraints().validate(parameters[i]);
+        }
+        runtime.validateParameters(runtime.requireDefinition(type), parameters);
+        Device device = create(type);
+        for (int i = 0; i < parameters.length; i++) setParameter(device, i, parameters[i]);
+        return device;
+    }
 
-        world.setDeviceParameter(device.id(), device.generation(), parameterId, value);
+    /**
+     * Resolves a live runtime handle for an existing device identity.
+     *
+     * <p>This operation does not add a native device. The supplied type must
+     * be valid for this runtime, and the exact device ID and generation must
+     * still be usable in this electrical world.</p>
+     *
+     * @param id the persistent device identity
+     * @param type the electrical device definition
+     * @return a newly bound runtime handle for the existing device
+     * @throws NullPointerException if {@code id} or {@code type} is null
+     * @throws IllegalArgumentException if the type has a different native definition
+     * @throws IllegalStateException if the system is closed or unusable, the
+     *     type is not registered for this runtime, or the identity is stale
+     */
+    public Device resolveDevice(DeviceId id, DeviceType type) {
+        requireUsable();
+
+        Objects.requireNonNull(id, "id");
+        Objects.requireNonNull(type, "type");
+
+        DeviceDefinition definition = runtime.requireDefinition(type);
+        if (world.deviceDefinition(id).id() != definition.id()) {
+            throw new IllegalArgumentException("Device type does not match the existing native definition");
+        }
+
+        Device device = new Device();
+        device.bind(this, id, definition, runtime.requireBinding(type));
+
+        return device;
+    }
+
+    void requireDefinition(Device device, DeviceType type) {
+        requireOwned(device);
+        world.requireDevice(device.id());
+        DeviceDefinition expected = runtime.requireDefinition(type);
+        if (device.definition().id() != expected.id()) {
+            throw new IllegalArgumentException("Device type does not match existing native definition");
+        }
+    }
+
+    void setParameter(Device device, int parameterId, double value) {
+        validateParameter(device, parameterId, value);
+
+        DeviceId id = device.id();
+        world.setDeviceParameter(id.value(), id.generation(), parameterId, value);
+    }
+
+    void validateParameter(Device device, int parameterId, double value) {
+        requireOwned(device);
+        world.requireDevice(device.id());
+        device.metadata().requireParameter(parameterId);
+        device.binding().type().parameters().get(parameterId).constraints().validate(value);
+        runtime.validateParameter(device.definition(), parameterId, value);
+        double[] proposed = world.parameterIntent(device.id(), device.metadata().parameterCount());
+        proposed[parameterId] = value;
+        runtime.validateParameters(device.definition(), proposed);
+    }
+
+    void validateParameters(Device device, java.util.Map<DeviceParameter, Double> updates) {
+        requireOwned(device);
+        world.requireDevice(device.id());
+        double[] proposed = world.parameterIntent(device.id(), device.metadata().parameterCount());
+        for (var update : updates.entrySet()) {
+            int index = device.binding().parameterIndex(update.getKey());
+            update.getKey().constraints().validate(update.getValue());
+            runtime.validateParameter(device.definition(), index, update.getValue());
+            proposed[index] = update.getValue();
+            runtime.validateParameters(device.definition(), proposed);
+        }
     }
 
     void attachTerminal(Device device, int terminalId, Wire wire) {
         requireOwned(device);
         requireOwned(wire);
 
-        world.attachTerminal(wire.id(), device.id(), device.generation(), terminalId);
+        DeviceId id = device.id();
+        world.requireDevice(id);
+        device.metadata().requireTerminal(terminalId);
+        world.attachTerminal(wire.id(), id.value(), id.generation(), terminalId);
     }
 
     void detachTerminal(Device device, int terminalId, Wire wire) {
         requireOwned(device);
         requireOwned(wire);
 
-        world.detachTerminal(wire.id(), device.id(), device.generation(), terminalId);
+        DeviceId id = device.id();
+        world.requireDevice(id);
+        device.metadata().requireTerminal(terminalId);
+        world.detachTerminal(wire.id(), id.value(), id.generation(), terminalId);
     }
 
     ObservationSubscription subscribe(Device device, int observerId, ObservationListener listener) {
@@ -247,14 +344,14 @@ public final class ElectricalSystem implements AutoCloseable {
 
         Objects.requireNonNull(listener, "listener");
 
-        int deviceId = device.id();
-        int deviceGeneration = device.generation();
+        DeviceId deviceId = device.id();
 
-        int subscriptionId = world.subscribeObserver(deviceId, deviceGeneration, observerId);
+        world.requireDevice(deviceId);
+        int subscriptionId = world.subscribeObserver(deviceId.value(), deviceId.generation(), observerId);
 
         try {
             ObservationSubscription subscription =
-                    new ObservationSubscription(this, subscriptionId, deviceId, listener);
+                    new ObservationSubscription(this, subscriptionId, deviceId.value(), listener);
 
             subscriptions.add(subscription);
 
@@ -304,12 +401,12 @@ public final class ElectricalSystem implements AutoCloseable {
     void remove(Device device) {
         requireOwned(device);
 
-        int deviceId = device.id();
+        DeviceId deviceId = device.id();
 
-        world.removeDevice(deviceId, device.generation());
+        world.removeDevice(deviceId.value(), deviceId.generation());
 
         try {
-            subscriptions.invalidateDevice(deviceId);
+            subscriptions.invalidateDevice(deviceId.value());
         } catch (RuntimeException | Error failure) {
             poisoned = true;
             throw failure;

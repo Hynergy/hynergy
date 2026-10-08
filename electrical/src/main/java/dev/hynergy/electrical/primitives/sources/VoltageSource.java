@@ -2,39 +2,60 @@ package dev.hynergy.electrical.primitives.sources;
 
 import dev.hynergy.electrical.*;
 
+import java.util.Objects;
+
 /**
  * Models an ideal voltage source between a positive terminal and a negative terminal.
  *
  * <p>Voltage is the positive-terminal voltage minus the negative-terminal voltage.
  * Positive current flows from the positive terminal to the negative terminal.</p>
  */
-public final class VoltageSource extends Device {
+public record VoltageSource(Device device) {
+    public static final DeviceType TYPE = PrimitiveDeviceTypes.VOLTAGE_SOURCE;
+
+    public static final DeviceTerminal POSITIVE = TYPE.terminal(0);
+    public static final DeviceTerminal NEGATIVE = TYPE.terminal(1);
+
+    public static final DeviceParameter VOLTAGE = TYPE.parameter(0);
+
+    public static final DeviceObserver VOLTAGE_OBSERVER = TYPE.observer(0);
+    public static final DeviceObserver CURRENT = TYPE.observer(1);
+
     /**
-     * The device type for VoltageSource.
+     * Uses a live device with this primitive definition.
+     *
+     * @throws IllegalArgumentException if the device has a different type
+     * @throws IllegalStateException    if the device is no longer usable
      */
-    public static final DeviceType<VoltageSource> TYPE = DeviceType.primitive(3, VoltageSource::new);
+    public VoltageSource {
+        Objects.requireNonNull(device, "device").requireDefinition(TYPE);
+    }
 
-    private static final int TERMINAL_POSITIVE = 0;
-    private static final int TERMINAL_NEGATIVE = 1;
+    @Override
+    public Device device() {
+        return device;
+    }
 
-    private static final int PARAMETER_VOLTAGE = 0;
+    public DeviceId id() {
+        return device.id();
+    }
 
-    private static final int OBSERVER_VOLTAGE = 0;
-    private static final int OBSERVER_CURRENT = 1;
-
-    private VoltageSource() {
+    /**
+     * Destroys the device and deactivates its observation subscriptions.
+     */
+    public void destroy() {
+        device.destroy();
     }
 
     /**
      * Creates a voltage source.
      *
-     * @param system the electrical system
-     * @param voltage the source voltage, in volts; the value must be finite
-     *
+     * @param system  the electrical system
+     * @param voltage the source voltage, in volts. The value must be finite.
      * @return the voltage source
      */
     public static VoltageSource create(ElectricalSystem system, double voltage) {
-        VoltageSource device = system.create(TYPE);
+        VoltageSource device = new VoltageSource(system.create(TYPE));
 
         device.setVoltage(voltage);
 
@@ -44,46 +65,26 @@ public final class VoltageSource extends Device {
     /**
      * Sets the voltage.
      *
-     * @param voltage the source voltage, in volts; the value must be finite
+     * @param voltage the source voltage, in volts. The value must be finite.
      */
     public void setVoltage(double voltage) {
-        setParameter(PARAMETER_VOLTAGE, voltage);
+        device.setParameter(VOLTAGE, voltage);
     }
 
-    /**
-     * Attaches the positive terminal to a wire.
-     *
-     * @param wire the wire
-     */
     public void attachPositive(Wire wire) {
-        attachTerminal(TERMINAL_POSITIVE, wire);
+        device.attachTerminal(POSITIVE, wire);
     }
 
-    /**
-     * Attaches the negative terminal to a wire.
-     *
-     * @param wire the wire
-     */
     public void attachNegative(Wire wire) {
-        attachTerminal(TERMINAL_NEGATIVE, wire);
+        device.attachTerminal(NEGATIVE, wire);
     }
 
-    /**
-     * Detaches the positive terminal from a wire.
-     *
-     * @param wire the wire
-     */
     public void detachPositive(Wire wire) {
-        detachTerminal(TERMINAL_POSITIVE, wire);
+        device.detachTerminal(POSITIVE, wire);
     }
 
-    /**
-     * Detaches the negative terminal from a wire.
-     *
-     * @param wire the wire
-     */
     public void detachNegative(Wire wire) {
-        detachTerminal(TERMINAL_NEGATIVE, wire);
+        device.detachTerminal(NEGATIVE, wire);
     }
 
     /**
@@ -92,13 +93,12 @@ public final class VoltageSource extends Device {
      * <p>Positive voltage is measured from the positive terminal to the negative terminal.</p>
      *
      * @param listener the observation listener
-     *
      * @return the observation subscription
      */
     public ObservationSubscription observeVoltage(
-        ObservationListener listener
+            ObservationListener listener
     ) {
-        return observe(OBSERVER_VOLTAGE, listener);
+        return device.observe(VOLTAGE_OBSERVER, listener);
     }
 
     /**
@@ -107,12 +107,11 @@ public final class VoltageSource extends Device {
      * <p>Positive current flows from the positive terminal to the negative terminal.</p>
      *
      * @param listener the observation listener
-     *
      * @return the observation subscription
      */
     public ObservationSubscription observeCurrent(
-        ObservationListener listener
+            ObservationListener listener
     ) {
-        return observe(OBSERVER_CURRENT, listener);
+        return device.observe(CURRENT, listener);
     }
 }

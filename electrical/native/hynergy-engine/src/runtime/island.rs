@@ -1378,6 +1378,957 @@ mod test {
 
     const DEFAULT_TIMESTEP: f64 = 1.0;
 
+    fn grounded_definition(
+        definitions: &DefinitionRegistry,
+        exposed: bool,
+        elements: &[(PrimitiveElementKind, f64)],
+    ) -> hynergy_model::device::definition::DeviceDefinition {
+        let mut builder = DeviceDefinitionBuilder::new(definitions);
+        let output = if exposed {
+            builder.add_terminal()
+        } else {
+            builder.add_node()
+        }
+        .unwrap();
+        let ground = builder.add_ground_node().unwrap();
+        builder.add_voltage_observer(output, ground).unwrap();
+        for &(kind, value) in elements {
+            let element = builder
+                .add_element(Element::new(
+                    kind.into(),
+                    vec![output, ground],
+                    vec![ValueRef::Literal(value)],
+                ))
+                .unwrap();
+            builder
+                .add_child_observer(element, DefinitionObserverId::new(1))
+                .unwrap();
+        }
+        builder.build_definition().unwrap()
+    }
+
+    fn compile_device_partition(
+        definitions: &DefinitionRegistry,
+        network: &Network,
+        device: DeviceId,
+        partition: u16,
+    ) -> crate::compile::island::CompiledIsland {
+        let topology = DerivedTopology::from_network(network, definitions);
+        let island = topology.component_island(
+            network,
+            DeviceComponent::new(device, DevicePartitionId::new(partition)),
+        );
+        compile_topology_island(definitions, network, &topology, island).unwrap()
+    }
+
+    #[test]
+    fn grounded_source_and_resistor_solve_with_exposed_or_hidden_output() {
+        for exposed in [true, false] {
+            let mut definitions = DefinitionRegistry::new();
+            let definition = grounded_definition(
+                &definitions,
+                exposed,
+                &[
+                    (PrimitiveElementKind::VoltageSource, 10.0),
+                    (PrimitiveElementKind::Resistance, 1000.0),
+                ],
+            );
+            let definition = definitions.register(definition).unwrap();
+            let device = DeviceId::try_from(1).unwrap();
+            let mut network = Network::new();
+            network
+                .add_device(&definitions, device, definition)
+                .unwrap();
+            let compiled = compile_device_partition(&definitions, &network, device, 0);
+            assert_eq!(compiled.pattern().dimension(), 2);
+            assert_eq!(compiled.state_count(), 0);
+            let mut runtime = IslandRuntime::new(compiled, &network, DEFAULT_TIMESTEP).unwrap();
+            runtime
+                .solve_tick_with_state_reader(&network, |_| None)
+                .unwrap();
+            for (index, expected) in [(0, 10.0), (1, -0.01), (2, 0.01)] {
+                let actual = runtime
+                    .observer_value(DeviceObserver::new(
+                        device,
+                        DefinitionObserverId::new(index),
+                    ))
+                    .unwrap();
+                assert!(
+                    (actual - expected).abs() < 1.0e-12,
+                    "observer {index}: {actual}"
+                );
+            }
+            if exposed {
+                assert_eq!(
+                    runtime.node_voltage(IslandNode::terminal(device, TerminalId::new(0))),
+                    Some(10.0)
+                );
+            }
+        }
+    }
+
+    #[test]
+    fn distinct_device_grounds_supply_load_through_one_connected_output() {
+        let mut definitions = DefinitionRegistry::new();
+        let source_definition = grounded_definition(
+            &definitions,
+            true,
+            &[(PrimitiveElementKind::VoltageSource, 10.0)],
+        );
+        let source_definition = definitions.register(source_definition).unwrap();
+        let load_definition = grounded_definition(
+            &definitions,
+            true,
+            &[(PrimitiveElementKind::Resistance, 1000.0)],
+        );
+        let load_definition = definitions.register(load_definition).unwrap();
+        let source = DeviceId::try_from(1).unwrap();
+        let load = DeviceId::try_from(2).unwrap();
+        let wire = WireId::try_from(1).unwrap();
+        let mut network = Network::new();
+        network.add_wire(wire).unwrap();
+        for (device, definition) in [(source, source_definition), (load, load_definition)] {
+            network
+                .add_device(&definitions, device, definition)
+                .unwrap();
+            network
+                .attach_terminal(wire, device, TerminalId::new(0))
+                .unwrap();
+        }
+        let compiled = compile_device_partition(&definitions, &network, source, 0);
+        assert_eq!(compiled.pattern().dimension(), 2);
+        let mut runtime = IslandRuntime::new(compiled, &network, DEFAULT_TIMESTEP).unwrap();
+        runtime
+            .solve_tick_with_state_reader(&network, |_| None)
+            .unwrap();
+        for (device, index, expected) in [(load, 0, 10.0), (load, 1, 0.01), (source, 1, -0.01)] {
+            let actual = runtime
+                .observer_value(DeviceObserver::new(
+                    device,
+                    DefinitionObserverId::new(index),
+                ))
+                .unwrap();
+            assert!((actual - expected).abs() < 1.0e-12);
+        }
+    }
+
+    #[test]
+    fn nested_grounded_and_floating_partitions_keep_separate_reference_policies() {
+        let mut definitions = DefinitionRegistry::new();
+        let child = grounded_definition(
+            &definitions,
+            true,
+            &[(PrimitiveElementKind::VoltageSource, 10.0)],
+        );
+        let mut child = definitions.register(child).unwrap();
+        for _ in 0..2 {
+            let mut builder = DeviceDefinitionBuilder::new(&definitions);
+            let output = builder.add_terminal().unwrap();
+            let element = builder
+                .add_element(Element::new(child, vec![output], vec![]))
+                .unwrap();
+            builder
+                .add_child_observer(element, DefinitionObserverId::new(0))
+                .unwrap();
+            child = definitions
+                .register(builder.build_definition().unwrap())
+                .unwrap();
+        }
+        let mut builder = DeviceDefinitionBuilder::new(&definitions);
+        let grounded = builder.add_terminal().unwrap();
+        let a = builder.add_terminal().unwrap();
+        let b = builder.add_terminal().unwrap();
+        let element = builder
+            .add_element(Element::new(child, vec![grounded], vec![]))
+            .unwrap();
+        builder
+            .add_child_observer(element, DefinitionObserverId::new(0))
+            .unwrap();
+        builder
+            .add_element(Element::new(
+                PrimitiveElementKind::VoltageSource.into(),
+                vec![a, b],
+                vec![ValueRef::Literal(7.0)],
+            ))
+            .unwrap();
+        builder
+            .add_element(Element::new(
+                PrimitiveElementKind::Resistance.into(),
+                vec![a, b],
+                vec![ValueRef::Literal(1000.0)],
+            ))
+            .unwrap();
+        builder.add_voltage_observer(a, b).unwrap();
+        let definition = definitions
+            .register(builder.build_definition().unwrap())
+            .unwrap();
+        let device = DeviceId::try_from(1).unwrap();
+        let mut network = Network::new();
+        network
+            .add_device(&definitions, device, definition)
+            .unwrap();
+        let topology = DerivedTopology::from_network(&network, &definitions);
+        let ground_island = topology.component_island(
+            &network,
+            DeviceComponent::new(device, DevicePartitionId::new(0)),
+        );
+        let floating_island = topology.component_island(
+            &network,
+            DeviceComponent::new(device, DevicePartitionId::new(1)),
+        );
+        assert_ne!(ground_island, floating_island);
+        for (partition, index, expected) in [(0, 0, 10.0), (1, 1, 7.0)] {
+            let compiled = compile_device_partition(&definitions, &network, device, partition);
+            assert_eq!(compiled.pattern().dimension(), 2);
+            let mut runtime = IslandRuntime::new(compiled, &network, DEFAULT_TIMESTEP).unwrap();
+            runtime
+                .solve_tick_with_state_reader(&network, |_| None)
+                .unwrap();
+            let voltage = runtime
+                .observer_value(DeviceObserver::new(
+                    device,
+                    DefinitionObserverId::new(index),
+                ))
+                .unwrap();
+            assert!((voltage - expected).abs() < 1.0e-12);
+            if partition == 1 {
+                let positive = runtime
+                    .node_voltage(IslandNode::terminal(device, TerminalId::new(1)))
+                    .unwrap();
+                let negative = runtime
+                    .node_voltage(IslandNode::terminal(device, TerminalId::new(2)))
+                    .unwrap();
+                assert!(positive == 0.0 || negative == 0.0);
+                assert!((positive - negative - 7.0).abs() < 1.0e-12);
+            }
+        }
+    }
+
+    fn switched_fixture(
+        kind_index: usize,
+        inputs: &[Option<f64>],
+        external: Option<(f64, f64)>,
+        off: f64,
+    ) -> (Network, crate::compile::island::CompiledIsland, DeviceId) {
+        let mut definitions = DefinitionRegistry::new();
+        let kind = *PrimitiveElementKind::ALL
+            .get(kind_index)
+            .expect("switched primitive is registered");
+        let mut builder = DeviceDefinitionBuilder::new(&definitions);
+        let output = builder.add_terminal().unwrap();
+        let vdd = builder.add_node().unwrap();
+        let ground = builder.add_ground_node().unwrap();
+        builder
+            .add_element(Element::new(
+                PrimitiveElementKind::VoltageSource.into(),
+                vec![vdd, ground],
+                vec![ValueRef::Literal(5.0)],
+            ))
+            .unwrap();
+        let mut terminals = vec![output, vdd, ground];
+        for input in inputs {
+            let node = builder.add_terminal().unwrap();
+            terminals.push(node);
+            if let Some(voltage) = input {
+                builder
+                    .add_element(Element::new(
+                        PrimitiveElementKind::VoltageSource.into(),
+                        vec![node, ground],
+                        vec![ValueRef::Literal(*voltage)],
+                    ))
+                    .unwrap();
+            }
+        }
+        let gate = builder
+            .add_element(Element::new(
+                kind.into(),
+                terminals,
+                [2.5, 1.0, off, 1e-6, 1e-6]
+                    .into_iter()
+                    .map(ValueRef::Literal)
+                    .collect::<Vec<_>>(),
+            ))
+            .unwrap();
+        if let Some((voltage, resistance)) = external {
+            let positive = if resistance == 0.0 {
+                output
+            } else {
+                builder.add_node().unwrap()
+            };
+            builder
+                .add_element(Element::new(
+                    PrimitiveElementKind::VoltageSource.into(),
+                    vec![positive, ground],
+                    vec![ValueRef::Literal(voltage)],
+                ))
+                .unwrap();
+            if resistance != 0.0 {
+                builder
+                    .add_element(Element::new(
+                        PrimitiveElementKind::Resistance.into(),
+                        vec![positive, output],
+                        vec![ValueRef::Literal(resistance)],
+                    ))
+                    .unwrap();
+            }
+        }
+        builder.add_voltage_observer(output, ground).unwrap();
+        builder
+            .add_child_observer(
+                gate,
+                DefinitionObserverId::new(if inputs.len() == 1 { 2 } else { 3 }),
+            )
+            .unwrap();
+        let definition = definitions
+            .register(builder.build_definition().unwrap())
+            .unwrap();
+        let device = DeviceId::try_from(1).unwrap();
+        let mut network = Network::new();
+        network
+            .add_device(&definitions, device, definition)
+            .unwrap();
+        let compiled = compile_device_partition(&definitions, &network, device, 0);
+        (network, compiled, device)
+    }
+
+    fn switched_values(
+        kind: usize,
+        inputs: &[Option<f64>],
+        external: Option<(f64, f64)>,
+        off: f64,
+    ) -> (f64, f64) {
+        let (network, compiled, device) = switched_fixture(kind, inputs, external, off);
+        let mut runtime = IslandRuntime::new(compiled, &network, DEFAULT_TIMESTEP).unwrap();
+        runtime
+            .solve_tick_with_state_reader(&network, |_| None)
+            .unwrap();
+        let read = |index| {
+            runtime
+                .observer_value(DeviceObserver::new(
+                    device,
+                    DefinitionObserverId::new(index),
+                ))
+                .unwrap()
+        };
+        (read(0), read(1))
+    }
+
+    #[test]
+    fn switched_truth_tables_biases_and_threshold() {
+        for (kind, mask) in [(18, 1), (19, 8), (20, 7), (21, 14), (22, 1)] {
+            for bits in 0..if kind == 18 { 2 } else { 4 } {
+                let mut inputs = vec![Some(if bits & 1 == 0 { 0.0 } else { 2.5 })];
+                if kind != 18 {
+                    inputs.push(Some(if bits & 2 == 0 { 0.0 } else { 2.5 }));
+                }
+                let expected = if mask & (1 << bits) == 0 {
+                    0.0
+                } else {
+                    5.0 / 1.000001
+                };
+                let (voltage, _) = switched_values(kind, &inputs, None, 0.0);
+                assert!(
+                    (voltage - expected).abs() < 1e-9,
+                    "kind={kind} bits={bits}: {voltage}"
+                );
+            }
+            let inputs = vec![None; if kind == 18 { 1 } else { 2 }];
+            let expected = if mask & 1 == 0 { 0.0 } else { 5.0 / 1.000001 };
+            assert!((switched_values(kind, &inputs, None, 0.0).0 - expected).abs() < 1e-9);
+        }
+    }
+
+    #[test]
+    fn switched_releases_output_and_reports_reverse_current() {
+        let (voltage, current) = switched_values(18, &[Some(5.0)], Some((5.0, 100.0)), 0.0);
+        assert!((voltage - 5.0 / 1.0001).abs() < 1e-9);
+        assert_eq!(current, 0.0);
+        let (voltage, current) = switched_values(18, &[Some(0.0)], Some((10.0, 0.0)), 0.0);
+        assert!((voltage - 10.0).abs() < 1e-9);
+        assert!((current + 5.0).abs() < 1e-9);
+        let (_, leakage) = switched_values(18, &[Some(5.0)], Some((10.0, 0.0)), 1e-9);
+        assert!((leakage + 5e-9).abs() < 1e-15);
+    }
+
+    #[test]
+    fn switched_unloaded_output_qualifies_for_fast_path() {
+        let (_, compiled, _) = switched_fixture(18, &[Some(0.0)], None, 0.0);
+        assert!(compiled.discrete_plan().is_some());
+        let (_, loaded, _) = switched_fixture(18, &[Some(0.0)], Some((5.0, 100.0)), 0.0);
+        assert!(loaded.discrete_plan().is_none());
+    }
+
+    fn switched_network_fixture(
+        shared: bool,
+        count: usize,
+    ) -> (Network, crate::compile::island::CompiledIsland, DeviceId) {
+        let mut definitions = DefinitionRegistry::new();
+        let mut b = DeviceDefinitionBuilder::new(&definitions);
+        let ground = b.add_ground_node().unwrap();
+        let supply = b.add_node().unwrap();
+        b.add_element(Element::new(
+            PrimitiveElementKind::VoltageSource.into(),
+            vec![supply, ground],
+            vec![ValueRef::Literal(5.0)],
+        ))
+        .unwrap();
+        let zero = b.add_node().unwrap();
+        b.add_element(Element::new(
+            PrimitiveElementKind::VoltageSource.into(),
+            vec![zero, ground],
+            vec![ValueRef::Literal(0.0)],
+        ))
+        .unwrap();
+        let mut previous = zero;
+        let shared_output = b.add_terminal().unwrap();
+        for index in 0..count {
+            let output = if shared || index + 1 == count {
+                shared_output
+            } else {
+                b.add_node().unwrap()
+            };
+            let input = if shared {
+                if index == 0 { zero } else { supply }
+            } else {
+                previous
+            };
+            b.add_element(Element::new(
+                PrimitiveElementKind::ALL[18].into(),
+                vec![output, supply, ground, input],
+                [2.5, 1.0, 0.0, 1e-6, 1e-6]
+                    .into_iter()
+                    .map(ValueRef::Literal)
+                    .collect::<Vec<_>>(),
+            ))
+            .unwrap();
+            previous = output;
+        }
+        b.add_voltage_observer(shared_output, ground).unwrap();
+        let definition = definitions.register(b.build_definition().unwrap()).unwrap();
+        let device = DeviceId::try_from(1).unwrap();
+        let mut network = Network::new();
+        network
+            .add_device(&definitions, device, definition)
+            .unwrap();
+        let compiled = compile_device_partition(&definitions, &network, device, 0);
+        (network, compiled, device)
+    }
+
+    #[test]
+    fn switched_biased_chains_and_shared_outputs_match_full_solver() {
+        for shared in [false, true] {
+            for count in [1, 2, 3, 8] {
+                let (network, compiled, device) = switched_network_fixture(shared, count);
+                let plan = compiled
+                    .discrete_plan()
+                    .expect("switched network must qualify");
+                assert_eq!(plan.drivers().len(), if shared { 1 } else { count });
+                let mut fast = IslandRuntime::new(compiled, &network, DEFAULT_TIMESTEP).unwrap();
+                let (network_full, compiled_full, _) = switched_network_fixture(shared, count);
+                let mut full =
+                    IslandRuntime::new(compiled_full, &network_full, DEFAULT_TIMESTEP).unwrap();
+                full.discrete_plan = None;
+                fast.solve_tick_with_state_reader(&network, |_| None)
+                    .unwrap();
+                full.solve_tick_with_state_reader(&network_full, |_| None)
+                    .unwrap();
+                let observer = DeviceObserver::new(device, DefinitionObserverId::new(0));
+                let actual = fast.observer_value(observer).unwrap();
+                let expected = if shared {
+                    5.0 / (1.0 + count as f64 * 1e-6)
+                } else if count % 2 == 0 {
+                    0.0
+                } else {
+                    5.0 / 1.000001
+                };
+                assert!((actual - expected).abs() < 1e-9);
+                assert!((actual - full.observer_value(observer).unwrap()).abs() < 1e-9);
+            }
+        }
+    }
+
+    #[test]
+    fn switched_unsupported_loads_only_disqualify_the_loaded_output() {
+        for (kind, parameters) in [
+            (PrimitiveElementKind::Resistance, vec![100.0]),
+            (PrimitiveElementKind::Capacitor, vec![1.0]),
+            (PrimitiveElementKind::Diode, vec![1.0, 1e-6]),
+            (PrimitiveElementKind::CurrentSource, vec![1.0]),
+            (PrimitiveElementKind::VoltageSource, vec![3.0]),
+        ] {
+            let mut definitions = DefinitionRegistry::new();
+            let mut b = DeviceDefinitionBuilder::new(&definitions);
+            let ground = b.add_ground_node().unwrap();
+            let rail = b.add_node().unwrap();
+            b.add_element(Element::new(
+                PrimitiveElementKind::VoltageSource.into(),
+                vec![rail, ground],
+                vec![ValueRef::Literal(5.0)],
+            ))
+            .unwrap();
+            let mut outputs = Vec::new();
+            for _ in 0..2 {
+                let output = b.add_terminal().unwrap();
+                let input = b.add_node().unwrap();
+                outputs.push(output);
+                b.add_element(Element::new(
+                    PrimitiveElementKind::SwitchedNot.into(),
+                    vec![output, rail, ground, input],
+                    [2.5, 1.0, 0.0, 1e-6, 1e-6]
+                        .into_iter()
+                        .map(ValueRef::Literal)
+                        .collect::<Vec<_>>(),
+                ))
+                .unwrap();
+            }
+            b.add_element(Element::new(
+                kind.into(),
+                vec![outputs[0], ground],
+                parameters
+                    .into_iter()
+                    .map(ValueRef::Literal)
+                    .collect::<Vec<_>>(),
+            ))
+            .unwrap();
+            let definition = definitions.register(b.build_definition().unwrap()).unwrap();
+            let mut network = Network::new();
+            let device = DeviceId::try_from(1).unwrap();
+            network
+                .add_device(&definitions, device, definition)
+                .unwrap();
+            let compiled = compile_device_partition(&definitions, &network, device, 0);
+            assert_eq!(
+                compiled.discrete_plan().unwrap().drivers().len(),
+                1,
+                "{kind:?}"
+            );
+        }
+    }
+
+    #[test]
+    fn switched_nested_instances_preserve_bound_bias_multiplicity() {
+        let mut definitions = DefinitionRegistry::new();
+        let mut child = DeviceDefinitionBuilder::new(&definitions);
+        let output = child.add_terminal().unwrap();
+        let input = child.add_terminal().unwrap();
+        let ground = child.add_ground_node().unwrap();
+        let vdd = child.add_node().unwrap();
+        let rail = child
+            .add_parameter(hynergy_model::parameter::ParameterConstraints::default())
+            .unwrap();
+        child
+            .add_element(Element::new(
+                PrimitiveElementKind::VoltageSource.into(),
+                vec![vdd, ground],
+                vec![ValueRef::Parameter(rail)],
+            ))
+            .unwrap();
+        child
+            .add_element(Element::new(
+                PrimitiveElementKind::SwitchedNot.into(),
+                vec![output, vdd, ground, input],
+                [2.5, 1.0, 0.0, 1e-6, 1e-6]
+                    .into_iter()
+                    .map(ValueRef::Literal)
+                    .collect::<Vec<_>>(),
+            ))
+            .unwrap();
+        let child = definitions
+            .register(child.build_definition().unwrap())
+            .unwrap();
+        let mut parent = DeviceDefinitionBuilder::new(&definitions);
+        let output = parent.add_terminal().unwrap();
+        let input = parent.add_terminal().unwrap();
+        let ground = parent.add_ground_node().unwrap();
+        for rail in [5.0, 7.0] {
+            parent
+                .add_element(Element::new(
+                    child,
+                    vec![output, input],
+                    vec![ValueRef::Literal(rail)],
+                ))
+                .unwrap();
+        }
+        parent
+            .add_element(Element::new(
+                PrimitiveElementKind::Conductance.into(),
+                vec![input, ground],
+                vec![ValueRef::Literal(1e-6)],
+            ))
+            .unwrap();
+        parent.add_voltage_observer(output, ground).unwrap();
+        parent.add_voltage_observer(input, ground).unwrap();
+        let parent = definitions
+            .register(parent.build_definition().unwrap())
+            .unwrap();
+        for reverse in [false, true] {
+            let device = DeviceId::try_from(1).unwrap();
+            let mut network = Network::new();
+            let peer = DeviceId::try_from(2).unwrap();
+            network.add_device(&definitions, device, parent).unwrap();
+            network.add_device(&definitions, peer, parent).unwrap();
+            let output_wire = WireId::try_from(1).unwrap();
+            let input_wire = WireId::try_from(2).unwrap();
+            network.add_wire(output_wire).unwrap();
+            network.add_wire(input_wire).unwrap();
+            for gate in if reverse {
+                [peer, device]
+            } else {
+                [device, peer]
+            } {
+                for (wire, terminal) in if reverse {
+                    [(input_wire, 1), (output_wire, 0)]
+                } else {
+                    [(output_wire, 0), (input_wire, 1)]
+                } {
+                    network
+                        .attach_terminal(wire, gate, TerminalId::new(terminal))
+                        .unwrap();
+                }
+            }
+            let compiled = compile_device_partition(&definitions, &network, device, 0);
+            let plan = compiled.discrete_plan().unwrap();
+            assert_eq!(plan.drivers().len(), 1);
+            assert_eq!(plan.drivers()[0].branches().count(), 8);
+            let mut fast = IslandRuntime::new(compiled, &network, DEFAULT_TIMESTEP).unwrap();
+            let mut full = IslandRuntime::new(
+                compile_device_partition(&definitions, &network, device, 0),
+                &network,
+                DEFAULT_TIMESTEP,
+            )
+            .unwrap();
+            full.discrete_plan = None;
+            fast.solve_tick_with_state_reader(&network, |_| None)
+                .unwrap();
+            full.solve_tick_with_state_reader(&network, |_| None)
+                .unwrap();
+            for (index, expected) in [12.0 / 2.000002, 0.0].into_iter().enumerate() {
+                let observer = DeviceObserver::new(device, DefinitionObserverId::new(index as u32));
+                assert!((fast.observer_value(observer).unwrap() - expected).abs() < 1e-9);
+                assert!(
+                    (fast.observer_value(observer).unwrap()
+                        - full.observer_value(observer).unwrap())
+                    .abs()
+                        < 1e-9
+                );
+            }
+        }
+    }
+
+    #[test]
+    fn switched_shared_dynamic_rails_aliases_and_order_match_full_solver() {
+        for alias in 0..7 {
+            for reverse in [false, true] {
+                let mut definitions = DefinitionRegistry::new();
+                let mut b = DeviceDefinitionBuilder::new(&definitions);
+                let ground = b.add_ground_node().unwrap();
+                let output = b.add_terminal().unwrap();
+                let parameters = (0..6)
+                    .map(|_| {
+                        b.add_parameter(hynergy_model::parameter::ParameterConstraints::default())
+                            .unwrap()
+                    })
+                    .collect::<Vec<_>>();
+                for index in if reverse { [1, 0] } else { [0, 1] } {
+                    let vss = if alias == 5 && index == 0 {
+                        output
+                    } else {
+                        b.add_node().unwrap()
+                    };
+                    let vdd = if alias == 4 && index == 0 {
+                        output
+                    } else if alias == 6 {
+                        vss
+                    } else {
+                        b.add_node().unwrap()
+                    };
+                    b.add_element(Element::new(
+                        PrimitiveElementKind::VoltageSource.into(),
+                        vec![vss, ground],
+                        vec![ValueRef::Parameter(parameters[index * 3])],
+                    ))
+                    .unwrap();
+                    let source_vdd = if alias == 6 {
+                        b.add_node().unwrap()
+                    } else {
+                        vdd
+                    };
+                    b.add_element(Element::new(
+                        PrimitiveElementKind::VoltageSource.into(),
+                        vec![source_vdd, vss],
+                        vec![ValueRef::Parameter(parameters[index * 3 + 1])],
+                    ))
+                    .unwrap();
+                    let source_input = b.add_node().unwrap();
+                    b.add_element(Element::new(
+                        PrimitiveElementKind::VoltageSource.into(),
+                        vec![source_input, vss],
+                        vec![ValueRef::Parameter(parameters[index * 3 + 2])],
+                    ))
+                    .unwrap();
+                    let input = match alias {
+                        1 => output,
+                        2 => vss,
+                        3 => vdd,
+                        _ => source_input,
+                    };
+                    // The second OR input holds an output/input alias HIGH without oscillation.
+                    let kind = if alias == 1 {
+                        PrimitiveElementKind::SwitchedOr
+                    } else {
+                        PrimitiveElementKind::SwitchedNot
+                    };
+                    let mut terminals = vec![output, vdd, vss, input];
+                    if alias == 1 {
+                        terminals.push(vdd);
+                    }
+                    b.add_element(Element::new(
+                        kind.into(),
+                        terminals,
+                        [2.5, 1.0, 0.0, 1e-6, 1e-6]
+                            .into_iter()
+                            .map(ValueRef::Literal)
+                            .collect::<Vec<_>>(),
+                    ))
+                    .unwrap();
+                }
+                b.add_voltage_observer(output, ground).unwrap();
+                let definition = definitions.register(b.build_definition().unwrap()).unwrap();
+                let device = DeviceId::try_from(1).unwrap();
+                let mut network = Network::new();
+                network
+                    .add_device(&definitions, device, definition)
+                    .unwrap();
+                for (index, value) in [1.0, 5.0, 0.0, 2.0, 7.0, 5.0].into_iter().enumerate() {
+                    network
+                        .set_device_parameter(&definitions, device, parameters[index], value)
+                        .unwrap();
+                }
+                let compiled = compile_device_partition(&definitions, &network, device, 0);
+                if alias < 4 {
+                    assert_eq!(compiled.discrete_plan().unwrap().drivers().len(), 1);
+                }
+                let mut fast = IslandRuntime::new(compiled, &network, DEFAULT_TIMESTEP).unwrap();
+                let mut full = IslandRuntime::new(
+                    compile_device_partition(&definitions, &network, device, 0),
+                    &network,
+                    DEFAULT_TIMESTEP,
+                )
+                .unwrap();
+                full.discrete_plan = None;
+                for values in [
+                    [1.0, 5.0, 0.0, 2.0, 7.0, 5.0],
+                    [1.0, 5.0, 5.0, 2.0, 7.0, 0.0],
+                    [1.0, 5.0, 0.0, 2.0, 7.0, 0.0],
+                    [1.0, 5.0, 5.0, 2.0, 7.0, 5.0],
+                    [-1.0, 6.0, 0.0, 3.0, 4.0, 0.0],
+                ] {
+                    for (index, value) in values.into_iter().enumerate() {
+                        network
+                            .set_device_parameter(&definitions, device, parameters[index], value)
+                            .unwrap();
+                    }
+                    fast.mark_numerical_dirty();
+                    full.mark_numerical_dirty();
+                    fast.solve_tick_with_state_reader(&network, |_| None)
+                        .unwrap();
+                    full.solve_tick_with_state_reader(&network, |_| None)
+                        .unwrap();
+                    let observer = DeviceObserver::new(device, DefinitionObserverId::new(0));
+                    let actual = fast.observer_value(observer).unwrap();
+                    assert!(actual.is_finite());
+                    assert!(
+                        (actual - full.observer_value(observer).unwrap()).abs() < 1e-9,
+                        "alias={alias}, reverse={reverse}, values={values:?}"
+                    );
+                    if alias == 0 {
+                        let g0 = if values[2] < 2.5 { 1.0 } else { 0.0 };
+                        let g1 = if values[5] < 2.5 { 1.0 } else { 0.0 };
+                        let expected = (g0 * (values[0] + values[1])
+                            + g1 * (values[3] + values[4])
+                            + 1e-6 * (values[0] + values[3]))
+                            / (g0 + g1 + 2e-6);
+                        assert!((actual - expected).abs() < 1e-9);
+                    }
+                }
+            }
+        }
+    }
+
+    #[test]
+    fn switched_feedback_converges_from_stable_state_and_bounds_oscillation() {
+        for count in [1, 2] {
+            for fast in [false, true] {
+                let mut definitions = DefinitionRegistry::new();
+                let mut b = DeviceDefinitionBuilder::new(&definitions);
+                let ground = b.add_ground_node().unwrap();
+                let supply = b.add_node().unwrap();
+                b.add_element(Element::new(
+                    PrimitiveElementKind::VoltageSource.into(),
+                    vec![supply, ground],
+                    vec![ValueRef::Literal(5.0)],
+                ))
+                .unwrap();
+                let outputs = (0..count)
+                    .map(|_| b.add_terminal().unwrap())
+                    .collect::<Vec<_>>();
+                for index in 0..count {
+                    b.add_element(Element::new(
+                        PrimitiveElementKind::SwitchedNot.into(),
+                        vec![outputs[index], supply, ground, outputs[(index + 1) % count]],
+                        [2.5, 1.0, 0.0, 1e-6, 1e-6]
+                            .into_iter()
+                            .map(ValueRef::Literal)
+                            .collect::<Vec<_>>(),
+                    ))
+                    .unwrap();
+                    b.add_voltage_observer(outputs[index], ground).unwrap();
+                }
+                let definition = definitions.register(b.build_definition().unwrap()).unwrap();
+                let device = DeviceId::try_from(1).unwrap();
+                let mut network = Network::new();
+                network
+                    .add_device(&definitions, device, definition)
+                    .unwrap();
+                let compiled = compile_device_partition(&definitions, &network, device, 0);
+                assert!(compiled.discrete_plan().is_some());
+                let mut runtime = IslandRuntime::new(compiled, &network, DEFAULT_TIMESTEP).unwrap();
+                if !fast {
+                    runtime.discrete_plan = None;
+                }
+                if count == 2 {
+                    let high = runtime
+                        .unknowns
+                        .node_unknown(IslandNode::terminal(device, TerminalId::new(0)))
+                        .unwrap();
+                    runtime.solution[high.index()] = 5.0;
+                    runtime
+                        .solve_tick_with_state_reader(&network, |_| None)
+                        .unwrap();
+                    let value = runtime
+                        .observer_value(DeviceObserver::new(device, DefinitionObserverId::new(0)))
+                        .unwrap();
+                    assert!((value - 5.0 / 1.000002).abs() < 1e-9);
+                } else {
+                    assert!(matches!(
+                        runtime.solve_tick_with_state_reader(&network, |_| None),
+                        Err(IslandRuntimeError::NonlinearDidNotConverge { .. })
+                    ));
+                }
+            }
+        }
+    }
+
+    #[test]
+    fn logic_composite_with_hidden_ground_and_supply_drives_finite_load() {
+        for input_voltage in [0.0, 5.0] {
+            let mut definitions = DefinitionRegistry::new();
+            let mut builder = DeviceDefinitionBuilder::new(&definitions);
+            let output = builder.add_terminal().unwrap();
+            let input = builder.add_terminal().unwrap();
+            let vdd = builder.add_node().unwrap();
+            let vss = builder.add_ground_node().unwrap();
+            builder
+                .add_element(Element::new(
+                    PrimitiveElementKind::VoltageSource.into(),
+                    vec![vdd, vss],
+                    vec![ValueRef::Literal(5.0)],
+                ))
+                .unwrap();
+            builder
+                .add_element(Element::new(
+                    PrimitiveElementKind::VoltageSource.into(),
+                    vec![input, vss],
+                    vec![ValueRef::Literal(input_voltage)],
+                ))
+                .unwrap();
+            builder
+                .add_element(Element::new(
+                    PrimitiveElementKind::Not.into(),
+                    vec![output, vdd, vss, input],
+                    vec![
+                        ValueRef::Literal(2.5),
+                        ValueRef::Literal(0.1),
+                        ValueRef::Literal(0.001),
+                    ],
+                ))
+                .unwrap();
+            builder
+                .add_element(Element::new(
+                    PrimitiveElementKind::Resistance.into(),
+                    vec![output, vss],
+                    vec![ValueRef::Literal(1000.0)],
+                ))
+                .unwrap();
+            builder.add_voltage_observer(output, vss).unwrap();
+            let definition = definitions
+                .register(builder.build_definition().unwrap())
+                .unwrap();
+            let device = DeviceId::try_from(1).unwrap();
+            let mut network = Network::new();
+            network
+                .add_device(&definitions, device, definition)
+                .unwrap();
+            let compiled = compile_device_partition(&definitions, &network, device, 0);
+            assert_eq!(compiled.pattern().dimension(), 5);
+            let mut runtime = IslandRuntime::new(compiled, &network, DEFAULT_TIMESTEP).unwrap();
+            runtime
+                .solve_tick_with_state_reader(&network, |_| None)
+                .unwrap();
+            // KCL: Vout = 5 * Gup / (Gup + Gdown + 1/1000).
+            let expected = if input_voltage == 0.0 {
+                0.5 / 0.102
+            } else {
+                0.005 / 0.102
+            };
+            let actual = runtime
+                .observer_value(DeviceObserver::new(device, DefinitionObserverId::new(0)))
+                .unwrap();
+            assert!(
+                (actual - expected).abs() < 1.0e-10,
+                "input {input_voltage}: {actual}"
+            );
+        }
+    }
+
+    #[test]
+    fn explicit_ground_preserves_singular_circuit_failure_without_observations() {
+        for elements in [
+            vec![
+                (PrimitiveElementKind::VoltageSource, 5.0),
+                (PrimitiveElementKind::VoltageSource, 10.0),
+            ],
+            vec![(PrimitiveElementKind::CurrentSource, 0.01)],
+        ] {
+            let mut definitions = DefinitionRegistry::new();
+            let definition = grounded_definition(&definitions, true, &elements);
+            let definition = definitions.register(definition).unwrap();
+            let device = DeviceId::try_from(1).unwrap();
+            let mut network = Network::new();
+            network
+                .add_device(&definitions, device, definition)
+                .unwrap();
+            let compiled = compile_device_partition(&definitions, &network, device, 0);
+            assert_eq!(
+                compiled.pattern().dimension(),
+                elements.len() + usize::from(elements[0].0 == PrimitiveElementKind::VoltageSource)
+            );
+            let mut runtime = IslandRuntime::new(compiled, &network, DEFAULT_TIMESTEP).unwrap();
+            assert!(matches!(
+                runtime.solve_tick_with_state_reader(&network, |_| None),
+                Err(IslandRuntimeError::Mna(MnaError::Singular { .. }))
+            ));
+            assert_eq!(
+                runtime.observer_value(DeviceObserver::new(device, DefinitionObserverId::new(0))),
+                None
+            );
+            assert_eq!(
+                runtime.node_voltage(IslandNode::terminal(device, TerminalId::new(0))),
+                None
+            );
+        }
+    }
+
     #[test]
     fn runtime_retains_compiled_discrete_plan_and_scratch() {
         let definitions = DefinitionRegistry::new();

@@ -89,6 +89,11 @@ pub enum PrimitiveElementKind {
     Or = 15,
     Nor = 16,
     SchmittBuffer = 17,
+    SwitchedNot = 18,
+    SwitchedAnd = 19,
+    SwitchedNand = 20,
+    SwitchedOr = 21,
+    SwitchedNor = 22,
 }
 
 #[derive(Debug, Error, Clone, Copy, PartialEq, Eq)]
@@ -107,7 +112,7 @@ pub enum PrimitiveParameterError {
 }
 
 impl PrimitiveElementKind {
-    pub const ALL: [Self; 18] = [
+    pub const ALL: [Self; 23] = [
         Self::Resistance,
         Self::Conductance,
         Self::VoltageSource,
@@ -126,6 +131,11 @@ impl PrimitiveElementKind {
         Self::Or,
         Self::Nor,
         Self::SchmittBuffer,
+        Self::SwitchedNot,
+        Self::SwitchedAnd,
+        Self::SwitchedNand,
+        Self::SwitchedOr,
+        Self::SwitchedNor,
     ];
 
     pub const COUNT: u32 = Self::ALL.len() as u32;
@@ -146,6 +156,11 @@ impl PrimitiveElementKind {
             Self::Diode => 2,
             Self::Not | Self::And | Self::Nand | Self::Or | Self::Nor => 3,
             Self::SchmittBuffer => 4,
+            Self::SwitchedNot
+            | Self::SwitchedAnd
+            | Self::SwitchedNand
+            | Self::SwitchedOr
+            | Self::SwitchedNor => 5,
         }
     }
 
@@ -184,11 +199,18 @@ impl PrimitiveElementKind {
             | Self::Inductor
             | Self::Diode => vec![voltage(0, 1, p0), current(0, 1, p0)],
 
-            Self::Not | Self::SchmittBuffer => {
+            Self::Not | Self::SchmittBuffer | Self::SwitchedNot => {
                 vec![voltage(0, 2, p0), voltage(3, 2, p0), current(1, 0, p0)]
             }
 
-            Self::And | Self::Nand | Self::Or | Self::Nor => vec![
+            Self::And
+            | Self::Nand
+            | Self::Or
+            | Self::Nor
+            | Self::SwitchedAnd
+            | Self::SwitchedNand
+            | Self::SwitchedOr
+            | Self::SwitchedNor => vec![
                 voltage(0, 2, p0),
                 voltage(3, 2, p0),
                 voltage(4, 2, p0),
@@ -301,6 +323,13 @@ impl PrimitiveElementKind {
                 [unrestricted, positive, non_negative].get(index).copied()
             }
 
+            Self::SwitchedNot
+            | Self::SwitchedAnd
+            | Self::SwitchedNand
+            | Self::SwitchedOr
+            | Self::SwitchedNor => [unrestricted, positive, non_negative, positive, positive]
+                .get(index)
+                .copied(),
             Self::TickDelay => None,
         }
     }
@@ -315,12 +344,19 @@ impl PrimitiveElementKind {
             | Self::Inductor
             | Self::Diode => (smallvec![0.into(), 1.into()], smallvec![0.into(), 0.into()]),
 
-            Self::Not | Self::SchmittBuffer => (
+            Self::Not | Self::SchmittBuffer | Self::SwitchedNot => (
                 smallvec![0.into(), 1.into(), 2.into(), 3.into()],
                 smallvec![0.into(), 0.into(), 0.into(), 0.into()],
             ),
 
-            Self::And | Self::Nand | Self::Or | Self::Nor => (
+            Self::And
+            | Self::Nand
+            | Self::Or
+            | Self::Nor
+            | Self::SwitchedAnd
+            | Self::SwitchedNand
+            | Self::SwitchedOr
+            | Self::SwitchedNor => (
                 smallvec![0.into(), 1.into(), 2.into(), 3.into(), 4.into()],
                 smallvec![0.into(), 0.into(), 0.into(), 0.into(), 0.into()],
             ),
@@ -439,7 +475,16 @@ impl PrimitiveElementKind {
                 });
             }
 
-            Self::Not | Self::And | Self::Nand | Self::Or | Self::Nor
+            Self::Not
+            | Self::And
+            | Self::Nand
+            | Self::Or
+            | Self::Nor
+            | Self::SwitchedNot
+            | Self::SwitchedAnd
+            | Self::SwitchedNand
+            | Self::SwitchedOr
+            | Self::SwitchedNor
                 if parameters[1] <= parameters[2] =>
             {
                 return Err(PrimitiveParameterError::ParameterMustBeGreater {
@@ -471,6 +516,48 @@ impl From<PrimitiveElementKind> for DefinitionId {
     }
 }
 
+#[cfg(test)]
+mod switched_contract_tests {
+    use super::*;
+
+    #[test]
+    fn switched_schemas_and_parameter_validation() {
+        for index in 18..23 {
+            let kind = *PrimitiveElementKind::ALL
+                .get(index)
+                .expect("switched primitive is registered");
+            assert_eq!(u32::from(DefinitionId::from(kind)), index as u32 + 1);
+            assert_eq!(
+                kind.definition().terminals().len(),
+                if index == 18 { 4 } else { 5 }
+            );
+            assert_eq!(kind.state_count(), 0);
+            let valid = [2.5, 1.0, 0.0, 1e-6, 1e-6];
+            assert!(kind.validate_parameters(&valid).is_ok());
+            for parameter in 0..5 {
+                for value in [f64::NAN, f64::INFINITY] {
+                    let mut invalid = valid;
+                    invalid[parameter] = value;
+                    assert!(kind.validate_parameters(&invalid).is_err());
+                }
+            }
+            for (parameter, value) in [
+                (1, 0.0),
+                (2, -1.0),
+                (2, 1.0),
+                (3, 0.0),
+                (4, 0.0),
+                (3, -1.0),
+                (4, -1.0),
+            ] {
+                let mut invalid = valid;
+                invalid[parameter] = value;
+                assert!(kind.validate_parameters(&invalid).is_err());
+            }
+        }
+    }
+}
+
 #[derive(Debug, Clone, PartialEq)]
 pub enum DeviceBody {
     Primitive(PrimitiveElementKind),
@@ -485,9 +572,70 @@ pub struct DeviceDefinition {
     partition_layout: DevicePartitionLayout,
     state_count: usize,
     observers: Vec<DefinitionObserver>,
+    ground_nodes: Vec<NodeId>,
 }
 
 impl DeviceDefinition {
+    /// Validates known values, including switched-gate relations through nested bindings.
+    /// The method checks each relation only when both parameter values are known.
+    pub fn validate_partial_parameters(
+        &self,
+        registry: &crate::device::registry::DefinitionRegistry,
+        parameters: &[Option<f64>],
+    ) -> Result<(), PrimitiveParameterError> {
+        if parameters.len() != self.parameters().len() {
+            return Err(PrimitiveParameterError::WrongParameterCount {
+                expected: self.parameters().len(),
+                actual: parameters.len(),
+            });
+        }
+        for (index, (value, constraints)) in parameters.iter().zip(self.parameters()).enumerate() {
+            if let Some(value) = value {
+                constraints.validate(*value).map_err(|source| {
+                    PrimitiveParameterError::InvalidParameter { index, source }
+                })?;
+            }
+        }
+        match self.body() {
+            DeviceBody::Primitive(
+                PrimitiveElementKind::SwitchedNot
+                | PrimitiveElementKind::SwitchedAnd
+                | PrimitiveElementKind::SwitchedNand
+                | PrimitiveElementKind::SwitchedOr
+                | PrimitiveElementKind::SwitchedNor,
+            ) => {
+                if let (Some(on), Some(off)) = (parameters[1], parameters[2])
+                    && on <= off
+                {
+                    return Err(PrimitiveParameterError::ParameterMustBeGreater {
+                        greater: 1,
+                        lesser: 2,
+                    });
+                }
+            }
+            DeviceBody::Composite(circuit) => {
+                for element in circuit.elements() {
+                    let child = registry
+                        .get(element.definition())
+                        .expect("registered child definition");
+                    let values = element
+                        .parameters()
+                        .iter()
+                        .map(|value| match value {
+                            crate::circuit::ValueRef::Literal(value) => Some(*value),
+                            crate::circuit::ValueRef::Parameter(parameter) => {
+                                parameters[parameter.index()]
+                            }
+                        })
+                        .collect::<Vec<_>>();
+                    child.validate_partial_parameters(registry, &values)?;
+                }
+            }
+            DeviceBody::Primitive(_) => {}
+        }
+        Ok(())
+    }
+
     pub(crate) fn new_primitive(
         kind: PrimitiveElementKind,
         terminals: impl Into<SmallVec<[NodeId; 4]>>,
@@ -502,6 +650,7 @@ impl DeviceDefinition {
             partition_layout,
             state_count: kind.state_count(),
             observers,
+            ground_nodes: Vec::new(),
         }
     }
 
@@ -512,6 +661,7 @@ impl DeviceDefinition {
         partition_layout: DevicePartitionLayout,
         state_count: usize,
         observers: Vec<DefinitionObserver>,
+        ground_nodes: Vec<NodeId>,
     ) -> Self {
         Self {
             body: DeviceBody::Composite(circuit),
@@ -520,6 +670,7 @@ impl DeviceDefinition {
             partition_layout,
             state_count,
             observers,
+            ground_nodes,
         }
     }
 
@@ -531,6 +682,16 @@ impl DeviceDefinition {
     #[inline]
     pub fn terminals(&self) -> &[NodeId] {
         &self.terminals
+    }
+
+    #[inline]
+    pub fn ground_nodes(&self) -> &[NodeId] {
+        &self.ground_nodes
+    }
+
+    #[inline]
+    pub fn is_ground_node(&self, node: NodeId) -> bool {
+        self.ground_nodes.binary_search(&node).is_ok()
     }
 
     #[inline]
@@ -1090,7 +1251,7 @@ mod tests {
 
         assert_eq!(
             PrimitiveElementKind::COUNT,
-            PrimitiveElementKind::SchmittBuffer as u32 + 1,
+            PrimitiveElementKind::SwitchedNor as u32 + 1,
         );
     }
 

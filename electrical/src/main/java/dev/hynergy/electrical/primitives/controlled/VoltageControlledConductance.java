@@ -2,6 +2,8 @@ package dev.hynergy.electrical.primitives.controlled;
 
 import dev.hynergy.electrical.*;
 
+import java.util.Objects;
+
 /**
  * Models a voltage-controlled conductance between two output terminals.
  *
@@ -12,53 +14,72 @@ import dev.hynergy.electrical.*;
  *
  * <p>Positive output current flows from output-positive to output-negative.</p>
  */
-public final class VoltageControlledConductance extends Device {
+public record VoltageControlledConductance(Device device) {
+    public static final DeviceType TYPE =
+            PrimitiveDeviceTypes.VOLTAGE_CONTROLLED_CONDUCTANCE;
+
+    public static final DeviceTerminal OUTPUT_POSITIVE = TYPE.terminal(0);
+    public static final DeviceTerminal OUTPUT_NEGATIVE = TYPE.terminal(1);
+    public static final DeviceTerminal CONTROL = TYPE.terminal(2);
+
+    public static final DeviceParameter THRESHOLD_VOLTAGE = TYPE.parameter(0);
+    public static final DeviceParameter TRANSITION_VOLTAGE = TYPE.parameter(1);
+    public static final DeviceParameter MINIMUM_CONDUCTANCE = TYPE.parameter(2);
+    public static final DeviceParameter MAXIMUM_CONDUCTANCE = TYPE.parameter(3);
+
+    public static final DeviceObserver OUTPUT_VOLTAGE = TYPE.observer(0);
+    public static final DeviceObserver CONTROL_VOLTAGE = TYPE.observer(1);
+    public static final DeviceObserver OUTPUT_CURRENT = TYPE.observer(2);
+
     /**
-     * The device type for {@code VoltageControlledConductance}.
+     * Uses a live device with this primitive definition.
+     *
+     * @throws IllegalArgumentException if the device has a different type
+     * @throws IllegalStateException    if the device is no longer usable
      */
-    public static final DeviceType<VoltageControlledConductance> TYPE =
-        DeviceType.primitive(10, VoltageControlledConductance::new);
+    public VoltageControlledConductance {
+        Objects.requireNonNull(device, "device").requireDefinition(TYPE);
+    }
 
-    private static final int TERMINAL_OUTPUT_POSITIVE = 0;
-    private static final int TERMINAL_OUTPUT_NEGATIVE = 1;
-    private static final int TERMINAL_CONTROL = 2;
+    @Override
+    public Device device() {
+        return device;
+    }
 
-    private static final int PARAMETER_THRESHOLD_VOLTAGE = 0;
-    private static final int PARAMETER_TRANSITION_VOLTAGE = 1;
-    private static final int PARAMETER_MINIMUM_CONDUCTANCE = 2;
-    private static final int PARAMETER_MAXIMUM_CONDUCTANCE = 3;
+    public DeviceId id() {
+        return device.id();
+    }
 
-    private static final int OBSERVER_OUTPUT_VOLTAGE = 0;
-    private static final int OBSERVER_CONTROL_VOLTAGE = 1;
-    private static final int OBSERVER_OUTPUT_CURRENT = 2;
-
-    private VoltageControlledConductance() {
+    /**
+     * Destroys the device and deactivates its observation subscriptions.
+     */
+    public void destroy() {
+        device.destroy();
     }
 
     /**
      * Creates a voltage-controlled conductance.
      *
-     * @param system the electrical system
-     * @param thresholdVoltage the center of the transition interval, in volts;
-     *     the value must be finite
-     * @param transitionVoltage the width of the transition interval, in volts;
-     *     the value must be finite and greater than zero
-     * @param minimumConductance the minimum conductance, in siemens; the value
-     *     must be finite and non-negative
-     * @param maximumConductance the maximum conductance, in siemens; the value
-     *     must be finite, greater than zero, and greater than
-     *     {@code minimumConductance}
-     *
+     * @param system             the electrical system
+     * @param thresholdVoltage   the center of the transition interval, in volts.
+     *                           The value must be finite.
+     * @param transitionVoltage  the width of the transition interval, in volts.
+     *                           The value must be finite and greater than zero.
+     * @param minimumConductance the minimum conductance, in siemens. The value
+     *                           must be finite and zero or greater.
+     * @param maximumConductance the maximum conductance, in siemens. The value
+     *                           must be finite and greater than zero.
+     *                           The value must be greater than {@code minimumConductance}.
      * @return the voltage-controlled conductance
      */
     public static VoltageControlledConductance create(
-        ElectricalSystem system,
-        double thresholdVoltage,
-        double transitionVoltage,
-        double minimumConductance,
-        double maximumConductance
+            ElectricalSystem system,
+            double thresholdVoltage,
+            double transitionVoltage,
+            double minimumConductance,
+            double maximumConductance
     ) {
-        VoltageControlledConductance device = system.create(TYPE);
+        VoltageControlledConductance device = new VoltageControlledConductance(system.create(TYPE));
 
         device.setThresholdVoltage(thresholdVoltage);
         device.setTransitionVoltage(transitionVoltage);
@@ -71,99 +92,67 @@ public final class VoltageControlledConductance extends Device {
     /**
      * Sets the center of the transition interval.
      *
-     * @param thresholdVoltage the threshold voltage, in volts; the value must
-     *     be finite
+     * @param thresholdVoltage the threshold voltage, in volts. The value must
+     *                         be finite.
      */
     public void setThresholdVoltage(double thresholdVoltage) {
-        setParameter(PARAMETER_THRESHOLD_VOLTAGE, thresholdVoltage);
+        device.setParameter(THRESHOLD_VOLTAGE, thresholdVoltage);
     }
 
     /**
      * Sets the width of the transition interval.
      *
-     * @param transitionVoltage the transition voltage, in volts; the value
-     *     must be finite and greater than zero
+     * @param transitionVoltage the transition voltage, in volts. The value
+     *                          must be finite and greater than zero.
      */
     public void setTransitionVoltage(double transitionVoltage) {
-        setParameter(PARAMETER_TRANSITION_VOLTAGE, transitionVoltage);
+        device.setParameter(TRANSITION_VOLTAGE, transitionVoltage);
     }
 
     /**
      * Sets the minimum conductance.
      *
-     * @param minimumConductance the conductance, in siemens; the value must be
-     *     finite, non-negative, and less than the current maximum conductance
+     * @param minimumConductance the conductance, in siemens. The value must be
+     *                           finite and zero or greater.
+     *                           The value must be less than the current maximum conductance.
      */
     public void setMinimumConductance(double minimumConductance) {
-        setParameter(PARAMETER_MINIMUM_CONDUCTANCE, minimumConductance);
+        device.setParameter(MINIMUM_CONDUCTANCE, minimumConductance);
     }
 
     /**
      * Sets the maximum conductance.
      *
-     * @param maximumConductance the conductance, in siemens; the value must be
-     *     finite, greater than zero, and greater than the current minimum
-     *     conductance
+     * @param maximumConductance the conductance, in siemens. The value must be
+     *                           finite and greater than the current minimum conductance.
+     *                           The value must also be greater than zero.
      */
     public void setMaximumConductance(double maximumConductance) {
-        setParameter(PARAMETER_MAXIMUM_CONDUCTANCE, maximumConductance);
+        device.setParameter(MAXIMUM_CONDUCTANCE, maximumConductance);
     }
 
-    /**
-     * Attaches the output-positive terminal to a wire.
-     *
-     * @param wire the wire
-     */
     public void attachOutputPositive(Wire wire) {
-        attachTerminal(TERMINAL_OUTPUT_POSITIVE, wire);
+        device.attachTerminal(OUTPUT_POSITIVE, wire);
     }
 
-    /**
-     * Detaches the output-positive terminal from a wire.
-     *
-     * @param wire the wire
-     */
     public void detachOutputPositive(Wire wire) {
-        detachTerminal(TERMINAL_OUTPUT_POSITIVE, wire);
+        device.detachTerminal(OUTPUT_POSITIVE, wire);
     }
 
-    /**
-     * Attaches the output-negative terminal to a wire.
-     *
-     * @param wire the wire
-     */
     public void attachOutputNegative(Wire wire) {
-        attachTerminal(TERMINAL_OUTPUT_NEGATIVE, wire);
+        device.attachTerminal(OUTPUT_NEGATIVE, wire);
     }
 
-    /**
-     * Detaches the output-negative terminal from a wire.
-     *
-     * @param wire the wire
-     */
     public void detachOutputNegative(Wire wire) {
-        detachTerminal(TERMINAL_OUTPUT_NEGATIVE, wire);
+        device.detachTerminal(OUTPUT_NEGATIVE, wire);
     }
 
-    /**
-     * Attaches the control terminal to a wire.
-     *
-     * <p>The control voltage uses the output-negative terminal as its
-     * reference.</p>
-     *
-     * @param wire the wire
-     */
     public void attachControl(Wire wire) {
-        attachTerminal(TERMINAL_CONTROL, wire);
+        device.attachTerminal(CONTROL, wire);
     }
 
-    /**
-     * Detaches the control terminal from a wire.
-     *
-     * @param wire the wire
-     */
     public void detachControl(Wire wire) {
-        detachTerminal(TERMINAL_CONTROL, wire);
+        device.detachTerminal(CONTROL, wire);
     }
 
     /**
@@ -173,13 +162,12 @@ public final class VoltageControlledConductance extends Device {
      * output-negative voltage.</p>
      *
      * @param listener the observation listener
-     *
      * @return the observation subscription
      */
     public ObservationSubscription observeOutputVoltage(
-        ObservationListener listener
+            ObservationListener listener
     ) {
-        return observe(OBSERVER_OUTPUT_VOLTAGE, listener);
+        return device.observe(OUTPUT_VOLTAGE, listener);
     }
 
     /**
@@ -189,13 +177,12 @@ public final class VoltageControlledConductance extends Device {
      * output-negative-terminal voltage.</p>
      *
      * @param listener the observation listener
-     *
      * @return the observation subscription
      */
     public ObservationSubscription observeControlVoltage(
-        ObservationListener listener
+            ObservationListener listener
     ) {
-        return observe(OBSERVER_CONTROL_VOLTAGE, listener);
+        return device.observe(CONTROL_VOLTAGE, listener);
     }
 
     /**
@@ -205,12 +192,11 @@ public final class VoltageControlledConductance extends Device {
      * output-negative.</p>
      *
      * @param listener the observation listener
-     *
      * @return the observation subscription
      */
     public ObservationSubscription observeOutputCurrent(
-        ObservationListener listener
+            ObservationListener listener
     ) {
-        return observe(OBSERVER_OUTPUT_CURRENT, listener);
+        return device.observe(OUTPUT_CURRENT, listener);
     }
 }

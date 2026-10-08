@@ -14,6 +14,7 @@ pub const DEFINITION_COMMAND_ADD_PARAMETER: u16 = 3;
 pub const DEFINITION_COMMAND_ADD_ELEMENT: u16 = 4;
 pub const DEFINITION_COMMAND_ADD_VOLTAGE_OBSERVER: u16 = 5;
 pub const DEFINITION_COMMAND_ADD_CHILD_OBSERVER: u16 = 6;
+pub const DEFINITION_COMMAND_ADD_GROUND_NODE: u16 = 7;
 
 pub const DEFINITION_VALUE_LITERAL: u8 = 0;
 pub const DEFINITION_VALUE_PARAMETER: u8 = 1;
@@ -219,6 +220,12 @@ pub fn decode_definition_buffer(
                 require_empty_payload(payload, command_index, command_offset)?;
                 builder
                     .add_node()
+                    .map_err(|error| map_builder_error(error, command_index, command_offset))?;
+            }
+            DEFINITION_COMMAND_ADD_GROUND_NODE => {
+                require_empty_payload(payload, command_index, command_offset)?;
+                builder
+                    .add_ground_node()
                     .map_err(|error| map_builder_error(error, command_index, command_offset))?;
             }
             DEFINITION_COMMAND_ADD_PARAMETER => {
@@ -620,6 +627,69 @@ fn truncated_header(error: Truncated) -> DefinitionRegistrationError {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn ground_command_registers_mixed_node_order_without_new_terminals() {
+        let mut engine = Engine::new(hynergy_engine::EngineConfig::new(1));
+        let mut commands = vec![
+            command(DEFINITION_COMMAND_ADD_TERMINAL, &[]),
+            command(DEFINITION_COMMAND_ADD_NODE, &[]),
+            command(DEFINITION_COMMAND_ADD_GROUND_NODE, &[]),
+            command(DEFINITION_COMMAND_ADD_TERMINAL, &[]),
+            command(DEFINITION_COMMAND_ADD_GROUND_NODE, &[]),
+        ];
+        for pair in [[0, 1], [1, 2], [3, 4]] {
+            commands.push(command(
+                DEFINITION_COMMAND_ADD_ELEMENT,
+                &element_payload(
+                    PrimitiveElementKind::Resistance as u32 + 1,
+                    &pair,
+                    &[TestValue::Literal(1000.0)],
+                ),
+            ));
+        }
+        let id = register_definition_buffer(&mut engine, &definition_buffer(&commands)).unwrap();
+        let definition = engine.definitions().get(id).unwrap();
+        assert_eq!(definition.terminals(), &[NodeId::new(0), NodeId::new(3)]);
+        assert_eq!(definition.ground_nodes(), &[NodeId::new(2), NodeId::new(4)]);
+        assert_eq!(definition.partition_count(), 2);
+    }
+
+    #[test]
+    fn ground_command_preserves_unused_node_and_payload_validation() {
+        let definitions = DefinitionRegistry::new();
+        for (bytes, expected) in [
+            (
+                definition_buffer(&[command(DEFINITION_COMMAND_ADD_GROUND_NODE, &[])]),
+                DefinitionRegistrationErrorKind::UnusedInternalNode,
+            ),
+            (
+                definition_buffer(&[command(DEFINITION_COMMAND_ADD_GROUND_NODE, &[0])]),
+                DefinitionRegistrationErrorKind::InvalidCommandLength,
+            ),
+            (
+                definition_buffer(&[framed_command(DEFINITION_COMMAND_ADD_GROUND_NODE, 1, &[])]),
+                DefinitionRegistrationErrorKind::TruncatedInput,
+            ),
+        ] {
+            assert_eq!(
+                decode_definition_buffer(&definitions, &bytes)
+                    .unwrap_err()
+                    .kind(),
+                expected
+            );
+        }
+        let complete = command(DEFINITION_COMMAND_ADD_GROUND_NODE, &[]);
+        for length in 0..complete.len() {
+            let bytes = definition_buffer(&[complete[..length].to_vec()]);
+            assert_eq!(
+                decode_definition_buffer(&definitions, &bytes)
+                    .unwrap_err()
+                    .kind(),
+                DefinitionRegistrationErrorKind::TruncatedInput
+            );
+        }
+    }
     use hynergy_model::device::definition::DefinitionObserverSource;
     use hynergy_model::device::definition::DevicePartitionId;
     use hynergy_model::device::definition::ObserverQuantity;
