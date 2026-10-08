@@ -95,13 +95,6 @@ public final class ElectricityModule extends HynergyModule {
                         DeviceComponent.CODEC
                 );
 
-        ComponentType<ChunkStore, LightbulbComponent> lightbulbComponentType =
-                chunkStoreRegistry.registerComponent(
-                        LightbulbComponent.class,
-                        "HynergyLightbulb",
-                        LightbulbComponent.CODEC
-                );
-
         wireBlockPortDefinitions =
                 new WireBlockPortDefinitions(
                         portModule,
@@ -216,7 +209,7 @@ public final class ElectricityModule extends HynergyModule {
                         >>) event -> rebuildBlockDefinitions()
         );
 
-        registerSystems(runtime, wireComponentType, deviceComponentType, lightbulbComponentType);
+        registerSystems(runtime, wireComponentType, deviceComponentType);
     }
 
     private void registerPortProtocols() {
@@ -232,8 +225,7 @@ public final class ElectricityModule extends HynergyModule {
     private void registerSystems(
             ElectricalRuntime runtime,
             ComponentType<ChunkStore, WireComponent> wireComponentType,
-            ComponentType<ChunkStore, DeviceComponent> deviceComponentType,
-            ComponentType<ChunkStore, LightbulbComponent> lightbulbComponentType
+            ComponentType<ChunkStore, DeviceComponent> deviceComponentType
     ) {
         ResourceType<ChunkStore, ElectricalSystemResource> resourceType =
                 chunkStoreRegistry.registerResource(
@@ -269,13 +261,7 @@ public final class ElectricityModule extends HynergyModule {
         );
 
         chunkStoreRegistry.registerSystem(
-                new LightbulbSystem(deviceComponentType, lightbulbComponentType)
-        );
-        chunkStoreRegistry.registerSystem(
                 new ElectricalTickSystem(runtime, resourceType)
-        );
-        chunkStoreRegistry.registerSystem(
-                new LightbulbSystem.Visuals(deviceComponentType, lightbulbComponentType)
         );
     }
 
