@@ -1,7 +1,10 @@
 package dev.hynergy.core.electricity.device;
 
 import dev.hynergy.core.electricity.ElectricalCodecs;
-import dev.hynergy.core.port.BlockPortDefinition;
+import dev.hynergy.core.electricity.device.config.CompiledDeviceConfig;
+import dev.hynergy.core.electricity.device.runtime.DeviceComponent;
+import dev.hynergy.core.electricity.device.runtime.ElectricalDeviceSystem;
+import dev.hynergy.core.port.layout.BlockPortDefinition;
 import dev.hynergy.electrical.*;
 import dev.hynergy.electrical.primitives.sources.VoltageSource;
 import org.bson.BsonValue;

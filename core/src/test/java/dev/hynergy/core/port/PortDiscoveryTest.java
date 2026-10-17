@@ -1,6 +1,11 @@
 package dev.hynergy.core.port;
 
 import com.hypixel.hytale.server.core.asset.type.blocktype.config.RotationTuple;
+import dev.hynergy.core.port.layout.BlockPortDefinition;
+import dev.hynergy.core.port.layout.PortDefinition;
+import dev.hynergy.core.port.layout.PortOffset;
+import dev.hynergy.core.port.layout.PortReach;
+import dev.hynergy.core.port.world.PortWorldView;
 import org.jspecify.annotations.Nullable;
 import org.junit.jupiter.api.Test;
 

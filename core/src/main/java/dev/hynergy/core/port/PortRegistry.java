@@ -1,6 +1,8 @@
 package dev.hynergy.core.port;
 
+import dev.hynergy.core.port.connection.PortResolver;
 import it.unimi.dsi.fastutil.objects.Object2ObjectLinkedOpenHashMap;
+import org.jspecify.annotations.Nullable;
 
 import java.util.IdentityHashMap;
 import java.util.Map;
@@ -11,7 +13,7 @@ final class PortRegistry {
     private final Map<String, PortStandard<?, ?>> standards = new Object2ObjectLinkedOpenHashMap<>();
     private final Map<StandardPair, Rule<?, ?, ?>> rules = new Object2ObjectLinkedOpenHashMap<>();
 
-    private Map<PortStandard<?, ?>, Map<PortStandard<?, ?>, RuleSide<?, ?, ?>>> ruleSidesByPair;
+    private @Nullable Map<PortStandard<?, ?>, Map<PortStandard<?, ?>, RuleSide<?, ?, ?>>> ruleSidesByPair;
     private boolean frozen;
 
     <R> PortDomain<R> registerDomain(String id) {
@@ -106,7 +108,7 @@ final class PortRegistry {
                 .put(target, side);
     }
 
-    RuleSide<?, ?, ?> ruleSide(PortStandard<?, ?> source, PortStandard<?, ?> target) {
+    @Nullable RuleSide<?, ?, ?> ruleSide(PortStandard<?, ?> source, PortStandard<?, ?> target) {
         if (!frozen) {
             throw new IllegalStateException("Port registry must be frozen before discovery");
         }

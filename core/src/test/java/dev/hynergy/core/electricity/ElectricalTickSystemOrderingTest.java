@@ -5,7 +5,8 @@ import com.hypixel.hytale.component.dependency.Order;
 import com.hypixel.hytale.component.dependency.SystemDependency;
 import com.hypixel.hytale.server.core.universe.world.storage.ChunkStore;
 import dev.hynergy.core.electricity.cable.CableSystem;
-import dev.hynergy.core.electricity.device.ElectricalDeviceSystem;
+import dev.hynergy.core.electricity.device.runtime.ElectricalDeviceSystem;
+import dev.hynergy.core.electricity.system.ElectricalTickSystem;
 import org.junit.jupiter.api.Test;
 
 import java.util.Set;

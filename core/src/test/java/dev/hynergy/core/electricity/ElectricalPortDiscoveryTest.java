@@ -2,7 +2,17 @@ package dev.hynergy.core.electricity;
 
 import com.hypixel.hytale.server.core.asset.type.blocktype.config.Rotation;
 import com.hypixel.hytale.server.core.asset.type.blocktype.config.RotationTuple;
-import dev.hynergy.core.port.*;
+import dev.hynergy.core.electricity.port.ElectricalPortConnection;
+import dev.hynergy.core.electricity.port.ElectricalPortProfile;
+import dev.hynergy.core.port.PortDomain;
+import dev.hynergy.core.port.PortModule;
+import dev.hynergy.core.port.PortModuleTestAccess;
+import dev.hynergy.core.port.PortStandard;
+import dev.hynergy.core.port.layout.BlockPortDefinition;
+import dev.hynergy.core.port.layout.PortDefinition;
+import dev.hynergy.core.port.layout.PortOffset;
+import dev.hynergy.core.port.layout.PortReach;
+import dev.hynergy.core.port.world.PortWorldView;
 import org.joml.Vector3i;
 import org.jspecify.annotations.Nullable;
 import org.junit.jupiter.api.Test;
@@ -203,7 +213,7 @@ final class ElectricalPortDiscoveryTest {
                 "test:electrical/conductor",
                 domain,
                 ElectricalPortProfile.class,
-                ElectricityModule::resolveConductorConnection
+                ElectricityPlugin::resolveConductorConnection
         );
     }
 

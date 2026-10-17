@@ -1,9 +1,23 @@
 package dev.hynergy.core.electricity.device;
 
 import com.hypixel.hytale.server.core.asset.type.blocktype.config.RotationTuple;
-import dev.hynergy.core.electricity.ElectricalPortConnection;
-import dev.hynergy.core.electricity.ElectricalPortProfile;
-import dev.hynergy.core.port.*;
+import dev.hynergy.core.electricity.device.config.CompiledDeviceConfig;
+import dev.hynergy.core.electricity.device.config.DeviceConfig;
+import dev.hynergy.core.electricity.device.config.DeviceParameterConfig;
+import dev.hynergy.core.electricity.device.config.DevicePortConfig;
+import dev.hynergy.core.electricity.device.runtime.DeviceComponent;
+import dev.hynergy.core.electricity.device.runtime.DeviceWireConnections;
+import dev.hynergy.core.electricity.device.runtime.ElectricalDeviceSystem;
+import dev.hynergy.core.electricity.port.ElectricalPortConnection;
+import dev.hynergy.core.electricity.port.ElectricalPortProfile;
+import dev.hynergy.core.port.PortDomain;
+import dev.hynergy.core.port.PortModule;
+import dev.hynergy.core.port.PortModuleTestAccess;
+import dev.hynergy.core.port.layout.BlockPortDefinition;
+import dev.hynergy.core.port.layout.PortDefinition;
+import dev.hynergy.core.port.layout.PortOffset;
+import dev.hynergy.core.port.layout.PortReach;
+import dev.hynergy.core.port.world.PortWorldView;
 import dev.hynergy.electrical.*;
 import dev.hynergy.electrical.primitives.passive.Resistance;
 import dev.hynergy.electrical.primitives.sources.VoltageSource;
@@ -16,9 +30,12 @@ import static org.junit.jupiter.api.Assertions.*;
 
 final class DeviceWireConnectionsTest {
     private static final DeviceType TYPE = DeviceTestTypes.resistor(4, 4, 1, 1);
+
     private static ElectricalSystem prepareSystem(ElectricalRuntime runtime) {
-        runtime.register(TYPE); return runtime.createSystem(20);
+        runtime.register(TYPE);
+        return runtime.createSystem(20);
     }
+
     @Test
     void deviceFirstDiscoveryMapsTargetPortToNativeTerminal() {
         try (Fixture fixture = new Fixture()) {

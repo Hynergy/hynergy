@@ -4,6 +4,7 @@ import com.hypixel.hytale.codec.ExtraInfo;
 import com.hypixel.hytale.codec.exception.CodecValidationException;
 import com.hypixel.hytale.codec.schema.SchemaContext;
 import com.hypixel.hytale.codec.schema.metadata.ui.UIEditor;
+import dev.hynergy.core.electricity.device.config.DeviceConfig;
 import dev.hynergy.electrical.primitives.passive.Resistance;
 import org.bson.BsonDocument;
 import org.junit.jupiter.api.Test;
@@ -12,8 +13,17 @@ import static org.junit.jupiter.api.Assertions.*;
 
 final class DeviceConfigCodecTest {
     private dev.hynergy.electrical.ElectricalRuntime runtime;
-    @org.junit.jupiter.api.BeforeEach void setupRuntime() { runtime = dev.hynergy.electrical.ElectricalRuntime.create(); }
-    @org.junit.jupiter.api.AfterEach void closeRuntime() { runtime.close(); }
+
+    @org.junit.jupiter.api.BeforeEach
+    void setupRuntime() {
+        runtime = dev.hynergy.electrical.ElectricalRuntime.create();
+    }
+
+    @org.junit.jupiter.api.AfterEach
+    void closeRuntime() {
+        runtime.close();
+    }
+
     @Test
     void decodingRejectsUnknownTypesEvenWithoutADeviceBlock() {
         var codec = DeviceConfig.createCodec(new DeviceRegistry(runtime));

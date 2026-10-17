@@ -1,17 +1,20 @@
 package dev.hynergy.core.port;
 
+import dev.hynergy.core.port.layout.BlockPortDefinition;
+import org.jspecify.annotations.Nullable;
+
 import java.util.Objects;
 import java.util.concurrent.atomic.AtomicReferenceArray;
 
 final class RuntimePortDefinitions {
-    private volatile AtomicReferenceArray<BlockPortDefinition> definitions = new AtomicReferenceArray<>(16);
+    private volatile AtomicReferenceArray<@Nullable BlockPortDefinition> definitions = new AtomicReferenceArray<>(16);
 
-    BlockPortDefinition get(int blockTypeId) {
+    @Nullable BlockPortDefinition get(int blockTypeId) {
         if (blockTypeId < 0) {
             return null;
         }
-        
-        AtomicReferenceArray<BlockPortDefinition> current = definitions;
+
+        AtomicReferenceArray<@Nullable BlockPortDefinition> current = definitions;
 
         return blockTypeId < current.length() ? current.get(blockTypeId) : null;
     }
@@ -23,7 +26,7 @@ final class RuntimePortDefinitions {
 
         Objects.requireNonNull(definition, "definition");
 
-        AtomicReferenceArray<BlockPortDefinition> current = definitions;
+        AtomicReferenceArray<@Nullable BlockPortDefinition> current = definitions;
         if (blockTypeId >= current.length()) {
             int newLength = current.length();
 
@@ -31,7 +34,7 @@ final class RuntimePortDefinitions {
                 newLength = Math.multiplyExact(newLength, 2);
             }
 
-            AtomicReferenceArray<BlockPortDefinition> grown = new AtomicReferenceArray<>(newLength);
+            AtomicReferenceArray<@Nullable BlockPortDefinition> grown = new AtomicReferenceArray<>(newLength);
             for (int index = 0; index < current.length(); index++) {
                 grown.set(index, current.get(index));
             }
@@ -47,7 +50,7 @@ final class RuntimePortDefinitions {
             throw new IllegalArgumentException("blockTypeId must be non-negative");
         }
 
-        AtomicReferenceArray<BlockPortDefinition> current = definitions;
+        AtomicReferenceArray<@Nullable BlockPortDefinition> current = definitions;
         if (blockTypeId < current.length()) {
             current.set(blockTypeId, null);
         }

@@ -1,6 +1,10 @@
 package dev.hynergy.core.electricity.device;
 
-import dev.hynergy.core.port.BlockPortDefinition;
+import dev.hynergy.core.electricity.device.config.CompiledDeviceConfig;
+import dev.hynergy.core.electricity.device.runtime.DeviceComponent;
+import dev.hynergy.core.electricity.device.runtime.DeviceWireConnections;
+import dev.hynergy.core.electricity.device.runtime.ElectricalDeviceSystem;
+import dev.hynergy.core.port.layout.BlockPortDefinition;
 import dev.hynergy.electrical.*;
 import org.junit.jupiter.api.Test;
 

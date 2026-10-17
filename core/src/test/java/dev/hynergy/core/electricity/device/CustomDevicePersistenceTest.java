@@ -1,8 +1,15 @@
 package dev.hynergy.core.electricity.device;
 
-import dev.hynergy.core.electricity.ElectricalPortConnection;
-import dev.hynergy.core.electricity.ElectricalPortProfile;
+import dev.hynergy.core.electricity.device.config.CompiledDeviceConfig;
+import dev.hynergy.core.electricity.device.config.DeviceConfig;
+import dev.hynergy.core.electricity.device.config.DeviceParameterConfig;
+import dev.hynergy.core.electricity.device.config.DevicePortConfig;
+import dev.hynergy.core.electricity.device.runtime.DeviceComponent;
+import dev.hynergy.core.electricity.device.runtime.ElectricalDeviceSystem;
+import dev.hynergy.core.electricity.port.ElectricalPortConnection;
+import dev.hynergy.core.electricity.port.ElectricalPortProfile;
 import dev.hynergy.core.port.PortModule;
+import dev.hynergy.core.port.layout.BlockPortDefinition;
 import dev.hynergy.electrical.*;
 import dev.hynergy.electrical.primitives.passive.Resistance;
 import dev.hynergy.electrical.primitives.sources.VoltageSource;
@@ -15,51 +22,69 @@ import java.util.concurrent.atomic.AtomicInteger;
 import static org.junit.jupiter.api.Assertions.*;
 
 final class CustomDevicePersistenceTest {
-    @Test void invalidLaterPersistedOverrideLeavesRetainedParametersAndTopologyIntact() {
+    @Test
+    void invalidLaterPersistedOverrideLeavesRetainedParametersAndTopologyIntact() {
         var type = DeviceType.define(b -> {
-            var p = b.terminal(2, "positive"); var n = b.terminal(5, "negative");
+            var p = b.terminal(2, "positive");
+            var n = b.terminal(5, "negative");
             var first = b.parameter(4, "first", ParameterConstraints.positiveFinite());
             var second = b.parameter(8, "second", ParameterConstraints.positiveFinite());
             var observed = b.element(Resistance.TYPE, e -> {
-                e.connect(Resistance.POSITIVE, p); e.connect(Resistance.NEGATIVE, n); e.bind(Resistance.RESISTANCE, first);
+                e.connect(Resistance.POSITIVE, p);
+                e.connect(Resistance.NEGATIVE, n);
+                e.bind(Resistance.RESISTANCE, first);
             });
             b.element(Resistance.TYPE, e -> {
-                e.connect(Resistance.POSITIVE, p); e.connect(Resistance.NEGATIVE, n); e.bind(Resistance.RESISTANCE, second);
+                e.connect(Resistance.POSITIVE, p);
+                e.connect(Resistance.NEGATIVE, n);
+                e.bind(Resistance.RESISTANCE, second);
             });
             b.childObserver(6, "current", observed, Resistance.CURRENT);
         });
         try (var runtime = ElectricalRuntime.create()) {
             var registry = new DeviceRegistry(runtime);
             var registration = registry.register("test:pair", type);
-            assertThrows(IllegalArgumentException.class, () -> registration.binding().validateParameter(type.parameter(8), 0));
+            assertThrows(IllegalArgumentException.class, () -> registration.binding()
+                                                                           .validateParameter(type.parameter(8), 0));
             var compiled = new CompiledDeviceConfig(registration, java.util.List.of(
-                new CompiledDeviceConfig.ParameterBinding(type.parameter(4), 20),
-                new CompiledDeviceConfig.ParameterBinding(type.parameter(8), 20)),
-                java.util.List.of(), dev.hynergy.core.port.BlockPortDefinition.of());
+                    new CompiledDeviceConfig.ParameterBinding(type.parameter(4), 20),
+                    new CompiledDeviceConfig.ParameterBinding(type.parameter(8), 20)),
+                    java.util.List.of(), BlockPortDefinition.of());
             try (var system = runtime.createSystem(20)) {
                 var component = new DeviceComponent("test:pair");
-                ElectricalDeviceSystem.bindDevice(component, compiled, system, () -> {});
-                var retained = component.device(); assertNotNull(retained);
+                ElectricalDeviceSystem.bindDevice(component, compiled, system, () -> {
+                });
+                var retained = component.device();
+                assertNotNull(retained);
                 var source = VoltageSource.create(system, 5);
-                var p = system.createWire(); var n = system.createWire();
-                source.attachPositive(p); source.attachNegative(n);
-                retained.attachTerminal(type.terminal(2), p); retained.attachTerminal(type.terminal(5), n);
+                var p = system.createWire();
+                var n = system.createWire();
+                source.attachPositive(p);
+                source.attachNegative(n);
+                retained.attachTerminal(type.terminal(2), p);
+                retained.attachTerminal(type.terminal(5), n);
                 var currents = new ArrayList<Double>();
                 component.observe(6, (status, value) -> currents.add(value));
-                system.tick(); assertEquals(0.25, currents.getLast(), 1e-9);
+                system.tick();
+                assertEquals(0.25, currents.getLast(), 1e-9);
                 var serialized = DeviceComponent.CODEC.decode(DeviceComponent.CODEC.encode(component));
-                serialized.overrides().set(4, 40); serialized.overrides().set(8, 0);
+                serialized.overrides().set(4, 40);
+                serialized.overrides().set(8, 0);
                 ElectricalDeviceSystem.unloadDevice(component);
                 var saves = new AtomicInteger();
                 assertThrows(IllegalArgumentException.class, () -> ElectricalDeviceSystem.bindDevice(serialized, compiled, system, saves::incrementAndGet));
-                assertNull(serialized.device()); assertEquals(retained.id(), serialized.getDeviceId());
+                assertNull(serialized.device());
+                assertEquals(retained.id(), serialized.getDeviceId());
                 assertEquals(40, serialized.overrides().getOrDefault(4, -1));
-                assertEquals(0, serialized.overrides().getOrDefault(8, -1)); assertEquals(0, saves.get());
-                system.tick(); assertEquals(0.25, currents.getLast(), 1e-9);
+                assertEquals(0, serialized.overrides().getOrDefault(8, -1));
+                assertEquals(0, saves.get());
+                system.tick();
+                assertEquals(0.25, currents.getLast(), 1e-9);
                 assertEquals(source.id().value() + 1, system.create(type).id().value());
             }
         }
     }
+
     @Test
     void customAssetUsesGenericHandlesAndRestoresOverridesAndRetainedConnections() {
         DeviceType type = DeviceType.define(builder -> {
@@ -68,15 +93,21 @@ final class CustomDevicePersistenceTest {
             var ground = builder.ground();
             var n = builder.terminal(5, "negative");
             var r = builder.parameter(4, "resistance", new ParameterConstraints(
-                ParameterConstraints.Bound.inclusive(10), ParameterConstraints.Bound.exclusive(100), true, false, null, null));
+                    ParameterConstraints.Bound.inclusive(10), ParameterConstraints.Bound.exclusive(100), true, false, null, null));
             var child = builder.element(Resistance.TYPE, e -> {
-                e.bind(Resistance.RESISTANCE, r); e.connect(Resistance.NEGATIVE, middle); e.connect(Resistance.POSITIVE, p);
+                e.bind(Resistance.RESISTANCE, r);
+                e.connect(Resistance.NEGATIVE, middle);
+                e.connect(Resistance.POSITIVE, p);
             });
             builder.element(VoltageSource.TYPE, e -> {
-                e.literal(VoltageSource.VOLTAGE, 0); e.connect(VoltageSource.NEGATIVE, n); e.connect(VoltageSource.POSITIVE, middle);
+                e.literal(VoltageSource.VOLTAGE, 0);
+                e.connect(VoltageSource.NEGATIVE, n);
+                e.connect(VoltageSource.POSITIVE, middle);
             });
             builder.element(VoltageSource.TYPE, e -> {
-                e.connect(VoltageSource.NEGATIVE, ground); e.connect(VoltageSource.POSITIVE, n); e.literal(VoltageSource.VOLTAGE, 0);
+                e.connect(VoltageSource.NEGATIVE, ground);
+                e.connect(VoltageSource.POSITIVE, n);
+                e.literal(VoltageSource.VOLTAGE, 0);
             });
             builder.childObserver(6, "current", child, Resistance.CURRENT);
         });

@@ -1,5 +1,7 @@
 package dev.hynergy.core.electricity.device;
 
+import dev.hynergy.core.electricity.device.runtime.DeviceParameterOverride;
+import dev.hynergy.core.electricity.device.runtime.ParameterOverrides;
 import org.junit.jupiter.api.Test;
 
 import static org.junit.jupiter.api.Assertions.*;

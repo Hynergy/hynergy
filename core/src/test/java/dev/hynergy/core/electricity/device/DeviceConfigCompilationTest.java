@@ -1,11 +1,15 @@
 package dev.hynergy.core.electricity.device;
 
-import dev.hynergy.core.electricity.ElectricalPortConnection;
-import dev.hynergy.core.electricity.ElectricalPortProfile;
-import dev.hynergy.core.port.BlockPortDefinition;
+import dev.hynergy.core.electricity.device.config.CompiledDeviceConfig;
+import dev.hynergy.core.electricity.device.config.DeviceConfig;
+import dev.hynergy.core.electricity.device.config.DeviceParameterConfig;
+import dev.hynergy.core.electricity.device.config.DevicePortConfig;
+import dev.hynergy.core.electricity.port.ElectricalPortConnection;
+import dev.hynergy.core.electricity.port.ElectricalPortProfile;
 import dev.hynergy.core.port.PortModule;
-import dev.hynergy.core.port.PortOffset;
 import dev.hynergy.core.port.PortStandard;
+import dev.hynergy.core.port.layout.BlockPortDefinition;
+import dev.hynergy.core.port.layout.PortOffset;
 import dev.hynergy.electrical.DeviceType;
 import dev.hynergy.electrical.ElectricalRuntime;
 import dev.hynergy.electrical.ParameterConstraints;

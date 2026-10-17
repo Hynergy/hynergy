@@ -8,4 +8,8 @@
  * <p>The caller owns connection state. The caller must check stored results
  * again after a relevant change to the world or a port layout.</p>
  */
+@NullMarked
+
 package dev.hynergy.core.port;
+
+import org.jspecify.annotations.NullMarked;

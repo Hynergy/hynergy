@@ -1,7 +1,8 @@
 package dev.hynergy.core.electricity.device;
 
-import dev.hynergy.core.electricity.ElectricalPortConnection;
-import dev.hynergy.core.electricity.ElectricalPortProfile;
+import dev.hynergy.core.electricity.device.config.*;
+import dev.hynergy.core.electricity.port.ElectricalPortConnection;
+import dev.hynergy.core.electricity.port.ElectricalPortProfile;
 import dev.hynergy.core.port.PortDomain;
 import dev.hynergy.core.port.PortModule;
 import dev.hynergy.core.port.PortStandard;

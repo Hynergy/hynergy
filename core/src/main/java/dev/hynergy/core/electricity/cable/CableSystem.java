@@ -9,17 +9,20 @@ import com.hypixel.hytale.server.core.universe.world.World;
 import com.hypixel.hytale.server.core.universe.world.chunk.section.BlockSection;
 import com.hypixel.hytale.server.core.universe.world.chunk.section.ChunkSection;
 import com.hypixel.hytale.server.core.universe.world.storage.ChunkStore;
-import dev.hynergy.core.electricity.ElectricalPortConnection;
-import dev.hynergy.core.electricity.ElectricalSystemResource;
-import dev.hynergy.core.electricity.device.DeviceComponent;
-import dev.hynergy.core.electricity.device.DeviceWireConnections;
-import dev.hynergy.core.port.*;
+import dev.hynergy.core.electricity.device.runtime.DeviceComponent;
+import dev.hynergy.core.electricity.device.runtime.DeviceWireConnections;
+import dev.hynergy.core.electricity.port.ElectricalPortConnection;
+import dev.hynergy.core.electricity.system.ElectricalSystemResource;
+import dev.hynergy.core.port.PortDomain;
+import dev.hynergy.core.port.PortService;
+import dev.hynergy.core.port.connection.PortConnectionConsumer;
+import dev.hynergy.core.port.layout.BlockPortDefinition;
+import dev.hynergy.core.port.world.HytalePortWorldView;
 import dev.hynergy.electrical.ElectricalRuntime;
 import dev.hynergy.electrical.ElectricalSystem;
 import dev.hynergy.electrical.Wire;
 import dev.hynergy.electrical.WireId;
 import it.unimi.dsi.fastutil.longs.LongOpenHashSet;
-import org.jspecify.annotations.NonNull;
 
 public final class CableSystem extends RefSystem<ChunkStore> {
 
@@ -27,7 +30,7 @@ public final class CableSystem extends RefSystem<ChunkStore> {
     private final ResourceType<ChunkStore, ElectricalSystemResource> electricalSystemResourceType;
     private final ComponentType<ChunkStore, CableComponent> wireComponentType;
     private final ComponentType<ChunkStore, DeviceComponent> deviceComponentType;
-    private final PortModule portModule;
+    private final PortService portService;
     private final PortDomain<ElectricalPortConnection> electricalPortDomain;
     private final Query<ChunkStore> query;
 
@@ -48,7 +51,7 @@ public final class CableSystem extends RefSystem<ChunkStore> {
                     CableComponent
                     > wireComponentType,
             ComponentType<ChunkStore, DeviceComponent> deviceComponentType,
-            PortModule portModule,
+            PortService portService,
             PortDomain<
                     ElectricalPortConnection
                     > electricalPortDomain
@@ -58,7 +61,7 @@ public final class CableSystem extends RefSystem<ChunkStore> {
                 electricalSystemResourceType;
         this.wireComponentType = wireComponentType;
         this.deviceComponentType = deviceComponentType;
-        this.portModule = portModule;
+        this.portService = portService;
         this.electricalPortDomain = electricalPortDomain;
 
         this.query = Query.and(
@@ -69,8 +72,8 @@ public final class CableSystem extends RefSystem<ChunkStore> {
 
     @Override
     public void onEntityAdded(
-            @NonNull Ref<ChunkStore> ref,
-            @NonNull AddReason reason,
+            Ref<ChunkStore> ref,
+            AddReason reason,
             Store<ChunkStore> store,
             CommandBuffer<ChunkStore> commandBuffer
     ) {
@@ -132,8 +135,8 @@ public final class CableSystem extends RefSystem<ChunkStore> {
 
     @Override
     public void onEntityRemove(
-            @NonNull Ref<ChunkStore> ref,
-            @NonNull RemoveReason reason,
+            Ref<ChunkStore> ref,
+            RemoveReason reason,
             Store<ChunkStore> store,
             CommandBuffer<ChunkStore> commandBuffer
     ) {
@@ -242,7 +245,7 @@ public final class CableSystem extends RefSystem<ChunkStore> {
                 blockSection.get(localX, localY, localZ);
 
         BlockPortDefinition definition =
-                portModule.blockPorts(blockTypeIndex);
+                portService.blockPorts(blockTypeIndex);
 
         if (definition == null) {
             throw new IllegalStateException(
@@ -256,7 +259,7 @@ public final class CableSystem extends RefSystem<ChunkStore> {
         World world = chunkStore.getWorld();
 
         HytalePortWorldView worldView =
-                new HytalePortWorldView(world, portModule::blockPorts);
+                new HytalePortWorldView(world, portService::blockPorts);
 
         ConnectionScratch scratch = connectionScratch.get();
         LongOpenHashSet connectedWires = scratch.connectedWires;
@@ -272,7 +275,7 @@ public final class CableSystem extends RefSystem<ChunkStore> {
                         targetZ,
                         targetPortId,
                         connection,
-                        sourceIsResolverFirst
+                        _
                 ) -> {
                     if (connection != ElectricalPortConnection.DIRECT) {
                         return;
@@ -323,7 +326,7 @@ public final class CableSystem extends RefSystem<ChunkStore> {
                 };
 
         try {
-            var discovery = portModule.discovery();
+            var discovery = portService.discovery();
 
             for (int index = 0;
                  index < definition.size();
