@@ -1,6 +1,12 @@
 package dev.hynergy.core.port;
 
 import com.hypixel.hytale.server.core.asset.type.blocktype.config.RotationTuple;
+import dev.hynergy.core.port.connection.PortGeometry;
+import dev.hynergy.core.port.layout.BlockPortDefinition;
+import dev.hynergy.core.port.layout.PortDefinition;
+import dev.hynergy.core.port.layout.PortOffset;
+import dev.hynergy.core.port.layout.PortReach;
+import dev.hynergy.core.port.world.PortWorldView;
 import org.joml.Vector3i;
 import org.jspecify.annotations.Nullable;
 import org.junit.jupiter.api.Test;
@@ -89,11 +95,11 @@ final class MechanicalDiscoveryShapeTest {
     }
 
     private static final class Fixture {
-        final PortModule module;
+        final PortService module;
         final PortDomain<MechanicalRelation> domain;
         final TestWorld world;
 
-        private Fixture(PortModule module, PortDomain<MechanicalRelation> domain) {
+        private Fixture(PortService module, PortDomain<MechanicalRelation> domain) {
             this.module = module;
             this.world = new TestWorld(module);
             this.domain = domain;
@@ -102,7 +108,7 @@ final class MechanicalDiscoveryShapeTest {
         }
 
         static Fixture create(GearProfile source, GearProfile target) {
-            PortModule module = new PortModule();
+            PortService module = new PortService();
             PortDomain<MechanicalRelation> domain = module.registerDomain("test:mechanical");
             PortStandard<GearProfile, MechanicalRelation> standard = module.registerStandard(
                     "test:spur-gear",
@@ -110,7 +116,7 @@ final class MechanicalDiscoveryShapeTest {
                     GearProfile.class,
                     MechanicalDiscoveryShapeTest::resolve
             );
-            PortModuleTestAccess.freeze(module);
+            PortServiceTestAccess.freeze(module);
             PortReach diagonal = PortReach.of(
                     new PortOffset(1, 1, 0), new PortOffset(1, -1, 0),
                     new PortOffset(-1, 1, 0), new PortOffset(-1, -1, 0)
@@ -135,11 +141,11 @@ final class MechanicalDiscoveryShapeTest {
     }
 
     private static final class TestWorld implements PortWorldView {
-        private final PortModule module;
+        private final PortService module;
 
         private final Map<Position, Integer> blocks = new HashMap<>();
 
-        TestWorld(PortModule module) {
+        TestWorld(PortService module) {
             this.module = module;
         }
 

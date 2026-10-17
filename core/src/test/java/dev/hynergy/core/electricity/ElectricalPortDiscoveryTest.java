@@ -2,7 +2,17 @@ package dev.hynergy.core.electricity;
 
 import com.hypixel.hytale.server.core.asset.type.blocktype.config.Rotation;
 import com.hypixel.hytale.server.core.asset.type.blocktype.config.RotationTuple;
-import dev.hynergy.core.port.*;
+import dev.hynergy.core.electricity.port.ElectricalPortConnection;
+import dev.hynergy.core.electricity.port.ElectricalPortProfile;
+import dev.hynergy.core.port.PortDomain;
+import dev.hynergy.core.port.PortService;
+import dev.hynergy.core.port.PortServiceTestAccess;
+import dev.hynergy.core.port.PortStandard;
+import dev.hynergy.core.port.layout.BlockPortDefinition;
+import dev.hynergy.core.port.layout.PortDefinition;
+import dev.hynergy.core.port.layout.PortOffset;
+import dev.hynergy.core.port.layout.PortReach;
+import dev.hynergy.core.port.world.PortWorldView;
 import org.joml.Vector3i;
 import org.jspecify.annotations.Nullable;
 import org.junit.jupiter.api.Test;
@@ -47,7 +57,7 @@ final class ElectricalPortDiscoveryTest {
 
     @Test
     void pluginStandardCanRegisterAdapterToBuiltInConductorWithoutChangingElectricalModule() {
-        PortModule ports = new PortModule();
+        PortService ports = new PortService();
 
         PortStandard<ElectricalPortProfile, ElectricalPortConnection> conductor =
                 registerConductorStandard(ports);
@@ -71,7 +81,7 @@ final class ElectricalPortDiscoveryTest {
                 (pluginProfile, conductorProfile, geometry) ->
                         ElectricalPortConnection.DIRECT
         );
-        PortModuleTestAccess.freeze(ports);
+        PortServiceTestAccess.freeze(ports);
         ports.setBlockPorts(1, BlockPortDefinition.of(
                 new PortDefinition<>(
                         0,
@@ -108,7 +118,7 @@ final class ElectricalPortDiscoveryTest {
     }
 
 
-    private record Fixture(PortModule ports, PortDomain<ElectricalPortConnection> domain, TestWorld world) {
+    private record Fixture(PortService ports, PortDomain<ElectricalPortConnection> domain, TestWorld world) {
 
         static Fixture create(
                 int sourceNormalX,
@@ -140,12 +150,12 @@ final class ElectricalPortDiscoveryTest {
                 int targetY,
                 int targetZ
         ) {
-            PortModule ports = new PortModule();
+            PortService ports = new PortService();
 
             PortStandard<ElectricalPortProfile, ElectricalPortConnection> conductor =
                     registerConductorStandard(ports);
 
-            PortModuleTestAccess.freeze(ports);
+            PortServiceTestAccess.freeze(ports);
 
             ports.setBlockPorts(
                     1,
@@ -195,7 +205,7 @@ final class ElectricalPortDiscoveryTest {
     }
 
     private static PortStandard<ElectricalPortProfile, ElectricalPortConnection>
-    registerConductorStandard(PortModule ports) {
+    registerConductorStandard(PortService ports) {
         PortDomain<ElectricalPortConnection> domain =
                 ports.registerDomain("test:electrical");
 
@@ -203,7 +213,7 @@ final class ElectricalPortDiscoveryTest {
                 "test:electrical/conductor",
                 domain,
                 ElectricalPortProfile.class,
-                ElectricityModule::resolveConductorConnection
+                ElectricityPlugin::resolveConductorConnection
         );
     }
 
@@ -225,12 +235,12 @@ final class ElectricalPortDiscoveryTest {
     }
 
     private static final class TestWorld implements PortWorldView {
-        private final PortModule module;
+        private final PortService module;
 
         private final Map<Position, Integer> ids = new HashMap<>();
         private final Map<Position, RotationTuple> rotations = new HashMap<>();
 
-        TestWorld(PortModule module) {
+        TestWorld(PortService module) {
             this.module = module;
         }
 

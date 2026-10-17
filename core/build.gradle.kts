@@ -27,6 +27,21 @@ hytaleTools {
     includesPack.set(
         providers.gradleProperty("includes_pack").map(String::toBoolean)
     )
+
+    subPlugin(
+        "Ports",
+        "dev.hynergy.core.port.PortPlugin"
+    )
+
+    subPlugin(
+        mapOf(
+            "Name" to "Electricity",
+            "Main" to "dev.hynergy.core.electricity.ElectricityPlugin",
+            "Dependencies" to mapOf(
+                "dev.hynergy:Ports" to "*"
+            )
+        )
+    )
 }
 
 

@@ -1,6 +1,11 @@
 package dev.hynergy.core.port;
 
 import com.hypixel.hytale.server.core.asset.type.blocktype.config.RotationTuple;
+import dev.hynergy.core.port.layout.BlockPortDefinition;
+import dev.hynergy.core.port.layout.PortDefinition;
+import dev.hynergy.core.port.layout.PortOffset;
+import dev.hynergy.core.port.layout.PortReach;
+import dev.hynergy.core.port.world.PortWorldView;
 import org.jspecify.annotations.Nullable;
 import org.junit.jupiter.api.Test;
 
@@ -25,13 +30,13 @@ final class PortDiscoveryTest {
 
     @Test
     void worldSelectedDefinitionsAreDiscoveredWithoutBlockTypeRegistration() {
-        PortModule module = new PortModule();
+        PortService module = new PortService();
         PortDomain<Result> domain = module.registerDomain("test:domain");
         PortStandard<Profile, Result> standard = module.registerStandard(
                 "test:standard", domain, Profile.class,
                 (first, second, geometry) -> new Result(first.name() + ":" + second.name())
         );
-        PortModuleTestAccess.freeze(module);
+        PortServiceTestAccess.freeze(module);
         BlockPortDefinition source = BlockPortDefinition.of(port(0, 1, standard, new Profile("source")));
         BlockPortDefinition target = BlockPortDefinition.of(port(5, -1, standard, new Profile("target")));
         PortWorldView world = new TestWorld(module) {
@@ -56,13 +61,13 @@ final class PortDiscoveryTest {
 
     @Test
     void sameStandardConnectionIsDiscovered() {
-        PortModule module = new PortModule();
+        PortService module = new PortService();
         PortDomain<Result> domain = module.registerDomain("test:domain");
         PortStandard<Profile, Result> standard = module.registerStandard(
                 "test:standard", domain, Profile.class,
                 (first, second, geometry) -> new Result(first.name() + ":" + second.name())
         );
-        PortModuleTestAccess.freeze(module);
+        PortServiceTestAccess.freeze(module);
         installPair(module, standard, new Profile("source"), new Profile("target"));
         TestWorld world = pairWorld(module);
 
@@ -76,7 +81,7 @@ final class PortDiscoveryTest {
 
     @Test
     void incompatibleStandardWithoutAdapterIsIgnored() {
-        PortModule module = new PortModule();
+        PortService module = new PortService();
         PortDomain<Result> domain = module.registerDomain("test:domain");
         PortStandard<Profile, Result> first = module.registerStandard(
                 "test:first", domain, Profile.class,
@@ -86,7 +91,7 @@ final class PortDiscoveryTest {
                 "test:second", domain, OtherProfile.class,
                 (a, b, geometry) -> new Result("second")
         );
-        PortModuleTestAccess.freeze(module);
+        PortServiceTestAccess.freeze(module);
         module.setBlockPorts(1, BlockPortDefinition.of(port(0, 1, first, new Profile("source"))));
         module.setBlockPorts(2, BlockPortDefinition.of(port(5, -1, second, new OtherProfile("target"))));
 
@@ -95,7 +100,7 @@ final class PortDiscoveryTest {
 
     @Test
     void adapterRegisteredByNewStandardConnectsToExistingStandardInEitherDirection() {
-        PortModule module = new PortModule();
+        PortService module = new PortService();
         PortDomain<Result> domain = module.registerDomain("test:domain");
         PortStandard<OtherProfile, Result> existing = module.registerStandard(
                 "test:existing", domain, OtherProfile.class,
@@ -114,7 +119,7 @@ final class PortDiscoveryTest {
                     return new Result(pluginProfile.name() + "->" + existingProfile.name());
                 }
         );
-        PortModuleTestAccess.freeze(module);
+        PortServiceTestAccess.freeze(module);
         module.setBlockPorts(1, BlockPortDefinition.of(port(3, -1, existing, new OtherProfile("existing"))));
         module.setBlockPorts(2, BlockPortDefinition.of(port(7, 1, plugin, new Profile("plugin"))));
         TestWorld world = new TestWorld(module);
@@ -134,7 +139,7 @@ final class PortDiscoveryTest {
 
     @Test
     void candidateDefinitionIsReadOnceWhenSourceHasMultipleCompatibleRules() {
-        PortModule module = new PortModule();
+        PortService module = new PortService();
         PortDomain<Result> domain = module.registerDomain("test:domain");
         PortStandard<Profile, Result> source = module.registerStandard(
                 "test:source", domain, Profile.class,
@@ -156,7 +161,7 @@ final class PortDiscoveryTest {
                 source, secondTarget,
                 (sourceProfile, targetProfile, geometry) -> new Result("second")
         );
-        PortModuleTestAccess.freeze(module);
+        PortServiceTestAccess.freeze(module);
         module.setBlockPorts(1, BlockPortDefinition.of(
                 port(0, 1, source, new Profile("source"))
         ));
@@ -180,13 +185,13 @@ final class PortDiscoveryTest {
 
     @Test
     void resolverRejectionDoesNotStopLaterCandidateOffset() {
-        PortModule module = new PortModule();
+        PortService module = new PortService();
         PortDomain<Result> domain = module.registerDomain("test:domain");
         PortStandard<Profile, Result> standard = module.registerStandard(
                 "test:standard", domain, Profile.class,
                 (first, second, geometry) -> second.name().equals("accept") ? new Result("ok") : null
         );
-        PortModuleTestAccess.freeze(module);
+        PortServiceTestAccess.freeze(module);
         PortReach twoCandidates = PortReach.of(new PortOffset(1, 0, 0), new PortOffset(2, 0, 0));
         module.setBlockPorts(1, BlockPortDefinition.of(
                 new PortDefinition<>(0, PortOffset.ZERO, twoCandidates, standard, new Profile("source"))
@@ -207,7 +212,7 @@ final class PortDiscoveryTest {
 
     @Test
     void unavailableCandidateBlockIsSkippedBeforeResolution() {
-        PortModule module = new PortModule();
+        PortService module = new PortService();
         PortDomain<Result> domain = module.registerDomain("test:domain");
         AtomicInteger calls = new AtomicInteger();
         PortStandard<Profile, Result> standard = module.registerStandard(
@@ -217,7 +222,7 @@ final class PortDiscoveryTest {
                     return new Result("ok");
                 }
         );
-        PortModuleTestAccess.freeze(module);
+        PortServiceTestAccess.freeze(module);
         module.setBlockPorts(1, BlockPortDefinition.of(port(0, 1, standard, new Profile("source"))));
         TestWorld world = new TestWorld(module);
         world.put(0, 0, 0, 1);
@@ -228,14 +233,14 @@ final class PortDiscoveryTest {
 
     @Test
     void sourceDomainMismatchIsRejected() {
-        PortModule module = new PortModule();
+        PortService module = new PortService();
         PortDomain<Result> firstDomain = module.registerDomain("test:first");
         PortDomain<Result> secondDomain = module.registerDomain("test:second");
         PortStandard<Profile, Result> standard = module.registerStandard(
                 "test:standard", firstDomain, Profile.class,
                 (first, second, geometry) -> new Result("ok")
         );
-        PortModuleTestAccess.freeze(module);
+        PortServiceTestAccess.freeze(module);
         module.setBlockPorts(1, BlockPortDefinition.of(port(0, 1, standard, new Profile("source"))));
         TestWorld world = new TestWorld(module);
         world.put(0, 0, 0, 1);
@@ -249,13 +254,13 @@ final class PortDiscoveryTest {
 
     @Test
     void discoveryIsConcurrentAcrossThreadsButNotReentrantOnOneThread() throws Exception {
-        PortModule module = new PortModule();
+        PortService module = new PortService();
         PortDomain<Result> domain = module.registerDomain("test:domain");
         PortStandard<Profile, Result> standard = module.registerStandard(
                 "test:standard", domain, Profile.class,
                 (first, second, geometry) -> new Result("ok")
         );
-        PortModuleTestAccess.freeze(module);
+        PortServiceTestAccess.freeze(module);
         installPair(module, standard, new Profile("source"), new Profile("target"));
         TestWorld world = pairWorld(module);
 
@@ -314,7 +319,7 @@ final class PortDiscoveryTest {
     }
 
     private static <P, R> void installPair(
-            PortModule module,
+            PortService module,
             PortStandard<P, R> standard,
             P source,
             P target
@@ -323,7 +328,7 @@ final class PortDiscoveryTest {
         module.setBlockPorts(2, BlockPortDefinition.of(port(5, -1, standard, target)));
     }
 
-    private static TestWorld pairWorld(PortModule module) {
+    private static TestWorld pairWorld(PortService module) {
         TestWorld world = new TestWorld(module);
         world.put(0, 0, 0, 1);
         world.put(1, 0, 0, 2);
@@ -352,11 +357,11 @@ final class PortDiscoveryTest {
     }
 
     private static class TestWorld implements PortWorldView {
-        private final PortModule module;
+        private final PortService module;
 
         private final Map<Position, Integer> blocks = new HashMap<>();
 
-        TestWorld(PortModule module) {
+        TestWorld(PortService module) {
             this.module = module;
         }
 
@@ -380,7 +385,7 @@ final class PortDiscoveryTest {
         private final Map<Position, Integer> definitionReads = new HashMap<>();
         private final Map<Position, Integer> rotationReads = new HashMap<>();
 
-        CountingWorld(PortModule module) {
+        CountingWorld(PortService module) {
             super(module);
         }
 

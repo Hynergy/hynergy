@@ -2,6 +2,12 @@ package dev.hynergy.core.port;
 
 import com.hypixel.hytale.server.core.asset.type.blocktype.config.Rotation;
 import com.hypixel.hytale.server.core.asset.type.blocktype.config.RotationTuple;
+import dev.hynergy.core.port.connection.PortGeometry;
+import dev.hynergy.core.port.layout.BlockPortDefinition;
+import dev.hynergy.core.port.layout.PortDefinition;
+import dev.hynergy.core.port.layout.PortOffset;
+import dev.hynergy.core.port.layout.PortReach;
+import dev.hynergy.core.port.world.PortWorldView;
 import org.joml.Vector3i;
 import org.jspecify.annotations.Nullable;
 import org.junit.jupiter.api.Test;
@@ -33,7 +39,7 @@ final class PortRotationTest {
         assertEquals(rotated.y(), geometries.getFirst().ownerDy());
         assertEquals(rotated.z(), geometries.getFirst().ownerDz());
     }
-  
+
     @Test
     void sourceAndTargetAnchorsAreRotatedBeforeAnchorDeltaIsBuilt() {
         RotationTuple sourceRotation = RotationTuple.of(Rotation.Ninety, Rotation.None);
@@ -77,17 +83,17 @@ final class PortRotationTest {
 
     private static final class Fixture {
         final TestWorld world;
-        final PortModule module;
+        final PortService module;
         final PortDomain<PortGeometry> domain;
 
-        private Fixture(PortModule module, PortDomain<PortGeometry> domain) {
+        private Fixture(PortService module, PortDomain<PortGeometry> domain) {
             this.module = module;
             this.world = new TestWorld(module);
             this.domain = domain;
         }
 
         static Fixture create(PortOffset sourceAnchor, PortOffset targetAnchor) {
-            PortModule module = new PortModule();
+            PortService module = new PortService();
             PortDomain<PortGeometry> domain = module.registerDomain("test:rotation");
             PortStandard<Profile, PortGeometry> standard = module.registerStandard(
                     "test:rotation-standard",
@@ -95,7 +101,7 @@ final class PortRotationTest {
                     Profile.class,
                     (first, second, geometry) -> geometry
             );
-            PortModuleTestAccess.freeze(module);
+            PortServiceTestAccess.freeze(module);
             module.setBlockPorts(1, BlockPortDefinition.of(
                     new PortDefinition<>(
                             0, sourceAnchor, PortReach.single(1, 0, 0), standard, new Profile("source")
@@ -130,11 +136,11 @@ final class PortRotationTest {
     }
 
     private static final class TestWorld implements PortWorldView {
-        private final PortModule module;
+        private final PortService module;
 
         private final Map<Position, Block> blocks = new HashMap<>();
 
-        TestWorld(PortModule module) {
+        TestWorld(PortService module) {
             this.module = module;
         }
 

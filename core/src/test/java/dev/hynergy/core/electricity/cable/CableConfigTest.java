@@ -1,9 +1,15 @@
 package dev.hynergy.core.electricity.cable;
 
 import com.hypixel.hytale.codec.ExtraInfo;
-import dev.hynergy.core.electricity.ElectricalPortConnection;
-import dev.hynergy.core.electricity.ElectricalPortProfile;
-import dev.hynergy.core.port.*;
+import dev.hynergy.core.electricity.port.ElectricalPortConnection;
+import dev.hynergy.core.electricity.port.ElectricalPortProfile;
+import dev.hynergy.core.port.PortDomain;
+import dev.hynergy.core.port.PortService;
+import dev.hynergy.core.port.PortStandard;
+import dev.hynergy.core.port.layout.BlockPortDefinition;
+import dev.hynergy.core.port.layout.PortDefinition;
+import dev.hynergy.core.port.layout.PortOffset;
+import dev.hynergy.core.port.layout.PortReach;
 import org.bson.BsonDocument;
 import org.junit.jupiter.api.Test;
 
@@ -31,7 +37,7 @@ final class CableConfigTest {
                         """),
                 ExtraInfo.THREAD_LOCAL.get()
         );
-        PortModule ports = new PortModule();
+        PortService ports = new PortService();
         PortDomain<ElectricalPortConnection> domain = ports.registerDomain("test:electrical");
         PortStandard<ElectricalPortProfile, ElectricalPortConnection> conductor = ports.registerStandard(
                 "test:conductor",
