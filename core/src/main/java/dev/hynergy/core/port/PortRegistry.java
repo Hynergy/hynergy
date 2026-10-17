@@ -44,8 +44,10 @@ final class PortRegistry {
         }
 
         PortStandard<P, R> standard = new PortStandard<>(id, domain, profileType);
+
         standards.put(id, standard);
         rules.put(new StandardPair(standard, standard), new Rule<>(standard, standard, resolver));
+
         return standard;
     }
 

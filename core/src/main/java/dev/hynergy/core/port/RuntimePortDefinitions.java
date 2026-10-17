@@ -10,7 +10,9 @@ final class RuntimePortDefinitions {
         if (blockTypeId < 0) {
             return null;
         }
+        
         AtomicReferenceArray<BlockPortDefinition> current = definitions;
+
         return blockTypeId < current.length() ? current.get(blockTypeId) : null;
     }
 
@@ -18,18 +20,22 @@ final class RuntimePortDefinitions {
         if (blockTypeId < 0) {
             throw new IllegalArgumentException("blockTypeId must be non-negative");
         }
+
         Objects.requireNonNull(definition, "definition");
 
         AtomicReferenceArray<BlockPortDefinition> current = definitions;
         if (blockTypeId >= current.length()) {
             int newLength = current.length();
+
             while (newLength <= blockTypeId) {
                 newLength = Math.multiplyExact(newLength, 2);
             }
+
             AtomicReferenceArray<BlockPortDefinition> grown = new AtomicReferenceArray<>(newLength);
             for (int index = 0; index < current.length(); index++) {
                 grown.set(index, current.get(index));
             }
+
             definitions = grown;
             current = grown;
         }
@@ -40,6 +46,7 @@ final class RuntimePortDefinitions {
         if (blockTypeId < 0) {
             throw new IllegalArgumentException("blockTypeId must be non-negative");
         }
+
         AtomicReferenceArray<BlockPortDefinition> current = definitions;
         if (blockTypeId < current.length()) {
             current.set(blockTypeId, null);

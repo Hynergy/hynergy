@@ -7,6 +7,7 @@ import java.util.Objects;
  *
  * @param <R> result type for the domain
  */
+@SuppressWarnings("unused")
 public final class PortDomain<R> {
     private final String id;
 
