@@ -10,7 +10,7 @@ import com.hypixel.hytale.server.core.universe.world.chunk.section.BlockSection;
 import com.hypixel.hytale.server.core.universe.world.storage.ChunkStore;
 import dev.hynergy.core.electricity.ElectricalPortConnection;
 import dev.hynergy.core.electricity.ElectricalSystemResource;
-import dev.hynergy.core.electricity.wire.WireComponent;
+import dev.hynergy.core.electricity.cable.CableComponent;
 import dev.hynergy.core.port.HytalePortWorldView;
 import dev.hynergy.core.port.PortConnectionConsumer;
 import dev.hynergy.core.port.PortDomain;
@@ -37,7 +37,7 @@ public final class ElectricalDeviceSystem extends RefSystem<ChunkStore> {
     private final ElectricalRuntime runtime;
     private final ResourceType<ChunkStore, ElectricalSystemResource> electricalSystemResourceType;
     private final ComponentType<ChunkStore, DeviceComponent> deviceComponentType;
-    private final ComponentType<ChunkStore, WireComponent> wireComponentType;
+    private final ComponentType<ChunkStore, CableComponent> wireComponentType;
     private final DeviceBlockDefinitions runtimeDefinitions;
     private final PortModule portModule;
     private final PortDomain<ElectricalPortConnection> electricalPortDomain;
@@ -53,7 +53,7 @@ public final class ElectricalDeviceSystem extends RefSystem<ChunkStore> {
             ElectricalRuntime runtime,
             ResourceType<ChunkStore, ElectricalSystemResource> electricalSystemResourceType,
             ComponentType<ChunkStore, DeviceComponent> deviceComponentType,
-            ComponentType<ChunkStore, WireComponent> wireComponentType,
+            ComponentType<ChunkStore, CableComponent> wireComponentType,
             DeviceBlockDefinitions runtimeDefinitions,
             PortModule portModule,
             PortDomain<ElectricalPortConnection> electricalPortDomain
@@ -378,14 +378,14 @@ public final class ElectricalDeviceSystem extends RefSystem<ChunkStore> {
         private @Nullable Device device;
         private @Nullable ChunkStore chunkStore;
         private @Nullable CommandBuffer<ChunkStore> commandBuffer;
-        private @Nullable ComponentType<ChunkStore, WireComponent> wireComponentType;
+        private @Nullable ComponentType<ChunkStore, CableComponent> wireComponentType;
         private dev.hynergy.electrical.@Nullable DeviceTerminal terminal;
 
         void begin(
                 Device device,
                 ChunkStore chunkStore,
                 CommandBuffer<ChunkStore> commandBuffer,
-                ComponentType<ChunkStore, WireComponent> wireComponentType
+                ComponentType<ChunkStore, CableComponent> wireComponentType
         ) {
             if (inUse) {
                 throw new IllegalStateException("Electrical device attachment discovery is not reentrant");
@@ -423,7 +423,7 @@ public final class ElectricalDeviceSystem extends RefSystem<ChunkStore> {
             ChunkStore chunkStore = Objects.requireNonNull(this.chunkStore, "attachment chunkStore");
             CommandBuffer<ChunkStore> commandBuffer =
                     Objects.requireNonNull(this.commandBuffer, "attachment commandBuffer");
-            ComponentType<ChunkStore, WireComponent> wireComponentType =
+            ComponentType<ChunkStore, CableComponent> wireComponentType =
                     Objects.requireNonNull(this.wireComponentType, "attachment wireComponentType");
             Device device = Objects.requireNonNull(this.device, "attachment device");
 
@@ -444,7 +444,7 @@ public final class ElectricalDeviceSystem extends RefSystem<ChunkStore> {
                 return;
             }
 
-            WireComponent targetComponent = commandBuffer.getComponent(targetRef, wireComponentType);
+            CableComponent targetComponent = commandBuffer.getComponent(targetRef, wireComponentType);
             if (targetComponent == null) {
                 return;
             }

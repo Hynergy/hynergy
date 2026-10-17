@@ -15,11 +15,11 @@ import com.hypixel.hytale.server.core.asset.type.blocktype.config.BlockType;
 import com.hypixel.hytale.server.core.plugin.registry.AssetRegistry;
 import com.hypixel.hytale.server.core.universe.world.storage.ChunkStore;
 import dev.hynergy.core.HynergyModule;
+import dev.hynergy.core.electricity.cable.CableBlockPortDefinitions;
+import dev.hynergy.core.electricity.cable.CableComponent;
+import dev.hynergy.core.electricity.cable.CableConfig;
+import dev.hynergy.core.electricity.cable.CableSystem;
 import dev.hynergy.core.electricity.device.*;
-import dev.hynergy.core.electricity.wire.WireBlockPortDefinitions;
-import dev.hynergy.core.electricity.wire.WireComponent;
-import dev.hynergy.core.electricity.wire.WireConfig;
-import dev.hynergy.core.electricity.wire.WireSystem;
 import dev.hynergy.core.port.PortDomain;
 import dev.hynergy.core.port.PortGeometry;
 import dev.hynergy.core.port.PortModule;
@@ -53,7 +53,7 @@ public final class ElectricityModule extends HynergyModule {
     private @Nullable PortDomain<ElectricalPortConnection> electricalPortDomain;
     private @Nullable PortStandard<ElectricalPortProfile, ElectricalPortConnection> conductorPortStandard;
 
-    private @Nullable WireBlockPortDefinitions wireBlockPortDefinitions;
+    private @Nullable CableBlockPortDefinitions wireBlockPortDefinitions;
     private @Nullable DeviceBlockDefinitions deviceBlockDefinitions;
 
     private boolean started;
@@ -81,11 +81,11 @@ public final class ElectricityModule extends HynergyModule {
         registerPortProtocols();
         registerBuiltinDevices(devices());
 
-        ComponentType<ChunkStore, WireComponent> wireComponentType =
+        ComponentType<ChunkStore, CableComponent> wireComponentType =
                 chunkStoreRegistry.registerComponent(
-                        WireComponent.class,
+                        CableComponent.class,
                         "HynergyWire",
-                        WireComponent.CODEC
+                        CableComponent.CODEC
                 );
 
         ComponentType<ChunkStore, DeviceComponent> deviceComponentType =
@@ -96,7 +96,7 @@ public final class ElectricityModule extends HynergyModule {
                 );
 
         wireBlockPortDefinitions =
-                new WireBlockPortDefinitions(
+                new CableBlockPortDefinitions(
                         portModule,
                         conductorPortStandard(),
                         wireComponentType
@@ -111,12 +111,12 @@ public final class ElectricityModule extends HynergyModule {
 
         assetRegistry.register(
                 HytaleAssetStore.builder(
-                                        WireConfig.class,
+                                        CableConfig.class,
                                         new DefaultAssetMap<>()
                                 )
                                 .setPath("Hynergy/Electricity/Wires")
-                                .setCodec(WireConfig.CODEC)
-                                .setKeyFunction(WireConfig::getId)
+                                .setCodec(CableConfig.CODEC)
+                                .setKeyFunction(CableConfig::getId)
                                 .build()
         );
 
@@ -133,8 +133,8 @@ public final class ElectricityModule extends HynergyModule {
 
         eventRegistry.register(
                 AssetEditorRequestDataSetEvent.class,
-                WireConfig.DATA_SET,
-                WireConfig::populateDataSet
+                CableConfig.DATA_SET,
+                CableConfig::populateDataSet
         );
 
         eventRegistry.register(
@@ -151,21 +151,21 @@ public final class ElectricityModule extends HynergyModule {
 
         eventRegistry.register(
                 LoadedAssetsEvent.class,
-                WireConfig.class,
+                CableConfig.class,
                 (Consumer<LoadedAssetsEvent<
                         String,
-                        WireConfig,
-                        DefaultAssetMap<String, WireConfig>
+                        CableConfig,
+                        DefaultAssetMap<String, CableConfig>
                         >>) event -> rebuildWireBlockPorts()
         );
 
         eventRegistry.register(
                 RemovedAssetsEvent.class,
-                WireConfig.class,
+                CableConfig.class,
                 (Consumer<RemovedAssetsEvent<
                         String,
-                        WireConfig,
-                        DefaultAssetMap<String, WireConfig>
+                        CableConfig,
+                        DefaultAssetMap<String, CableConfig>
                         >>) event -> rebuildWireBlockPorts()
         );
 
@@ -224,7 +224,7 @@ public final class ElectricityModule extends HynergyModule {
 
     private void registerSystems(
             ElectricalRuntime runtime,
-            ComponentType<ChunkStore, WireComponent> wireComponentType,
+            ComponentType<ChunkStore, CableComponent> wireComponentType,
             ComponentType<ChunkStore, DeviceComponent> deviceComponentType
     ) {
         ResourceType<ChunkStore, ElectricalSystemResource> resourceType =
@@ -238,7 +238,7 @@ public final class ElectricityModule extends HynergyModule {
         );
 
         chunkStoreRegistry.registerSystem(
-                new WireSystem(
+                new CableSystem(
                         runtime,
                         resourceType,
                         wireComponentType,
@@ -266,7 +266,7 @@ public final class ElectricityModule extends HynergyModule {
     }
 
     private void rebuildWireBlockPorts() {
-        WireBlockPortDefinitions definitions = wireBlockPortDefinitions;
+        CableBlockPortDefinitions definitions = wireBlockPortDefinitions;
         if (definitions == null) {
             throw new IllegalStateException(
                     "Wire block port definitions are unavailable before module setup"

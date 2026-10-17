@@ -4,8 +4,8 @@ import com.hypixel.hytale.component.dependency.Dependency;
 import com.hypixel.hytale.component.dependency.Order;
 import com.hypixel.hytale.component.dependency.SystemDependency;
 import com.hypixel.hytale.server.core.universe.world.storage.ChunkStore;
+import dev.hynergy.core.electricity.cable.CableSystem;
 import dev.hynergy.core.electricity.device.ElectricalDeviceSystem;
-import dev.hynergy.core.electricity.wire.WireSystem;
 import org.junit.jupiter.api.Test;
 
 import java.util.Set;
@@ -19,7 +19,7 @@ final class ElectricalTickSystemOrderingTest {
         Set<Dependency<ChunkStore>> dependencies =
                 new ElectricalTickSystem(null, null).getDependencies();
 
-        assertAfter(dependencies, WireSystem.class);
+        assertAfter(dependencies, CableSystem.class);
         assertAfter(dependencies, ElectricalDeviceSystem.class);
     }
 

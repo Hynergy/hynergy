@@ -1,4 +1,4 @@
-package dev.hynergy.core.electricity.wire;
+package dev.hynergy.core.electricity.cable;
 
 import com.hypixel.hytale.codec.ExtraInfo;
 import dev.hynergy.core.electricity.ElectricalPortConnection;
@@ -9,11 +9,11 @@ import org.junit.jupiter.api.Test;
 
 import static org.junit.jupiter.api.Assertions.*;
 
-final class WireConfigTest {
+final class CableConfigTest {
 
     @Test
     void buildPortDefinitionCompilesIdsAnchorsReachAndProfile() {
-        WireConfig config = WireConfig.CODEC.decode(
+        CableConfig config = CableConfig.CODEC.decode(
                 BsonDocument.parse("""
                         {
                           "Ports": [

@@ -1,4 +1,4 @@
-package dev.hynergy.core.electricity.wire;
+package dev.hynergy.core.electricity.cable;
 
 import com.hypixel.hytale.codec.Codec;
 import com.hypixel.hytale.codec.KeyedCodec;
@@ -12,7 +12,7 @@ import com.hypixel.hytale.math.vector.Vector3iUtil;
 import lombok.Getter;
 import org.joml.Vector3i;
 
-public final class WirePortConfig {
+public final class CablePortConfig {
 
     private static final Validator<Vector3i> CARDINAL_NORMAL_VALIDATOR =
             new Validator<>() {
@@ -43,8 +43,8 @@ public final class WirePortConfig {
                 }
             };
 
-    public static final BuilderCodec<WirePortConfig> CODEC =
-            BuilderCodec.builder(WirePortConfig.class, WirePortConfig::new)
+    public static final BuilderCodec<CablePortConfig> CODEC =
+            BuilderCodec.builder(CablePortConfig.class, CablePortConfig::new)
                         .append(
                                 new KeyedCodec<>("Id", Codec.INTEGER, true),
                                 (port, id) -> port.id = id,
@@ -81,6 +81,6 @@ public final class WirePortConfig {
     @Getter private Vector3i anchor;
     @Getter private Vector3i normal;
 
-    private WirePortConfig() {
+    private CablePortConfig() {
     }
 }

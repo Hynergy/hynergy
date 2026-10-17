@@ -1,4 +1,4 @@
-package dev.hynergy.core.electricity.wire;
+package dev.hynergy.core.electricity.cable;
 
 import com.hypixel.hytale.component.*;
 import com.hypixel.hytale.component.query.Query;
@@ -21,11 +21,11 @@ import dev.hynergy.electrical.WireId;
 import it.unimi.dsi.fastutil.longs.LongOpenHashSet;
 import org.jspecify.annotations.NonNull;
 
-public final class WireSystem extends RefSystem<ChunkStore> {
+public final class CableSystem extends RefSystem<ChunkStore> {
 
     private final ElectricalRuntime runtime;
     private final ResourceType<ChunkStore, ElectricalSystemResource> electricalSystemResourceType;
-    private final ComponentType<ChunkStore, WireComponent> wireComponentType;
+    private final ComponentType<ChunkStore, CableComponent> wireComponentType;
     private final ComponentType<ChunkStore, DeviceComponent> deviceComponentType;
     private final PortModule portModule;
     private final PortDomain<ElectricalPortConnection> electricalPortDomain;
@@ -37,7 +37,7 @@ public final class WireSystem extends RefSystem<ChunkStore> {
     private final ThreadLocal<ConnectionScratch> connectionScratch =
             ThreadLocal.withInitial(ConnectionScratch::new);
 
-    public WireSystem(
+    public CableSystem(
             ElectricalRuntime runtime,
             ResourceType<
                     ChunkStore,
@@ -45,7 +45,7 @@ public final class WireSystem extends RefSystem<ChunkStore> {
                     > electricalSystemResourceType,
             ComponentType<
                     ChunkStore,
-                    WireComponent
+                    CableComponent
                     > wireComponentType,
             ComponentType<ChunkStore, DeviceComponent> deviceComponentType,
             PortModule portModule,
@@ -79,7 +79,7 @@ public final class WireSystem extends RefSystem<ChunkStore> {
         World world = store.getExternalData().getWorld();
         world.debugAssertInTickingThread();
 
-        WireComponent component =
+        CableComponent component =
                 commandBuffer.getComponent(
                         ref,
                         wireComponentType
@@ -99,7 +99,7 @@ public final class WireSystem extends RefSystem<ChunkStore> {
 
         if (component.getWire() != null) {
             throw new IllegalStateException(
-                    "WireComponent already has a runtime Wire handle"
+                    "CableComponent already has a runtime Wire handle"
             );
         }
 
@@ -142,7 +142,7 @@ public final class WireSystem extends RefSystem<ChunkStore> {
         World world = store.getExternalData().getWorld();
         world.debugAssertInTickingThread();
 
-        WireComponent component =
+        CableComponent component =
                 commandBuffer.getComponent(
                         ref,
                         wireComponentType
@@ -150,7 +150,7 @@ public final class WireSystem extends RefSystem<ChunkStore> {
 
         if (component == null) {
             throw new IllegalStateException(
-                    "ElectricalWireSystem matched an entity without a WireComponent"
+                    "ElectricalWireSystem matched an entity without a CableComponent"
             );
         }
 
@@ -304,7 +304,7 @@ public final class WireSystem extends RefSystem<ChunkStore> {
                         return;
                     }
 
-                    WireComponent targetComponent =
+                    CableComponent targetComponent =
                             commandBuffer.getComponent(
                                     targetRef,
                                     wireComponentType

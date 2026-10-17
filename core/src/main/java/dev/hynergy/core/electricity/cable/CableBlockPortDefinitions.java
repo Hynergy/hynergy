@@ -1,4 +1,4 @@
-package dev.hynergy.core.electricity.wire;
+package dev.hynergy.core.electricity.cable;
 
 import com.hypixel.hytale.component.ComponentType;
 import com.hypixel.hytale.server.core.asset.type.blocktype.config.BlockType;
@@ -15,22 +15,22 @@ import java.util.IdentityHashMap;
 import java.util.Map;
 import java.util.Objects;
 
-public final class WireBlockPortDefinitions {
+public final class CableBlockPortDefinitions {
     private final PortModule portModule;
     private final PortStandard<ElectricalPortProfile, ElectricalPortConnection> conductorStandard;
-    private final ComponentType<ChunkStore, WireComponent> wireComponentType;
+    private final ComponentType<ChunkStore, CableComponent> cableComponentType;
 
-    private final Map<WireConfig, BlockPortDefinition> compiledDefinitions = new IdentityHashMap<>();
+    private final Map<CableConfig, BlockPortDefinition> compiledDefinitions = new IdentityHashMap<>();
     private final IntOpenHashSet publishedBlockTypes = new IntOpenHashSet();
     private final IntOpenHashSet rebuiltBlockTypes = new IntOpenHashSet();
 
-    public WireBlockPortDefinitions(
+    public CableBlockPortDefinitions(
             PortModule portModule,
             PortStandard<
                     ElectricalPortProfile,
                     ElectricalPortConnection
                     > conductorStandard,
-            ComponentType<ChunkStore, WireComponent> wireComponentType
+            ComponentType<ChunkStore, CableComponent> cableComponentType
     ) {
         this.portModule =
                 Objects.requireNonNull(portModule, "portModule");
@@ -41,10 +41,10 @@ public final class WireBlockPortDefinitions {
                         "conductorStandard"
                 );
 
-        this.wireComponentType =
+        this.cableComponentType =
                 Objects.requireNonNull(
-                        wireComponentType,
-                        "wireComponentType"
+                        cableComponentType,
+                        "cableComponentType"
                 );
     }
 
@@ -53,7 +53,7 @@ public final class WireBlockPortDefinitions {
         rebuiltBlockTypes.clear();
 
         var blockTypes = BlockType.getAssetMap();
-        var wireConfigs = WireConfig.getAssetMap();
+        var cableConfigs = CableConfig.getAssetMap();
 
         for (BlockType blockType : blockTypes.getAssetMap().values()) {
             var blockEntity = blockType.getBlockEntity();
@@ -61,19 +61,19 @@ public final class WireBlockPortDefinitions {
                 continue;
             }
 
-            WireComponent wireComponent =
-                    blockEntity.getComponent(wireComponentType);
+            CableComponent cableComponent =
+                    blockEntity.getComponent(cableComponentType);
 
-            if (wireComponent == null) {
+            if (cableComponent == null) {
                 continue;
             }
 
-            String configId = wireComponent.getConfigId();
+            String configId = cableComponent.getConfigId();
             if (configId == null) {
                 continue;
             }
 
-            WireConfig config = wireConfigs.getAsset(configId);
+            CableConfig config = cableConfigs.getAsset(configId);
             if (config == null) {
                 continue;
             }

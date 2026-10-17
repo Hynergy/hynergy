@@ -1,4 +1,4 @@
-package dev.hynergy.core.electricity.wire;
+package dev.hynergy.core.electricity.cable;
 
 import com.hypixel.hytale.codec.Codec;
 import com.hypixel.hytale.codec.KeyedCodec;
@@ -16,18 +16,18 @@ import lombok.Setter;
 import org.jspecify.annotations.Nullable;
 
 @NoArgsConstructor
-public class WireComponent implements Component<ChunkStore> {
+public class CableComponent implements Component<ChunkStore> {
 
-    public static final BuilderCodec<WireComponent> CODEC =
-            BuilderCodec.builder(WireComponent.class, WireComponent::new)
+    public static final BuilderCodec<CableComponent> CODEC =
+            BuilderCodec.builder(CableComponent.class, CableComponent::new)
                         .append(
                                 new KeyedCodec<>("Config", Codec.STRING),
-                                WireComponent::setConfigId,
-                                WireComponent::getConfigId)
-                        .metadata(new UIEditor(new UIEditor.Dropdown(WireConfig.DATA_SET)))
+                                CableComponent::setConfigId,
+                                CableComponent::getConfigId)
+                        .metadata(new UIEditor(new UIEditor.Dropdown(CableConfig.DATA_SET)))
                         .addValidator(Validators.nonNull())
                         .addValidator(Validators.nonEmptyString())
-                        .addValidatorLate(() -> WireConfig.VALIDATOR_CACHE.getValidator().late())
+                        .addValidatorLate(() -> CableConfig.VALIDATOR_CACHE.getValidator().late())
                         .add()
                         .append(
                                 new KeyedCodec<>("WireId", ElectricalCodecs.WIRE_ID),
@@ -40,29 +40,8 @@ public class WireComponent implements Component<ChunkStore> {
     @Getter private @Nullable WireId wireId;
     @Getter private transient @Nullable Wire wire;
 
-    private WireComponent(String configId) {
+    private CableComponent(String configId) {
         this.configId = configId;
-    }
-
-    @Override
-    public Component<ChunkStore> cloneSerializable() {
-        WireComponent cloned = new WireComponent(configId);
-        cloned.wireId = wireId;
-        return cloned;
-    }
-
-    @Override
-    public @Nullable Component<ChunkStore> clone() {
-        try {
-            WireComponent cloned = (WireComponent) super.clone();
-
-            cloned.wireId = null;
-            cloned.wire = null;
-
-            return cloned;
-        } catch (CloneNotSupportedException e) {
-            throw new AssertionError(e);
-        }
     }
 
     void setWire(@Nullable Wire wire) {
@@ -71,5 +50,26 @@ public class WireComponent implements Component<ChunkStore> {
 
     void setWireId(@Nullable WireId wireId) {
         this.wireId = wireId;
+    }
+
+    @Override
+    public Component<ChunkStore> cloneSerializable() {
+        CableComponent cloned = new CableComponent(configId);
+        cloned.wireId = wireId;
+        return cloned;
+    }
+
+    @Override
+    public @Nullable Component<ChunkStore> clone() {
+        try {
+            CableComponent cloned = (CableComponent) super.clone();
+
+            cloned.wireId = null;
+            cloned.wire = null;
+
+            return cloned;
+        } catch (CloneNotSupportedException e) {
+            throw new AssertionError(e);
+        }
     }
 }

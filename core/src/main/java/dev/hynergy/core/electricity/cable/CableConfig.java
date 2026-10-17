@@ -1,4 +1,4 @@
-package dev.hynergy.core.electricity.wire;
+package dev.hynergy.core.electricity.cable;
 
 import com.hypixel.hytale.assetstore.AssetExtraInfo;
 import com.hypixel.hytale.assetstore.AssetKeyValidator;
@@ -26,14 +26,14 @@ import org.joml.Vector3i;
 
 import java.util.Objects;
 
-public class WireConfig implements JsonAssetWithMap<String, DefaultAssetMap<String, WireConfig>> {
+public class CableConfig implements JsonAssetWithMap<String, DefaultAssetMap<String, CableConfig>> {
     public static final String DATA_SET = "WireConfigs";
 
-    private static final Validator<WirePortConfig[]> PORTS_VALIDATOR =
+    private static final Validator<CablePortConfig[]> PORTS_VALIDATOR =
             new Validator<>() {
                 @Override
                 public void accept(
-                        WirePortConfig[] ports,
+                        CablePortConfig[] ports,
                         ValidationResults results
                 ) {
                     if (ports == null) {
@@ -43,7 +43,7 @@ public class WireConfig implements JsonAssetWithMap<String, DefaultAssetMap<Stri
                     IntOpenHashSet ids =
                             new IntOpenHashSet(ports.length);
 
-                    for (WirePortConfig port : ports) {
+                    for (CablePortConfig port : ports) {
                         if (port == null) {
                             results.fail(
                                     "Wire ports must not contain null entries"
@@ -68,10 +68,10 @@ public class WireConfig implements JsonAssetWithMap<String, DefaultAssetMap<Stri
                 }
             };
 
-    public static final AssetBuilderCodec<String, WireConfig> CODEC =
+    public static final AssetBuilderCodec<String, CableConfig> CODEC =
             AssetBuilderCodec.builder(
-                                     WireConfig.class,
-                                     WireConfig::new,
+                                     CableConfig.class,
+                                     CableConfig::new,
                                      Codec.STRING,
 
                                      (config, id) -> config.id = id,
@@ -84,8 +84,8 @@ public class WireConfig implements JsonAssetWithMap<String, DefaultAssetMap<Stri
                                      new KeyedCodec<>(
                                              "Ports",
                                              new ArrayCodec<>(
-                                                     WirePortConfig.CODEC,
-                                                     WirePortConfig[]::new
+                                                     CablePortConfig.CODEC,
+                                                     CablePortConfig[]::new
                                              ),
                                              true
                                      ),
@@ -103,24 +103,24 @@ public class WireConfig implements JsonAssetWithMap<String, DefaultAssetMap<Stri
     public static final ValidatorCache<String> VALIDATOR_CACHE =
             new ValidatorCache<>(
                     new AssetKeyValidator<>(
-                            WireConfig::getAssetStore
+                            CableConfig::getAssetStore
                     )
             );
 
     private static AssetStore<
             String,
-            WireConfig,
-            DefaultAssetMap<String, WireConfig>
+            CableConfig,
+            DefaultAssetMap<String, CableConfig>
             > ASSET_STORE;
 
 
     private AssetExtraInfo.Data extraData;
 
     @Getter private String id;
-    @Getter private WirePortConfig[] ports;
+    @Getter private CablePortConfig[] ports;
 
 
-    private WireConfig() {
+    private CableConfig() {
     }
 
 
@@ -131,7 +131,7 @@ public class WireConfig implements JsonAssetWithMap<String, DefaultAssetMap<Stri
 
         PortDefinition<?, ?>[] definitions = new PortDefinition[ports.length];
         for (int index = 0; index < ports.length; index++) {
-            WirePortConfig port = ports[index];
+            CablePortConfig port = ports[index];
             Vector3i anchor = port.getAnchor();
             Vector3i normal = port.getNormal();
 
@@ -151,20 +151,20 @@ public class WireConfig implements JsonAssetWithMap<String, DefaultAssetMap<Stri
 
     public static AssetStore<
             String,
-            WireConfig,
-            DefaultAssetMap<String, WireConfig>
+            CableConfig,
+            DefaultAssetMap<String, CableConfig>
             > getAssetStore() {
         if (ASSET_STORE == null) {
             ASSET_STORE =
                     AssetRegistry.getAssetStore(
-                            WireConfig.class
+                            CableConfig.class
                     );
         }
 
         return ASSET_STORE;
     }
 
-    public static DefaultAssetMap<String, WireConfig>
+    public static DefaultAssetMap<String, CableConfig>
 
     getAssetMap() {
         return getAssetStore().getAssetMap();
