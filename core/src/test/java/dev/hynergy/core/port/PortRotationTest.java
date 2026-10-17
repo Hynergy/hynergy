@@ -83,17 +83,17 @@ final class PortRotationTest {
 
     private static final class Fixture {
         final TestWorld world;
-        final PortModule module;
+        final PortService module;
         final PortDomain<PortGeometry> domain;
 
-        private Fixture(PortModule module, PortDomain<PortGeometry> domain) {
+        private Fixture(PortService module, PortDomain<PortGeometry> domain) {
             this.module = module;
             this.world = new TestWorld(module);
             this.domain = domain;
         }
 
         static Fixture create(PortOffset sourceAnchor, PortOffset targetAnchor) {
-            PortModule module = new PortModule();
+            PortService module = new PortService();
             PortDomain<PortGeometry> domain = module.registerDomain("test:rotation");
             PortStandard<Profile, PortGeometry> standard = module.registerStandard(
                     "test:rotation-standard",
@@ -101,7 +101,7 @@ final class PortRotationTest {
                     Profile.class,
                     (first, second, geometry) -> geometry
             );
-            PortModuleTestAccess.freeze(module);
+            PortServiceTestAccess.freeze(module);
             module.setBlockPorts(1, BlockPortDefinition.of(
                     new PortDefinition<>(
                             0, sourceAnchor, PortReach.single(1, 0, 0), standard, new Profile("source")
@@ -136,11 +136,11 @@ final class PortRotationTest {
     }
 
     private static final class TestWorld implements PortWorldView {
-        private final PortModule module;
+        private final PortService module;
 
         private final Map<Position, Block> blocks = new HashMap<>();
 
-        TestWorld(PortModule module) {
+        TestWorld(PortService module) {
             this.module = module;
         }
 

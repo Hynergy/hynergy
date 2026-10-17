@@ -25,6 +25,7 @@ import dev.hynergy.core.port.layout.PortOffset;
 import dev.hynergy.core.port.layout.PortReach;
 import lombok.Getter;
 import org.joml.Vector3i;
+import org.jspecify.annotations.NullUnmarked;
 import org.jspecify.annotations.Nullable;
 
 import java.util.ArrayList;
@@ -53,14 +54,14 @@ public final class DeviceConfig implements JsonAssetWithMap<String, DefaultAsset
                                         DeviceConfig::new,
                                         Codec.STRING,
                                         (config, id) -> config.id = id,
-                                        DeviceConfig::getId,
+                                        DeviceConfig::codecId,
                                         (config, data) -> config.extraData = data,
                                         config -> config.extraData
                                 )
                                 .append(
                                         new KeyedCodec<>("Type", Codec.STRING, true),
                                         (config, type) -> config.type = type,
-                                        config -> Objects.requireNonNull(config.type, "DeviceConfig Type is not initialized")
+                                        config -> config.type
                                 )
                                 .addValidator(Validators.nonEmptyString())
                                 .addValidator(new DeviceTypeValidator(devices))
@@ -281,6 +282,11 @@ public final class DeviceConfig implements JsonAssetWithMap<String, DefaultAsset
 
     private IllegalArgumentException invalid(String message, Throwable cause) {
         return new IllegalArgumentException("Invalid device config " + displayId() + ": " + message, cause);
+    }
+
+    @NullUnmarked
+    private static String codecId(DeviceConfig config) {
+        return config.id;
     }
 
     private String displayId() {

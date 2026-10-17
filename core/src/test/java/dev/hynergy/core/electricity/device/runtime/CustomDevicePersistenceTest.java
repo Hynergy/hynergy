@@ -1,14 +1,11 @@
-package dev.hynergy.core.electricity.device;
+package dev.hynergy.core.electricity.device.runtime;
 
-import dev.hynergy.core.electricity.device.config.CompiledDeviceConfig;
-import dev.hynergy.core.electricity.device.config.DeviceConfig;
-import dev.hynergy.core.electricity.device.config.DeviceParameterConfig;
-import dev.hynergy.core.electricity.device.config.DevicePortConfig;
-import dev.hynergy.core.electricity.device.runtime.DeviceComponent;
-import dev.hynergy.core.electricity.device.runtime.ElectricalDeviceSystem;
+import dev.hynergy.core.electricity.device.DeviceRegistration;
+import dev.hynergy.core.electricity.device.DeviceRegistry;
+import dev.hynergy.core.electricity.device.config.*;
 import dev.hynergy.core.electricity.port.ElectricalPortConnection;
 import dev.hynergy.core.electricity.port.ElectricalPortProfile;
-import dev.hynergy.core.port.PortModule;
+import dev.hynergy.core.port.PortService;
 import dev.hynergy.core.port.layout.BlockPortDefinition;
 import dev.hynergy.electrical.*;
 import dev.hynergy.electrical.primitives.passive.Resistance;
@@ -46,9 +43,9 @@ final class CustomDevicePersistenceTest {
             var registration = registry.register("test:pair", type);
             assertThrows(IllegalArgumentException.class, () -> registration.binding()
                                                                            .validateParameter(type.parameter(8), 0));
-            var compiled = new CompiledDeviceConfig(registration, java.util.List.of(
-                    new CompiledDeviceConfig.ParameterBinding(type.parameter(4), 20),
-                    new CompiledDeviceConfig.ParameterBinding(type.parameter(8), 20)),
+            var compiled = DeviceConfigTestFixtures.compiled(registration, java.util.List.of(
+                            new CompiledDeviceConfig.ParameterBinding(type.parameter(4), 20),
+                            new CompiledDeviceConfig.ParameterBinding(type.parameter(8), 20)),
                     java.util.List.of(), BlockPortDefinition.of());
             try (var system = runtime.createSystem(20)) {
                 var component = new DeviceComponent("test:pair");
@@ -116,15 +113,15 @@ final class CustomDevicePersistenceTest {
             DeviceRegistry registry = new DeviceRegistry(runtime);
             DeviceRegistration descriptor = registry.register("test:custom", type);
             registry.freeze();
-            PortModule ports = new PortModule();
+            PortService ports = new PortService();
             var domain = ports.<ElectricalPortConnection>registerDomain("test:electrical");
             var conductor = ports.registerStandard("test:conductor", domain,
                     ElectricalPortProfile.class, (first, second, geometry) -> ElectricalPortConnection.DIRECT);
-            DeviceConfig config = new DeviceConfig("test:asset", "test:custom",
-                    new DeviceParameterConfig[]{new DeviceParameterConfig(4, 10.0)},
+            DeviceConfig config = DeviceConfigTestFixtures.config("test:asset", "test:custom",
+                    new DeviceParameterConfig[]{DeviceConfigTestFixtures.parameter(4, 10.0)},
                     new DevicePortConfig[]{
-                            new DevicePortConfig(9, 2, null, new Vector3i(1, 0, 0)),
-                            new DevicePortConfig(12, 5, null, new Vector3i(-1, 0, 0))});
+                            DeviceConfigTestFixtures.port(9, 2, null, new Vector3i(1, 0, 0)),
+                            DeviceConfigTestFixtures.port(12, 5, null, new Vector3i(-1, 0, 0))});
             CompiledDeviceConfig compiled = config.compile(registry, conductor);
             assertSame(descriptor, compiled.registration());
             assertEquals(9, compiled.ports().get(0).portId());

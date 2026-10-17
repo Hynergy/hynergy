@@ -25,7 +25,7 @@ final class PortAssetDefinitionTest {
 
     @Test
     void blockPortsCanBeInstalledAfterProtocolFreezeAndDiscovered() {
-        PortModule module = new PortModule();
+        PortService module = new PortService();
         PortDomain<Result> domain = module.registerDomain("test:domain");
         PortStandard<Profile, Result> standard = module.registerStandard(
                 "test:standard",
@@ -33,7 +33,7 @@ final class PortAssetDefinitionTest {
                 Profile.class,
                 (first, second, geometry) -> new Result(first.name() + ":" + second.name())
         );
-        PortModuleTestAccess.freeze(module);
+        PortServiceTestAccess.freeze(module);
 
         module.setBlockPorts(1, BlockPortDefinition.of(
                 new PortDefinition<>(0, new PortOffset(0, 0, 0), PortReach.single(1, 0, 0), standard, new Profile("source"))
@@ -57,13 +57,13 @@ final class PortAssetDefinitionTest {
 
     @Test
     void replacingAndClearingRuntimeBlockPortsTakesEffectImmediately() {
-        PortModule module = new PortModule();
+        PortService module = new PortService();
         PortDomain<Result> domain = module.registerDomain("test:domain");
         PortStandard<Profile, Result> standard = module.registerStandard(
                 "test:standard", domain, Profile.class,
                 (first, second, geometry) -> new Result(second.name())
         );
-        PortModuleTestAccess.freeze(module);
+        PortServiceTestAccess.freeze(module);
 
         BlockPortDefinition source = BlockPortDefinition.of(
                 new PortDefinition<>(0, PortOffset.ZERO, PortReach.single(1, 0, 0), standard, new Profile("source"))
@@ -90,13 +90,13 @@ final class PortAssetDefinitionTest {
 
     @Test
     void bothPortReachesMustContainTheRelationship() {
-        PortModule module = new PortModule();
+        PortService module = new PortService();
         PortDomain<Result> domain = module.registerDomain("test:domain");
         PortStandard<Profile, Result> standard = module.registerStandard(
                 "test:standard", domain, Profile.class,
                 (first, second, geometry) -> new Result("connected")
         );
-        PortModuleTestAccess.freeze(module);
+        PortServiceTestAccess.freeze(module);
         module.setBlockPorts(1, BlockPortDefinition.of(
                 new PortDefinition<>(0, PortOffset.ZERO, PortReach.single(1, 0, 0), standard, new Profile("source"))
         ));
@@ -112,15 +112,15 @@ final class PortAssetDefinitionTest {
     }
 
     @Test
-    void runtimeDefinitionRejectsStandardsFromAnotherPortModule() {
-        PortModule owner = new PortModule();
+    void runtimeDefinitionRejectsStandardsFromAnotherPortService() {
+        PortService owner = new PortService();
         PortDomain<Result> ownerDomain = owner.registerDomain("test:owner-domain");
         owner.registerStandard(
                 "test:owner-standard", ownerDomain, Profile.class,
                 (first, second, geometry) -> new Result("owner")
         );
 
-        PortModule foreign = new PortModule();
+        PortService foreign = new PortService();
         PortDomain<Result> foreignDomain = foreign.registerDomain("test:foreign-domain");
         PortStandard<Profile, Result> foreignStandard = foreign.registerStandard(
                 "test:foreign-standard", foreignDomain, Profile.class,
@@ -137,7 +137,7 @@ final class PortAssetDefinitionTest {
 
     @Test
     void blockDefinitionRejectsInvalidPortDefinitions() {
-        PortModule module = new PortModule();
+        PortService module = new PortService();
         PortDomain<Result> domain = module.registerDomain("test:domain");
         PortStandard<Profile, Result> standard = module.registerStandard(
                 "test:standard", domain, Profile.class,
@@ -154,7 +154,7 @@ final class PortAssetDefinitionTest {
         assertThrows(IllegalArgumentException.class, () -> BlockPortDefinition.of(first, second));
     }
 
-    private static List<Result> discover(PortModule module, TestWorld world, PortDomain<Result> domain) {
+    private static List<Result> discover(PortService module, TestWorld world, PortDomain<Result> domain) {
         List<Result> results = new ArrayList<>();
         module.discovery().discover(
                 world, 0, 0, 0, 0, domain,
@@ -164,11 +164,11 @@ final class PortAssetDefinitionTest {
     }
 
     private static final class TestWorld implements PortWorldView {
-        private final PortModule module;
+        private final PortService module;
 
         private final Map<Position, Integer> blocks = new HashMap<>();
 
-        TestWorld(PortModule module) {
+        TestWorld(PortService module) {
             this.module = module;
         }
 

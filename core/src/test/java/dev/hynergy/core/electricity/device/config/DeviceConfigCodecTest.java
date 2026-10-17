@@ -1,10 +1,10 @@
-package dev.hynergy.core.electricity.device;
+package dev.hynergy.core.electricity.device.config;
 
 import com.hypixel.hytale.codec.ExtraInfo;
 import com.hypixel.hytale.codec.exception.CodecValidationException;
 import com.hypixel.hytale.codec.schema.SchemaContext;
 import com.hypixel.hytale.codec.schema.metadata.ui.UIEditor;
-import dev.hynergy.core.electricity.device.config.DeviceConfig;
+import dev.hynergy.core.electricity.device.DeviceRegistry;
 import dev.hynergy.electrical.primitives.passive.Resistance;
 import org.bson.BsonDocument;
 import org.junit.jupiter.api.Test;

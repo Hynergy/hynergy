@@ -5,8 +5,8 @@ import com.hypixel.hytale.server.core.asset.type.blocktype.config.RotationTuple;
 import dev.hynergy.core.electricity.port.ElectricalPortConnection;
 import dev.hynergy.core.electricity.port.ElectricalPortProfile;
 import dev.hynergy.core.port.PortDomain;
-import dev.hynergy.core.port.PortModule;
-import dev.hynergy.core.port.PortModuleTestAccess;
+import dev.hynergy.core.port.PortService;
+import dev.hynergy.core.port.PortServiceTestAccess;
 import dev.hynergy.core.port.PortStandard;
 import dev.hynergy.core.port.layout.BlockPortDefinition;
 import dev.hynergy.core.port.layout.PortDefinition;
@@ -57,7 +57,7 @@ final class ElectricalPortDiscoveryTest {
 
     @Test
     void pluginStandardCanRegisterAdapterToBuiltInConductorWithoutChangingElectricalModule() {
-        PortModule ports = new PortModule();
+        PortService ports = new PortService();
 
         PortStandard<ElectricalPortProfile, ElectricalPortConnection> conductor =
                 registerConductorStandard(ports);
@@ -81,7 +81,7 @@ final class ElectricalPortDiscoveryTest {
                 (pluginProfile, conductorProfile, geometry) ->
                         ElectricalPortConnection.DIRECT
         );
-        PortModuleTestAccess.freeze(ports);
+        PortServiceTestAccess.freeze(ports);
         ports.setBlockPorts(1, BlockPortDefinition.of(
                 new PortDefinition<>(
                         0,
@@ -118,7 +118,7 @@ final class ElectricalPortDiscoveryTest {
     }
 
 
-    private record Fixture(PortModule ports, PortDomain<ElectricalPortConnection> domain, TestWorld world) {
+    private record Fixture(PortService ports, PortDomain<ElectricalPortConnection> domain, TestWorld world) {
 
         static Fixture create(
                 int sourceNormalX,
@@ -150,12 +150,12 @@ final class ElectricalPortDiscoveryTest {
                 int targetY,
                 int targetZ
         ) {
-            PortModule ports = new PortModule();
+            PortService ports = new PortService();
 
             PortStandard<ElectricalPortProfile, ElectricalPortConnection> conductor =
                     registerConductorStandard(ports);
 
-            PortModuleTestAccess.freeze(ports);
+            PortServiceTestAccess.freeze(ports);
 
             ports.setBlockPorts(
                     1,
@@ -205,7 +205,7 @@ final class ElectricalPortDiscoveryTest {
     }
 
     private static PortStandard<ElectricalPortProfile, ElectricalPortConnection>
-    registerConductorStandard(PortModule ports) {
+    registerConductorStandard(PortService ports) {
         PortDomain<ElectricalPortConnection> domain =
                 ports.registerDomain("test:electrical");
 
@@ -235,12 +235,12 @@ final class ElectricalPortDiscoveryTest {
     }
 
     private static final class TestWorld implements PortWorldView {
-        private final PortModule module;
+        private final PortService module;
 
         private final Map<Position, Integer> ids = new HashMap<>();
         private final Map<Position, RotationTuple> rotations = new HashMap<>();
 
-        TestWorld(PortModule module) {
+        TestWorld(PortService module) {
             this.module = module;
         }
 

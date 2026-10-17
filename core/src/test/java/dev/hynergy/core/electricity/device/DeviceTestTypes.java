@@ -3,12 +3,11 @@ package dev.hynergy.core.electricity.device;
 import dev.hynergy.electrical.DeviceType;
 import dev.hynergy.electrical.ParameterConstraints;
 import dev.hynergy.electrical.PrimitiveDeviceTypes;
-
-final class DeviceTestTypes {
+public final class DeviceTestTypes {
     private DeviceTestTypes() {
     }
 
-    static DeviceType resistor(int parameterId, int positiveId, int negativeId, int currentId) {
+    public static DeviceType resistor(int parameterId, int positiveId, int negativeId, int currentId) {
         return DeviceType.define(b -> {
             var p = b.terminal(positiveId, "positive");
             var n = b.terminal(negativeId, "negative");

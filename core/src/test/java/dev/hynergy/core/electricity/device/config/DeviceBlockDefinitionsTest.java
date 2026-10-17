@@ -1,10 +1,10 @@
-package dev.hynergy.core.electricity.device;
+package dev.hynergy.core.electricity.device.config;
 
-import dev.hynergy.core.electricity.device.config.*;
+import dev.hynergy.core.electricity.device.DeviceRegistry;
 import dev.hynergy.core.electricity.port.ElectricalPortConnection;
 import dev.hynergy.core.electricity.port.ElectricalPortProfile;
 import dev.hynergy.core.port.PortDomain;
-import dev.hynergy.core.port.PortModule;
+import dev.hynergy.core.port.PortService;
 import dev.hynergy.core.port.PortStandard;
 import dev.hynergy.electrical.ElectricalRuntime;
 import dev.hynergy.electrical.PrimitiveDeviceTypes;
@@ -37,7 +37,7 @@ final class DeviceBlockDefinitionsTest {
     void rebuildCompilesSharedConfigOnceAndKeepsRuntimeAndPortDefinitionsAligned() {
         DeviceRegistry descriptors = descriptors();
         descriptors.freeze();
-        PortModule ports = new PortModule();
+        PortService ports = new PortService();
         PortStandard<ElectricalPortProfile, ElectricalPortConnection> conductor = conductorStandard(ports);
         DeviceBlockDefinitions.Publisher publisher = new DeviceBlockDefinitions.Publisher(
                 descriptors,
@@ -70,7 +70,7 @@ final class DeviceBlockDefinitionsTest {
     void rebuildPublishesAllReplacementsBeforeClearingAnyStaleIndexes() {
         DeviceRegistry descriptors = descriptors();
         descriptors.freeze();
-        PortModule ports = new PortModule();
+        PortService ports = new PortService();
         PortStandard<ElectricalPortProfile, ElectricalPortConnection> conductor = conductorStandard(ports);
         RecordingSink sink = new RecordingSink();
         DeviceBlockDefinitions.Publisher publisher =
@@ -94,7 +94,7 @@ final class DeviceBlockDefinitionsTest {
     @Test
     void publishingRequiresFrozenDescriptors() {
         DeviceRegistry descriptors = descriptors();
-        PortModule ports = new PortModule();
+        PortService ports = new PortService();
         PortStandard<ElectricalPortProfile, ElectricalPortConnection> conductor = conductorStandard(ports);
         DeviceBlockDefinitions.Publisher publisher = new DeviceBlockDefinitions.Publisher(
                 descriptors,
@@ -114,7 +114,7 @@ final class DeviceBlockDefinitionsTest {
     void nativeInvalidDefaultLeavesPublishedConfigurationsAndPortsIntact() {
         DeviceRegistry descriptors = descriptors();
         descriptors.freeze();
-        PortModule ports = new PortModule();
+        PortService ports = new PortService();
         var publisher = new DeviceBlockDefinitions.Publisher(descriptors, ports, conductorStandard(ports));
         publisher.rebuild(List.of(new DeviceBlockDefinitions.Binding(2, config("test:old", 100.0, 4))));
         CompiledDeviceConfig previous = publisher.get(2);
@@ -153,7 +153,7 @@ final class DeviceBlockDefinitionsTest {
     }
 
     private static PortStandard<ElectricalPortProfile, ElectricalPortConnection> conductorStandard(
-            PortModule ports
+            PortService ports
     ) {
         PortDomain<ElectricalPortConnection> domain = ports.registerDomain("test:electrical");
         return ports.registerStandard(

@@ -1,12 +1,9 @@
-package dev.hynergy.core.electricity.device;
+package dev.hynergy.core.electricity.device.config;
 
-import dev.hynergy.core.electricity.device.config.CompiledDeviceConfig;
-import dev.hynergy.core.electricity.device.config.DeviceConfig;
-import dev.hynergy.core.electricity.device.config.DeviceParameterConfig;
-import dev.hynergy.core.electricity.device.config.DevicePortConfig;
+import dev.hynergy.core.electricity.device.DeviceRegistry;
 import dev.hynergy.core.electricity.port.ElectricalPortConnection;
 import dev.hynergy.core.electricity.port.ElectricalPortProfile;
-import dev.hynergy.core.port.PortModule;
+import dev.hynergy.core.port.PortService;
 import dev.hynergy.core.port.PortStandard;
 import dev.hynergy.core.port.layout.BlockPortDefinition;
 import dev.hynergy.core.port.layout.PortOffset;
@@ -57,7 +54,7 @@ class DeviceConfigCompilationTest {
     }
 
     static PortStandard<ElectricalPortProfile, ElectricalPortConnection> conductorStandard() {
-        var ports = new PortModule();
+        var ports = new PortService();
         var domain = ports.<ElectricalPortConnection>registerDomain("test:electrical");
         return ports.registerStandard("test:conductor", domain, ElectricalPortProfile.class, (a, b, g) -> ElectricalPortConnection.DIRECT);
     }
@@ -108,6 +105,17 @@ class DeviceConfigCompilationTest {
         assertSame(compiled.ports().get(0).terminal(), compiled.ports().get(1).terminal());
         assertSame(type.parameter(1), compiled.declaredParameter(1));
         assertEquals(0, config(null, null).compile(registry, conductorStandard()).portDefinition().size());
+    }
+
+    @Test
+    void nullArrayElementsAreRejectedDuringCompilation() {
+        var standard = conductorStandard();
+        DeviceConfig invalidParameter = config(new DeviceParameterConfig[]{null}, null);
+        DeviceConfig invalidPort = config(null, new DevicePortConfig[]{null});
+        assertThrows(IllegalArgumentException.class,
+                () -> invalidParameter.compile(registry, standard));
+        assertThrows(IllegalArgumentException.class,
+                () -> invalidPort.compile(registry, standard));
     }
 
     @Test

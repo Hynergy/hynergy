@@ -1,9 +1,10 @@
-package dev.hynergy.core.electricity.device;
+package dev.hynergy.core.electricity.device.runtime;
 
 import dev.hynergy.core.electricity.ElectricalCodecs;
+import dev.hynergy.core.electricity.device.DeviceRegistry;
+import dev.hynergy.core.electricity.device.DeviceTestTypes;
 import dev.hynergy.core.electricity.device.config.CompiledDeviceConfig;
-import dev.hynergy.core.electricity.device.runtime.DeviceComponent;
-import dev.hynergy.core.electricity.device.runtime.ElectricalDeviceSystem;
+import dev.hynergy.core.electricity.device.config.DeviceConfigTestFixtures;
 import dev.hynergy.core.port.layout.BlockPortDefinition;
 import dev.hynergy.electrical.*;
 import dev.hynergy.electrical.primitives.sources.VoltageSource;
@@ -25,7 +26,7 @@ final class DeviceComponentTest {
         try (ElectricalRuntime runtime = ElectricalRuntime.create();
              ElectricalSystem system = prepareSystem(runtime)) {
             var descriptor = new DeviceRegistry(runtime).register("test:voltage", VoltageSource.TYPE);
-            CompiledDeviceConfig compiled = new CompiledDeviceConfig(descriptor,
+            CompiledDeviceConfig compiled = DeviceConfigTestFixtures.compiled(descriptor,
                     java.util.List.of(new CompiledDeviceConfig.ParameterBinding(VoltageSource.VOLTAGE, 0.0)),
                     java.util.List.of(), BlockPortDefinition.of());
             DeviceComponent component = new DeviceComponent("test:voltage");
@@ -240,7 +241,7 @@ final class DeviceComponentTest {
 
     private static CompiledDeviceConfig compiled(ElectricalRuntime runtime, int stableParameterId, double defaultValue, int stableObserverId) {
         var registration = new DeviceRegistry(runtime).register("test:device", TYPE);
-        return new CompiledDeviceConfig(registration,
+        return DeviceConfigTestFixtures.compiled(registration,
                 java.util.List.of(new CompiledDeviceConfig.ParameterBinding(TYPE.parameter(stableParameterId), defaultValue)),
                 java.util.List.of(), BlockPortDefinition.of());
     }

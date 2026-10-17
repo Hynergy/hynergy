@@ -1,18 +1,17 @@
-package dev.hynergy.core.electricity.device;
+package dev.hynergy.core.electricity.device.runtime;
 
 import com.hypixel.hytale.server.core.asset.type.blocktype.config.RotationTuple;
+import dev.hynergy.core.electricity.device.DeviceRegistry;
+import dev.hynergy.core.electricity.device.DeviceTestTypes;
 import dev.hynergy.core.electricity.device.config.CompiledDeviceConfig;
-import dev.hynergy.core.electricity.device.config.DeviceConfig;
+import dev.hynergy.core.electricity.device.config.DeviceConfigTestFixtures;
 import dev.hynergy.core.electricity.device.config.DeviceParameterConfig;
 import dev.hynergy.core.electricity.device.config.DevicePortConfig;
-import dev.hynergy.core.electricity.device.runtime.DeviceComponent;
-import dev.hynergy.core.electricity.device.runtime.DeviceWireConnections;
-import dev.hynergy.core.electricity.device.runtime.ElectricalDeviceSystem;
 import dev.hynergy.core.electricity.port.ElectricalPortConnection;
 import dev.hynergy.core.electricity.port.ElectricalPortProfile;
 import dev.hynergy.core.port.PortDomain;
-import dev.hynergy.core.port.PortModule;
-import dev.hynergy.core.port.PortModuleTestAccess;
+import dev.hynergy.core.port.PortService;
+import dev.hynergy.core.port.PortServiceTestAccess;
 import dev.hynergy.core.port.layout.BlockPortDefinition;
 import dev.hynergy.core.port.layout.PortDefinition;
 import dev.hynergy.core.port.layout.PortOffset;
@@ -164,7 +163,7 @@ final class DeviceWireConnectionsTest {
     private static final class Fixture implements AutoCloseable, PortWorldView {
         private final ElectricalRuntime runtime = ElectricalRuntime.create();
         private final ElectricalSystem system = prepareSystem(runtime);
-        private final PortModule ports = new PortModule();
+        private final PortService ports = new PortService();
         private final PortDomain<ElectricalPortConnection> domain = ports.registerDomain("test:electrical");
         private final CompiledDeviceConfig compiled;
         private final DeviceComponent component = new DeviceComponent("test:resistance");
@@ -184,16 +183,16 @@ final class DeviceWireConnectionsTest {
             var standard = ports.registerStandard("test:conductor", domain, ElectricalPortProfile.class,
                     (first, second, geometry) ->
                             first.normalX() == -second.normalX() ? ElectricalPortConnection.DIRECT : null);
-            PortModuleTestAccess.freeze(ports);
+            PortServiceTestAccess.freeze(ports);
             runtime.register(Resistance.TYPE);
             var descriptors = new DeviceRegistry(runtime);
             descriptors.register("test:resistance", TYPE);
-            compiled = new DeviceConfig("test:resistance", "test:resistance",
-                    new DeviceParameterConfig[]{new DeviceParameterConfig(4, 10.0)},
+            compiled = DeviceConfigTestFixtures.config("test:resistance", "test:resistance",
+                    new DeviceParameterConfig[]{DeviceConfigTestFixtures.parameter(4, 10.0)},
                     new DevicePortConfig[]{
-                            new DevicePortConfig(3, 1, null, new Vector3i(1, 0, 0)),
-                            new DevicePortConfig(7, 4, null, new Vector3i(-1, 0, 0)),
-                            new DevicePortConfig(19, 4, null, new Vector3i(-1, 0, 0))
+                            DeviceConfigTestFixtures.port(3, 1, null, new Vector3i(1, 0, 0)),
+                            DeviceConfigTestFixtures.port(7, 4, null, new Vector3i(-1, 0, 0)),
+                            DeviceConfigTestFixtures.port(19, 4, null, new Vector3i(-1, 0, 0))
                     }).compile(descriptors, standard);
             leftWirePorts = BlockPortDefinition.of(new PortDefinition<>(
                     12, PortOffset.ZERO, PortReach.single(1, 0, 0), standard, new ElectricalPortProfile(1, 0, 0)));

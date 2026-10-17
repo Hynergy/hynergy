@@ -1,9 +1,9 @@
-package dev.hynergy.core.electricity.device;
+package dev.hynergy.core.electricity.device.runtime;
 
+import dev.hynergy.core.electricity.device.DeviceRegistry;
+import dev.hynergy.core.electricity.device.DeviceTestTypes;
 import dev.hynergy.core.electricity.device.config.CompiledDeviceConfig;
-import dev.hynergy.core.electricity.device.runtime.DeviceComponent;
-import dev.hynergy.core.electricity.device.runtime.DeviceWireConnections;
-import dev.hynergy.core.electricity.device.runtime.ElectricalDeviceSystem;
+import dev.hynergy.core.electricity.device.config.DeviceConfigTestFixtures;
 import dev.hynergy.core.port.layout.BlockPortDefinition;
 import dev.hynergy.electrical.*;
 import org.junit.jupiter.api.Test;
@@ -40,7 +40,7 @@ final class ElectricalDeviceSystemTest {
             component.setDeviceId(resistance.id());
             component.overrides().set(9, 123.0);
             CompiledDeviceConfig valid = compiled(runtime, 4, 20.0);
-            CompiledDeviceConfig invalid = new CompiledDeviceConfig(valid.registration(),
+            CompiledDeviceConfig invalid = DeviceConfigTestFixtures.compiled(valid.registration(),
                     java.util.List.of(new CompiledDeviceConfig.ParameterBinding(TYPE.parameter(4), 20.0), new CompiledDeviceConfig.ParameterBinding(PrimitiveDeviceTypes.VOLTAGE_SOURCE.parameter(0), 1.0)),
                     java.util.List.of(), BlockPortDefinition.of());
             assertThrows(IllegalArgumentException.class,
@@ -255,13 +255,13 @@ final class ElectricalDeviceSystemTest {
 
     private static CompiledDeviceConfig compiled(ElectricalRuntime runtime, int stableParameterId, double defaultValue) {
         var registration = new DeviceRegistry(runtime).register("test:device", TYPE);
-        return new CompiledDeviceConfig(registration,
+        return DeviceConfigTestFixtures.compiled(registration,
                 java.util.List.of(new CompiledDeviceConfig.ParameterBinding(TYPE.parameter(stableParameterId), defaultValue)),
                 java.util.List.of(), BlockPortDefinition.of());
     }
 
     private static CompiledDeviceConfig compiledWithoutDefault(ElectricalRuntime runtime) {
-        return new CompiledDeviceConfig(new DeviceRegistry(runtime).register("test:device", TYPE7),
+        return DeviceConfigTestFixtures.compiled(new DeviceRegistry(runtime).register("test:device", TYPE7),
                 java.util.List.of(), java.util.List.of(), BlockPortDefinition.of());
     }
 
