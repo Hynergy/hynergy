@@ -3,6 +3,7 @@ package dev.hynergy.core.electricity.cable;
 import com.hypixel.hytale.codec.Codec;
 import com.hypixel.hytale.codec.KeyedCodec;
 import com.hypixel.hytale.codec.builder.BuilderCodec;
+import com.hypixel.hytale.codec.schema.metadata.ui.UIDisplayMode;
 import com.hypixel.hytale.codec.schema.metadata.ui.UIEditor;
 import com.hypixel.hytale.codec.validation.Validators;
 import com.hypixel.hytale.component.Component;
@@ -33,6 +34,7 @@ public class CableComponent implements Component<ChunkStore> {
                                 new KeyedCodec<>("WireId", ElectricalCodecs.WIRE_ID),
                                 (component, id) -> component.wireId = id,
                                 component -> component.wireId)
+                        .metadata(UIDisplayMode.HIDDEN)
                         .add()
                         .build();
 

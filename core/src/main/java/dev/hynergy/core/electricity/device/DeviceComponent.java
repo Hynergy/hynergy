@@ -4,6 +4,7 @@ import com.hypixel.hytale.codec.Codec;
 import com.hypixel.hytale.codec.KeyedCodec;
 import com.hypixel.hytale.codec.builder.BuilderCodec;
 import com.hypixel.hytale.codec.codecs.array.ArrayCodec;
+import com.hypixel.hytale.codec.schema.metadata.ui.UIDisplayMode;
 import com.hypixel.hytale.codec.schema.metadata.ui.UIEditor;
 import com.hypixel.hytale.codec.validation.Validators;
 import com.hypixel.hytale.component.Component;
@@ -43,6 +44,7 @@ public final class DeviceComponent implements Component<ChunkStore> {
                                 (component, id) -> component.deviceId = id,
                                 component -> component.deviceId
                         )
+                        .metadata(UIDisplayMode.HIDDEN)
                         .add()
                         .append(
                                 new KeyedCodec<>("Overrides", OVERRIDES_CODEC),
