@@ -49,7 +49,7 @@ final class CustomDevicePersistenceTest {
                     java.util.List.of(), BlockPortDefinition.of());
             try (var system = runtime.createSystem(20)) {
                 var component = new DeviceComponent("test:pair");
-                ElectricalDeviceSystem.bindDevice(component, compiled, system, () -> {
+                DeviceSystem.bindDevice(component, compiled, system, () -> {
                 });
                 var retained = component.device();
                 assertNotNull(retained);
@@ -67,9 +67,9 @@ final class CustomDevicePersistenceTest {
                 var serialized = DeviceComponent.CODEC.decode(DeviceComponent.CODEC.encode(component));
                 serialized.overrides().set(4, 40);
                 serialized.overrides().set(8, 0);
-                ElectricalDeviceSystem.unloadDevice(component);
+                DeviceSystem.unloadDevice(component);
                 var saves = new AtomicInteger();
-                assertThrows(IllegalArgumentException.class, () -> ElectricalDeviceSystem.bindDevice(serialized, compiled, system, saves::incrementAndGet));
+                assertThrows(IllegalArgumentException.class, () -> DeviceSystem.bindDevice(serialized, compiled, system, saves::incrementAndGet));
                 assertNull(serialized.device());
                 assertEquals(retained.id(), serialized.getDeviceId());
                 assertEquals(40, serialized.overrides().getOrDefault(4, -1));
@@ -131,7 +131,7 @@ final class CustomDevicePersistenceTest {
             AtomicInteger dirty = new AtomicInteger();
             try (ElectricalSystem system = runtime.createSystem(20)) {
                 DeviceComponent component = new DeviceComponent("test:asset");
-                ElectricalDeviceSystem.bindDevice(component, compiled, system, dirty::incrementAndGet);
+                DeviceSystem.bindDevice(component, compiled, system, dirty::incrementAndGet);
                 Device handle = component.device();
                 assertNotNull(handle);
                 assertEquals(Device.class, handle.getClass());
@@ -154,8 +154,8 @@ final class CustomDevicePersistenceTest {
                 assertEquals(handle.id(), restored.getDeviceId());
                 assertEquals(20.0, restored.overrides().getOrDefault(4, -1.0));
                 assertNull(restored.device());
-                ElectricalDeviceSystem.unloadDevice(component);
-                var result = ElectricalDeviceSystem.bindDevice(restored, compiled, system, dirty::incrementAndGet);
+                DeviceSystem.unloadDevice(component);
+                var result = DeviceSystem.bindDevice(restored, compiled, system, dirty::incrementAndGet);
                 assertFalse(result.created());
                 assertFalse(result.persistenceChanged());
                 assertEquals(handle.id(), restored.device().id());

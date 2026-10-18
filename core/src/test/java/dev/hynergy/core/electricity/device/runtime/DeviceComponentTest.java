@@ -31,7 +31,7 @@ final class DeviceComponentTest {
                     java.util.List.of(), BlockPortDefinition.of());
             DeviceComponent component = new DeviceComponent("test:voltage");
             java.util.ArrayList<Long> saved = new java.util.ArrayList<>();
-            ElectricalDeviceSystem.bindDevice(component, compiled, system,
+            DeviceSystem.bindDevice(component, compiled, system,
                     () -> saved.add(Double.doubleToLongBits(component.overrides().getOrDefault(0, 0.0))));
             component.setParameter(0, -0.0);
             assertTrue(component.overrides().contains(0));
@@ -48,7 +48,7 @@ final class DeviceComponentTest {
              ElectricalSystem system = prepareSystem(runtime)) {
             DeviceComponent component = new DeviceComponent("test:device");
             java.util.ArrayList<Double> savedOverrides = new java.util.ArrayList<>();
-            ElectricalDeviceSystem.bindDevice(component, compiled(runtime, 4, 100.0, 6), system,
+            DeviceSystem.bindDevice(component, compiled(runtime, 4, 100.0, 6), system,
                     () -> savedOverrides.add(component.overrides().getOrDefault(4, 100.0)));
 
             component.setParameter(4, 470.0);
@@ -62,10 +62,10 @@ final class DeviceComponentTest {
             assertFalse(component.overrides().contains(4));
             assertEquals(java.util.List.of(470.0, 100.0), savedOverrides);
 
-            ElectricalDeviceSystem.unloadDevice(component);
+            DeviceSystem.unloadDevice(component);
             assertThrows(IllegalStateException.class, () -> component.setParameter(4, 220.0));
             java.util.ArrayList<Double> reloadedSaves = new java.util.ArrayList<>();
-            ElectricalDeviceSystem.bindDevice(component, compiled(runtime, 4, 100.0, 6), system,
+            DeviceSystem.bindDevice(component, compiled(runtime, 4, 100.0, 6), system,
                     () -> reloadedSaves.add(component.overrides().getOrDefault(4, 100.0)));
             component.setParameter(4, 220.0);
             assertEquals(java.util.List.of(220.0), reloadedSaves);
@@ -79,7 +79,7 @@ final class DeviceComponentTest {
         try (ElectricalRuntime runtime = ElectricalRuntime.create();
              ElectricalSystem system = prepareSystem(runtime)) {
             DeviceComponent component = new DeviceComponent("test:device");
-            ElectricalDeviceSystem.bindDevice(component, compiled(runtime, 4, 100.0, 6), system, () -> {
+            DeviceSystem.bindDevice(component, compiled(runtime, 4, 100.0, 6), system, () -> {
             });
             component.setParameter(4, 470.0);
 

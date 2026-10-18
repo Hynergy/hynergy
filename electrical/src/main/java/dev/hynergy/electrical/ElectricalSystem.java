@@ -1,8 +1,10 @@
 package dev.hynergy.electrical;
 
+import lombok.Getter;
 import org.jspecify.annotations.Nullable;
 
 import java.util.Objects;
+import java.util.UUID;
 
 /**
  * Contains one electrical simulation world.
@@ -22,6 +24,8 @@ import java.util.Objects;
 public final class ElectricalSystem implements AutoCloseable {
     private final ElectricalRuntime runtime;
     private final ElectricalWorld world;
+
+    @Getter private final UUID uuid = UUID.randomUUID();
 
     private final ObservationSubscriptionRegistry subscriptions = new ObservationSubscriptionRegistry();
 
@@ -225,11 +229,11 @@ public final class ElectricalSystem implements AutoCloseable {
      * Values follow the parameter order in the declaration.
      * The method rejects invalid values before it allocates a device.
      *
-     * @param type a type registered in this runtime
+     * @param type       a type registered in this runtime
      * @param parameters one value for each entry in {@link DeviceType#parameters()}, in list order
      * @return the device handle
      * @throws IllegalArgumentException if the value count or parameter vector is invalid
-     * @throws IllegalStateException if the system is unusable or the type is not registered
+     * @throws IllegalStateException    if the system is unusable or the type is not registered
      */
     public Device create(DeviceType type, double... parameters) {
         requireUsable();
@@ -254,13 +258,13 @@ public final class ElectricalSystem implements AutoCloseable {
      * be valid for this runtime, and the exact device ID and generation must
      * still be usable in this electrical world.</p>
      *
-     * @param id the persistent device identity
+     * @param id   the persistent device identity
      * @param type the electrical device definition
      * @return a newly bound runtime handle for the existing device
-     * @throws NullPointerException if {@code id} or {@code type} is null
+     * @throws NullPointerException     if {@code id} or {@code type} is null
      * @throws IllegalArgumentException if the type has a different native definition
-     * @throws IllegalStateException if the system is closed or unusable, the
-     *     type is not registered for this runtime, or the identity is stale
+     * @throws IllegalStateException    if the system is closed or unusable, the
+     *                                  type is not registered for this runtime, or the identity is stale
      */
     public Device resolveDevice(DeviceId id, DeviceType type) {
         requireUsable();
@@ -392,7 +396,6 @@ public final class ElectricalSystem implements AutoCloseable {
         try {
             subscriptions.remove(subscription);
         } catch (RuntimeException | Error failure) {
-
             poisoned = true;
             throw failure;
         }

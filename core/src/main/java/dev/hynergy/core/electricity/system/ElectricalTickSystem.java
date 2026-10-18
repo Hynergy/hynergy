@@ -9,7 +9,7 @@ import com.hypixel.hytale.component.system.tick.TickingSystem;
 import com.hypixel.hytale.server.core.universe.world.World;
 import com.hypixel.hytale.server.core.universe.world.storage.ChunkStore;
 import dev.hynergy.core.electricity.cable.CableSystem;
-import dev.hynergy.core.electricity.device.runtime.ElectricalDeviceSystem;
+import dev.hynergy.core.electricity.device.runtime.DeviceSystem;
 import dev.hynergy.electrical.ElectricalRuntime;
 import dev.hynergy.electrical.ElectricalSystem;
 
@@ -18,7 +18,7 @@ import java.util.Set;
 public final class ElectricalTickSystem extends TickingSystem<ChunkStore> {
     private static final Set<Dependency<ChunkStore>> DEPENDENCIES = Set.of(
             new SystemDependency<>(Order.AFTER, CableSystem.class),
-            new SystemDependency<>(Order.AFTER, ElectricalDeviceSystem.class)
+            new SystemDependency<>(Order.AFTER, DeviceSystem.class)
     );
 
     private final ElectricalRuntime runtime;

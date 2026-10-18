@@ -44,7 +44,7 @@ final class ElectricalDeviceSystemTest {
                     java.util.List.of(new CompiledDeviceConfig.ParameterBinding(TYPE.parameter(4), 20.0), new CompiledDeviceConfig.ParameterBinding(PrimitiveDeviceTypes.VOLTAGE_SOURCE.parameter(0), 1.0)),
                     java.util.List.of(), BlockPortDefinition.of());
             assertThrows(IllegalArgumentException.class,
-                    () -> ElectricalDeviceSystem.bindDevice(component, invalid, system, () -> {
+                    () -> DeviceSystem.bindDevice(component, invalid, system, () -> {
                     }));
             assertNull(component.device());
             assertTrue(component.overrides().contains(9));
@@ -60,7 +60,7 @@ final class ElectricalDeviceSystemTest {
              ElectricalSystem system = prepareSystem(runtime)) {
             DeviceComponent component = new DeviceComponent("test:device");
             assertThrows(IllegalArgumentException.class,
-                    () -> ElectricalDeviceSystem.bindDevice(component, compiled(runtime, 4, 0.0), system, () -> {
+                    () -> DeviceSystem.bindDevice(component, compiled(runtime, 4, 0.0), system, () -> {
                     }));
             assertNull(component.device());
             assertNull(component.getDeviceId());
@@ -75,8 +75,8 @@ final class ElectricalDeviceSystemTest {
             DeviceComponent component = new DeviceComponent("test:device");
             CompiledDeviceConfig compiled = compiled(runtime, 4, 10.0);
 
-            ElectricalDeviceSystem.BindResult created =
-                    ElectricalDeviceSystem.bindDevice(component, compiled, system, () -> {
+            DeviceSystem.BindResult created =
+                    DeviceSystem.bindDevice(component, compiled, system, () -> {
                     });
             DeviceId persisted = Objects.requireNonNull(component.getDeviceId());
             Device firstHandle = Objects.requireNonNull(component.device());
@@ -85,13 +85,13 @@ final class ElectricalDeviceSystemTest {
             assertTrue(created.persistenceChanged());
             assertEquals(firstHandle.id(), persisted);
 
-            ElectricalDeviceSystem.unloadDevice(component);
+            DeviceSystem.unloadDevice(component);
             assertEquals(persisted, component.getDeviceId());
             assertNull(component.device());
             assertNull(component.compiledConfig());
 
-            ElectricalDeviceSystem.BindResult restored =
-                    ElectricalDeviceSystem.bindDevice(component, compiled, system, () -> {
+            DeviceSystem.BindResult restored =
+                    DeviceSystem.bindDevice(component, compiled, system, () -> {
                     });
 
             assertFalse(restored.created());
@@ -109,12 +109,12 @@ final class ElectricalDeviceSystemTest {
              ElectricalSystem system = prepareSystem(runtime)) {
             DeviceComponent component = new DeviceComponent("test:device");
             CompiledDeviceConfig compiled = compiled(runtime, 4, 10.0);
-            ElectricalDeviceSystem.bindDevice(component, compiled, system, () -> {
+            DeviceSystem.bindDevice(component, compiled, system, () -> {
             });
             DeviceId removedId = Objects.requireNonNull(component.getDeviceId());
 
-            ElectricalDeviceSystem.unloadDevice(component);
-            ElectricalDeviceSystem.destroyDevice(component, compiled, system);
+            DeviceSystem.unloadDevice(component);
+            DeviceSystem.destroyDevice(component, compiled, system);
 
             assertNull(component.getDeviceId());
             assertNull(component.device());
@@ -134,7 +134,7 @@ final class ElectricalDeviceSystemTest {
             DeviceComponent component = new DeviceComponent("test:device");
             CompiledDeviceConfig compiled = compiled(runtime, 4, 10.0);
 
-            ElectricalDeviceSystem.bindDevice(component, compiled, system, () -> {
+            DeviceSystem.bindDevice(component, compiled, system, () -> {
             });
             Device resistance = Objects.requireNonNull(component.device());
             ArrayList<Double> currents = new ArrayList<>();
@@ -156,7 +156,7 @@ final class ElectricalDeviceSystemTest {
             component.overrides().set(4, 20.0);
             CompiledDeviceConfig compiled = compiled(runtime, 4, 10.0);
 
-            ElectricalDeviceSystem.bindDevice(component, compiled, system, () -> {
+            DeviceSystem.bindDevice(component, compiled, system, () -> {
             });
             Device resistance = Objects.requireNonNull(component.device());
 
@@ -185,7 +185,7 @@ final class ElectricalDeviceSystemTest {
             component.overrides().set(7, 20.0);
             CompiledDeviceConfig compiled = compiledWithoutDefault(runtime);
 
-            ElectricalDeviceSystem.bindDevice(component, compiled, system, () -> {
+            DeviceSystem.bindDevice(component, compiled, system, () -> {
             });
             Device resistance = Objects.requireNonNull(component.device());
             ArrayList<Double> currents = new ArrayList<>();
@@ -209,8 +209,8 @@ final class ElectricalDeviceSystemTest {
             component.overrides().set(9, 123.0);
             CompiledDeviceConfig compiled = compiled(runtime, 4, 10.0);
 
-            ElectricalDeviceSystem.BindResult result =
-                    ElectricalDeviceSystem.bindDevice(component, compiled, system, () -> {
+            DeviceSystem.BindResult result =
+                    DeviceSystem.bindDevice(component, compiled, system, () -> {
                     });
 
             assertFalse(result.created());

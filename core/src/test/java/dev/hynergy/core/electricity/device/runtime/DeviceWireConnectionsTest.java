@@ -95,7 +95,7 @@ final class DeviceWireConnectionsTest {
     void discoveryAttachesDifferentDevicesWithTheSameTerminalIndex() {
         try (Fixture fixture = new Fixture()) {
             DeviceComponent second = new DeviceComponent("test:resistance");
-            ElectricalDeviceSystem.bindDevice(second, fixture.compiled, fixture.system, () -> {
+            DeviceSystem.bindDevice(second, fixture.compiled, fixture.system, () -> {
             });
             Device secondResistance = second.device();
             ArrayList<Double> currents = new ArrayList<>();
@@ -117,9 +117,9 @@ final class DeviceWireConnectionsTest {
             assertFalse(DeviceWireConnections.attachPortIfNew(null, 7, fixture.positive, dedup));
             assertFalse(DeviceWireConnections.attachPortIfNew(fixture.component, 7, null, dedup));
             assertFalse(DeviceWireConnections.attachPortIfNew(fixture.component, 99, fixture.positive, dedup));
-            ElectricalDeviceSystem.unloadDevice(fixture.component);
+            DeviceSystem.unloadDevice(fixture.component);
             assertFalse(DeviceWireConnections.attachPortIfNew(fixture.component, 7, fixture.positive, dedup));
-            assertFalse(ElectricalDeviceSystem.bindDevice(
+            assertFalse(DeviceSystem.bindDevice(
                     fixture.component, fixture.compiled, fixture.system, () -> {
                     }
             ).created());
@@ -136,8 +136,8 @@ final class DeviceWireConnectionsTest {
             fixture.discoverWire(fixture.negative, 1);
             fixture.assertCurrent(0.5);
             DeviceId retained = fixture.component.getDeviceId();
-            ElectricalDeviceSystem.unloadDevice(fixture.component);
-            assertFalse(ElectricalDeviceSystem.bindDevice(
+            DeviceSystem.unloadDevice(fixture.component);
+            assertFalse(DeviceSystem.bindDevice(
                     fixture.component, fixture.compiled, fixture.system, () -> {
                     }
             ).created());
@@ -199,13 +199,13 @@ final class DeviceWireConnectionsTest {
             rightWirePorts = BlockPortDefinition.of(new PortDefinition<>(
                     12, PortOffset.ZERO, PortReach.single(-1, 0, 0), standard, new ElectricalPortProfile(-1, 0, 0)));
             if (deviceFirst) {
-                ElectricalDeviceSystem.bindDevice(component, compiled, system, () -> {
+                DeviceSystem.bindDevice(component, compiled, system, () -> {
                 });
             }
             positive = system.createWire();
             negative = system.createWire();
             if (!deviceFirst) {
-                ElectricalDeviceSystem.bindDevice(component, compiled, system, () -> {
+                DeviceSystem.bindDevice(component, compiled, system, () -> {
                 });
             }
             resistance = component.device();

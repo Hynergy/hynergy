@@ -22,7 +22,6 @@ import dev.hynergy.electrical.DeviceId;
 import dev.hynergy.electrical.ElectricalRuntime;
 import dev.hynergy.electrical.ElectricalSystem;
 import org.joml.Vector3i;
-import org.jspecify.annotations.NonNull;
 import org.jspecify.annotations.Nullable;
 
 import java.util.Objects;
@@ -35,7 +34,7 @@ import java.util.Objects;
  * Restoration applies the configured parameter values.
  * Restoration retains native connections and does not discover them again.</p>
  */
-public final class ElectricalDeviceSystem extends RefSystem<ChunkStore> {
+public final class DeviceSystem extends RefSystem<ChunkStore> {
     private final ElectricalRuntime runtime;
     private final ResourceType<ChunkStore, ElectricalSystemResource> electricalSystemResourceType;
     private final ComponentType<ChunkStore, DeviceComponent> deviceComponentType;
@@ -51,7 +50,7 @@ public final class ElectricalDeviceSystem extends RefSystem<ChunkStore> {
     private final ThreadLocal<AttachmentScratch> attachmentScratch =
             ThreadLocal.withInitial(AttachmentScratch::new);
 
-    public ElectricalDeviceSystem(
+    public DeviceSystem(
             ElectricalRuntime runtime,
             ResourceType<ChunkStore, ElectricalSystemResource> electricalSystemResourceType,
             ComponentType<ChunkStore, DeviceComponent> deviceComponentType,
@@ -73,8 +72,8 @@ public final class ElectricalDeviceSystem extends RefSystem<ChunkStore> {
 
     @Override
     public void onEntityAdded(
-            @NonNull Ref<ChunkStore> ref,
-            @NonNull AddReason reason,
+            Ref<ChunkStore> ref,
+            AddReason reason,
             Store<ChunkStore> store,
             CommandBuffer<ChunkStore> commandBuffer
     ) {
@@ -89,7 +88,7 @@ public final class ElectricalDeviceSystem extends RefSystem<ChunkStore> {
 
         if (component == null || blockStateInfo == null) {
             throw new IllegalStateException(
-                    "ElectricalDeviceSystem matched an entity without its required components"
+                    "DeviceSystem matched an entity without its required components"
             );
         }
 
@@ -113,8 +112,8 @@ public final class ElectricalDeviceSystem extends RefSystem<ChunkStore> {
 
     @Override
     public void onEntityRemove(
-            @NonNull Ref<ChunkStore> ref,
-            @NonNull RemoveReason reason,
+            Ref<ChunkStore> ref,
+            RemoveReason reason,
             Store<ChunkStore> store,
             CommandBuffer<ChunkStore> commandBuffer
     ) {
@@ -126,7 +125,7 @@ public final class ElectricalDeviceSystem extends RefSystem<ChunkStore> {
         DeviceComponent component = commandBuffer.getComponent(ref, deviceComponentType);
         if (component == null) {
             throw new IllegalStateException(
-                    "ElectricalDeviceSystem matched an entity without a DeviceComponent"
+                    "DeviceSystem matched an entity without a DeviceComponent"
             );
         }
 
@@ -196,6 +195,7 @@ public final class ElectricalDeviceSystem extends RefSystem<ChunkStore> {
         if (device == null) {
             throw new IllegalStateException("New DeviceComponent is not runtime-bound");
         }
+
         if (compiled.ports().isEmpty()) {
             return;
         }
@@ -206,13 +206,16 @@ public final class ElectricalDeviceSystem extends RefSystem<ChunkStore> {
         }
 
         ChunkStore chunkStore = store.getExternalData();
+
         HytalePortWorldView worldView =
                 new HytalePortWorldView(chunkStore.getWorld(), portService::blockPorts);
+
         scratch.begin(device, chunkStore, commandBuffer, wireComponentType);
 
         try {
             for (var port : compiled.ports()) {
                 scratch.terminal = port.terminal();
+
                 portService.discovery().discover(
                         worldView,
                         scratch.sourcePosition.x,
@@ -240,11 +243,13 @@ public final class ElectricalDeviceSystem extends RefSystem<ChunkStore> {
         Objects.requireNonNull(markNeedsSaving, "markNeedsSaving");
 
         if (component.device() != null || component.compiledConfig() != null) {
-            throw new IllegalStateException("DeviceComponent is already runtime-bound");
+            throw new IllegalStateException("DeviceComponent is already runtime bound");
         }
 
         DeviceId persistedId = component.getDeviceId();
-        boolean created = persistedId == null;
+
+        boolean created = persistedId == null || !system.getUuid().equals(component.getSystemId());
+
         Device device = created
                 ? system.create(compiled.registration().type())
                 : system.resolveDevice(persistedId, compiled.registration().type());
@@ -265,8 +270,11 @@ public final class ElectricalDeviceSystem extends RefSystem<ChunkStore> {
 
         if (created) {
             component.setDeviceId(device.id());
+            component.setSystemId(system.getUuid());
         }
+
         component.bindRuntime(device, compiled, markNeedsSaving);
+
         return new BindResult(created, created || migrated);
     }
 
@@ -286,12 +294,14 @@ public final class ElectricalDeviceSystem extends RefSystem<ChunkStore> {
             int stableId = parameter.stableId();
             updates.put(parameter.parameter(), overrides.getOrDefault(stableId, parameter.defaultValue()));
         }
+
         for (int index = 0; index < overrides.size(); index++) {
             int stableId = overrides.stableIdAt(index);
             if (compiled.parameter(stableId) != null) continue;
             var parameter = compiled.declaredParameter(stableId);
             if (parameter != null) updates.put(parameter, overrides.valueAt(index));
         }
+
         device.validateParameters(updates);
 
         for (var parameter : compiled.parameters()) {
@@ -315,11 +325,13 @@ public final class ElectricalDeviceSystem extends RefSystem<ChunkStore> {
         boolean migrated = false;
         for (int index = overrides.size() - 1; index >= 0; index--) {
             int stableId = overrides.stableIdAt(index);
+
             if (compiled.declaredParameter(stableId) == null) {
                 overrides.remove(stableId);
                 migrated = true;
             }
         }
+
         return migrated;
     }
 
@@ -352,11 +364,13 @@ public final class ElectricalDeviceSystem extends RefSystem<ChunkStore> {
         }
 
         component.clearRuntime();
+        component.setSystemId(null);
         component.setDeviceId(null);
     }
 
     private static void rollbackCreatedDevice(DeviceComponent component, Throwable failure) {
         Device device = component.device();
+
         if (device != null) {
             try {
                 device.destroy();
@@ -364,7 +378,9 @@ public final class ElectricalDeviceSystem extends RefSystem<ChunkStore> {
                 failure.addSuppressed(cleanupFailure);
             }
         }
+
         component.clearRuntime();
+        component.setSystemId(null);
         component.setDeviceId(null);
     }
 
@@ -423,14 +439,18 @@ public final class ElectricalDeviceSystem extends RefSystem<ChunkStore> {
             }
 
             ChunkStore chunkStore = Objects.requireNonNull(this.chunkStore, "attachment chunkStore");
+
             CommandBuffer<ChunkStore> commandBuffer =
                     Objects.requireNonNull(this.commandBuffer, "attachment commandBuffer");
+
             ComponentType<ChunkStore, CableComponent> wireComponentType =
                     Objects.requireNonNull(this.wireComponentType, "attachment wireComponentType");
+
             Device device = Objects.requireNonNull(this.device, "attachment device");
 
             Ref<ChunkStore> targetSectionRef =
                     chunkStore.getChunkSectionReferenceAtBlock(targetX, targetY, targetZ);
+
             if (targetSectionRef == null || !targetSectionRef.isValid()) {
                 return;
             }
@@ -442,6 +462,7 @@ public final class ElectricalDeviceSystem extends RefSystem<ChunkStore> {
                     targetY,
                     targetZ
             );
+
             if (targetRef == null) {
                 return;
             }

@@ -22,7 +22,7 @@ import dev.hynergy.core.electricity.device.DeviceRegistry;
 import dev.hynergy.core.electricity.device.config.DeviceBlockDefinitions;
 import dev.hynergy.core.electricity.device.config.DeviceConfig;
 import dev.hynergy.core.electricity.device.runtime.DeviceComponent;
-import dev.hynergy.core.electricity.device.runtime.ElectricalDeviceSystem;
+import dev.hynergy.core.electricity.device.runtime.DeviceSystem;
 import dev.hynergy.core.electricity.port.ElectricalPortConnection;
 import dev.hynergy.core.electricity.port.ElectricalPortProfile;
 import dev.hynergy.core.electricity.system.ElectricalSystemLifecycleSystem;
@@ -320,7 +320,7 @@ public final class ElectricityPlugin extends JavaPlugin {
         );
 
         registry.registerSystem(
-                new ElectricalDeviceSystem(
+                new DeviceSystem(
                         runtime,
                         resourceType,
                         deviceComponentType,

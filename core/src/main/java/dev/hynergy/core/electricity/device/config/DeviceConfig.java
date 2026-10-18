@@ -91,7 +91,7 @@ public final class DeviceConfig implements JsonAssetWithMap<String, DefaultAsset
                                 .build();
     }
 
-    public static final ValidatorCache<String> VALIDATOR_CACHE =
+    public static final ValidatorCache<@Nullable String> VALIDATOR_CACHE =
             new ValidatorCache<>(new AssetKeyValidator<>(DeviceConfig::getAssetStore));
 
     private static @Nullable AssetStore<String, DeviceConfig, DefaultAssetMap<String, DeviceConfig>> ASSET_STORE;

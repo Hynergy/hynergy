@@ -17,10 +17,10 @@ import dev.hynergy.electrical.DeviceId;
 import dev.hynergy.electrical.ObservationListener;
 import dev.hynergy.electrical.ObservationSubscription;
 import lombok.Getter;
-import org.jspecify.annotations.NonNull;
 import org.jspecify.annotations.Nullable;
 
 import java.util.Objects;
+import java.util.UUID;
 
 /**
  * Represents one Hytale entity that acts as an electrical device.
@@ -56,6 +56,8 @@ public final class DeviceComponent implements Component<ChunkStore> {
                         .add()
                         .build();
 
+    @Getter private @Nullable UUID systemId;
+
     @Getter private @Nullable String configId;
     private @Nullable DeviceId deviceId;
     private ParameterOverrides overrides = new ParameterOverrides();
@@ -71,7 +73,11 @@ public final class DeviceComponent implements Component<ChunkStore> {
         this.configId = Objects.requireNonNull(configId, "configId");
     }
 
-    public void setConfigId(String configId) {
+    void setSystemId(@Nullable UUID systemId) {
+        this.systemId = systemId;
+    }
+
+    public void setConfigId(@Nullable String configId) {
         this.configId = Objects.requireNonNull(configId, "configId");
     }
 
@@ -96,6 +102,7 @@ public final class DeviceComponent implements Component<ChunkStore> {
         CompiledDeviceConfig compiled = requireCompiledConfig();
         Device device = requireDevice();
         CompiledDeviceConfig.ParameterBinding parameter = compiled.parameter(stableParameterId);
+
         if (parameter == null) {
             throw new IllegalArgumentException(
                     "Stable parameter ID is not configurable by this device config: " + stableParameterId
@@ -111,6 +118,7 @@ public final class DeviceComponent implements Component<ChunkStore> {
             changed = !overrides.contains(stableParameterId)
                     || Double.doubleToLongBits(overrides.getOrDefault(stableParameterId, value))
                     != Double.doubleToLongBits(value);
+
             overrides.set(stableParameterId, value);
         }
         if (changed) {
@@ -123,22 +131,29 @@ public final class DeviceComponent implements Component<ChunkStore> {
      */
     public ObservationSubscription observe(int stableObserverId, ObservationListener listener) {
         CompiledDeviceConfig compiled = requireCompiledConfig();
+
         Device device = requireDevice();
+
         return device.observe(compiled.registration().type().observer(stableObserverId), listener);
     }
 
     @Override
     public DeviceComponent cloneSerializable() {
-        DeviceComponent cloned = new DeviceComponent(configId);
+        DeviceComponent cloned = new DeviceComponent();
+
+        cloned.systemId = systemId;
+        cloned.configId = configId;
         cloned.deviceId = deviceId;
         cloned.overrides = overrides.copy();
+
         return cloned;
     }
 
     @Override
-    public @NonNull DeviceComponent clone() {
+    public DeviceComponent clone() {
         try {
             DeviceComponent cloned = (DeviceComponent) super.clone();
+            cloned.systemId = null;
             cloned.deviceId = null;
             cloned.overrides = overrides.copy();
             cloned.device = null;
@@ -170,9 +185,11 @@ public final class DeviceComponent implements Component<ChunkStore> {
         Objects.requireNonNull(device, "device");
         Objects.requireNonNull(compiledConfig, "compiledConfig");
         Objects.requireNonNull(markNeedsSaving, "markNeedsSaving");
+
         if (this.device != null || this.compiledConfig != null) {
             throw new IllegalStateException("Device component is already runtime-bound");
         }
+
         this.device = device;
         this.compiledConfig = compiledConfig;
         this.markNeedsSaving = markNeedsSaving;
@@ -186,17 +203,21 @@ public final class DeviceComponent implements Component<ChunkStore> {
 
     private Device requireDevice() {
         Device device = this.device;
+
         if (device == null) {
             throw new IllegalStateException("Device component is not runtime-bound");
         }
+
         return device;
     }
 
     private CompiledDeviceConfig requireCompiledConfig() {
         CompiledDeviceConfig compiled = this.compiledConfig;
+
         if (compiled == null) {
             throw new IllegalStateException("Device component has no compiled runtime config");
         }
+
         return compiled;
     }
 }

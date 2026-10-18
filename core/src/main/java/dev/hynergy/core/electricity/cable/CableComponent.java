@@ -16,6 +16,8 @@ import lombok.NoArgsConstructor;
 import lombok.Setter;
 import org.jspecify.annotations.Nullable;
 
+import java.util.UUID;
+
 @NoArgsConstructor
 public class CableComponent implements Component<ChunkStore> {
 
@@ -38,6 +40,8 @@ public class CableComponent implements Component<ChunkStore> {
                         .add()
                         .build();
 
+    @Getter private @Nullable UUID systemId;
+
     @Getter @Setter private String configId;
     @Getter private @Nullable WireId wireId;
     @Getter private transient @Nullable Wire wire;
@@ -46,7 +50,11 @@ public class CableComponent implements Component<ChunkStore> {
         this.configId = configId;
     }
 
-    void setWire(@Nullable Wire wire) {
+    void setSystemId(@Nullable UUID systemId) {
+        this.systemId = systemId;
+    }
+
+    void bindRuntime(@Nullable Wire wire) {
         this.wire = wire;
     }
 
@@ -73,5 +81,9 @@ public class CableComponent implements Component<ChunkStore> {
         } catch (CloneNotSupportedException e) {
             throw new AssertionError(e);
         }
+    }
+
+    void clearRuntime() {
+        wire = null;
     }
 }
