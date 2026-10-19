@@ -350,7 +350,7 @@ public final class DeviceSystem extends RefSystem<ChunkStore> {
         Device device = component.device();
         DeviceId id = component.getDeviceId();
 
-        if (device == null && id != null) {
+        if (device == null && id != null && system.getUuid().equals(component.getSystemId())) {
             if (compiled == null) {
                 throw new IllegalStateException(
                         "A compiled device definition is required to resolve a persisted device before removal"
