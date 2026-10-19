@@ -150,6 +150,7 @@ pub(crate) enum IslandTickStatus {
     Pending,
     Available,
     Unavailable,
+    Suspended,
 }
 
 impl IslandRuntimeError {
@@ -186,6 +187,7 @@ pub(crate) struct IslandRuntime {
     needs_solve: bool,
     nonlinear_scratch: Option<Box<NonlinearScratch>>,
     tick_status: IslandTickStatus,
+    suspended: bool,
 
     #[cfg(feature = "solver-profiling")]
     solver_tick_profile: SolverIslandProfile,
@@ -281,6 +283,7 @@ impl IslandRuntime {
             needs_solve: true,
             nonlinear_scratch,
             tick_status: IslandTickStatus::Pending,
+            suspended: false,
 
             #[cfg(feature = "solver-profiling")]
             solver_tick_profile: SolverIslandProfile::default(),
@@ -658,7 +661,6 @@ impl IslandRuntime {
             }
         }
 
-        // Verification leaves the workspace evaluated for the new solution.
         while iterations_used < NONLINEAR_MAX_ITERATIONS {
             let closure_needed = {
                 let plan = self
@@ -1019,6 +1021,18 @@ impl IslandRuntime {
         Ok(())
     }
 
+    pub(crate) fn set_suspended(&mut self, suspended: bool) {
+        if self.suspended == suspended {
+            return;
+        }
+
+        self.suspended = suspended;
+
+        if !suspended {
+            self.mark_numerical_dirty();
+        }
+    }
+
     #[inline]
     pub(crate) const fn observer_outputs_dirty(&self) -> bool {
         self.observer_outputs_dirty
@@ -1036,7 +1050,11 @@ impl IslandRuntime {
 
     #[inline]
     pub(crate) fn begin_tick(&mut self) {
-        self.tick_status = IslandTickStatus::Pending;
+        self.tick_status = if self.suspended {
+            IslandTickStatus::Suspended
+        } else {
+            IslandTickStatus::Pending
+        };
     }
 
     #[inline]

@@ -1,3 +1,4 @@
+mod availability;
 mod compile;
 #[cfg(feature = "solver-profiling")]
 mod profiling;
@@ -12,8 +13,16 @@ use crate::runtime::subscription::{
     PublishedObservation, SubscriptionRegistry, SubscriptionUpdate,
 };
 
+use crate::availability::DeviceAvailability;
+#[cfg(feature = "solver-profiling")]
+pub use crate::profiling::{
+    SolverDiscreteProfile, SolverIslandProfile, SolverIterationProfile, SolverTickProfile,
+};
+pub use crate::runtime::subscription::{
+    SubscriptionError, SubscriptionId, SubscriptionValueStatus,
+};
 use crate::state::{PhysicalStateError, PhysicalStateStore};
-use crate::topology::{DerivedTopology, TraversalScratch};
+use crate::topology::{DerivedTopology, IslandId, TraversalScratch};
 use hynergy_mna::system::MnaError;
 use hynergy_model::device::definition::{
     DefinitionId, DefinitionObserverId, DeviceDefinition, DeviceId, TerminalId,
@@ -23,14 +32,6 @@ use hynergy_model::network::{Network, NetworkModelError, WireId};
 use hynergy_model::parameter::ParameterId;
 use std::num::NonZeroU32;
 use thiserror::Error;
-
-#[cfg(feature = "solver-profiling")]
-pub use crate::profiling::{
-    SolverDiscreteProfile, SolverIslandProfile, SolverIterationProfile, SolverTickProfile,
-};
-pub use crate::runtime::subscription::{
-    SubscriptionError, SubscriptionId, SubscriptionValueStatus,
-};
 
 #[derive(Debug, Error, Clone, Copy, PartialEq, Eq)]
 pub enum EngineTickError {
@@ -406,6 +407,7 @@ pub struct World {
     physical_state: PhysicalStateStore,
     island_runtimes: IslandRuntimeStore,
     subscription_updates: Vec<SubscriptionUpdate>,
+    device_availability: DeviceAvailability,
 }
 
 impl World {
@@ -419,6 +421,7 @@ impl World {
             physical_state: PhysicalStateStore::default(),
             island_runtimes: IslandRuntimeStore::default(),
             subscription_updates: Vec::new(),
+            device_availability: DeviceAvailability::default(),
         }
     }
 
@@ -431,60 +434,77 @@ impl World {
 
         self.sync_island_runtimes(definitions)?;
 
-        {
-            let topology = &self.derived_topology;
-            let network = &self.network;
-            let physical_state = &self.physical_state;
-            let runtimes = &mut self.island_runtimes;
+        let topology = &self.derived_topology;
+        let network = &self.network;
+        let physical_state = &self.physical_state;
+        let runtimes = &mut self.island_runtimes;
 
-            for (island, _) in topology.islands() {
-                let runtime = runtimes
-                    .get_mut(island)
-                    .expect("live island must have a runtime after synchronization");
+        for (island, _) in topology.islands() {
+            let runtime = runtimes
+                .get_mut(island)
+                .expect("live island must have a runtime after synchronization");
 
-                runtime.begin_tick();
+            runtime.begin_tick();
 
-                match runtime.prepare_tick_state_inputs(network, physical_state) {
-                    Ok(()) => {}
+            if runtime.tick_status() == IslandTickStatus::Suspended {
+                continue;
+            }
 
-                    Err(error) if error.is_localizable_tick_failure() => {
-                        runtime.mark_unavailable();
-                    }
+            match runtime.prepare_tick_state_inputs(network, physical_state) {
+                Ok(()) => {}
 
-                    Err(error) => return Err(error.into()),
+                Err(error) if error.is_localizable_tick_failure() => {
+                    runtime.mark_unavailable();
                 }
+
+                Err(error) => return Err(error.into()),
             }
         }
 
-        {
-            let topology = &self.derived_topology;
-            let network = &self.network;
-            let runtimes = &mut self.island_runtimes;
+        for (island, _) in topology.islands() {
+            let runtime = runtimes
+                .get_mut(island)
+                .expect("live island must have a runtime after synchronization");
 
-            for (island, _) in topology.islands() {
-                let runtime = runtimes
-                    .get_mut(island)
-                    .expect("live island must have a runtime after synchronization");
+            runtime.begin_tick();
 
-                if runtime.tick_status() == IslandTickStatus::Unavailable {
-                    continue;
+            match runtime.prepare_tick_state_inputs(network, physical_state) {
+                Ok(()) => {}
+
+                Err(error) if error.is_localizable_tick_failure() => {
+                    runtime.mark_unavailable();
                 }
 
-                debug_assert_eq!(
-                    runtime.tick_status(),
-                    IslandTickStatus::Pending,
-                    "prepared island must remain pending until solved",
-                );
+                Err(error) => return Err(error.into()),
+            }
+        }
 
-                match runtime.solve_prepared_tick(network) {
-                    Ok(()) => runtime.mark_available(),
+        for (island, _) in topology.islands() {
+            let runtime = runtimes
+                .get_mut(island)
+                .expect("live island must have a runtime after synchronization");
 
-                    Err(error) if error.is_localizable_tick_failure() => {
-                        runtime.mark_unavailable();
-                    }
+            if matches!(
+                runtime.tick_status(),
+                IslandTickStatus::Unavailable | IslandTickStatus::Suspended
+            ) {
+                continue;
+            }
 
-                    Err(error) => return Err(error.into()),
+            debug_assert_eq!(
+                runtime.tick_status(),
+                IslandTickStatus::Pending,
+                "prepared island must remain pending until solved",
+            );
+
+            match runtime.solve_prepared_tick(network) {
+                Ok(()) => runtime.mark_available(),
+
+                Err(error) if error.is_localizable_tick_failure() => {
+                    runtime.mark_unavailable();
                 }
+
+                Err(error) => return Err(error.into()),
             }
         }
 
@@ -563,7 +583,7 @@ impl World {
                         updates.push(SubscriptionUpdate::available(subscription.id(), value));
                     }
 
-                    IslandTickStatus::Unavailable => {
+                    IslandTickStatus::Unavailable | IslandTickStatus::Suspended => {
                         let published = PublishedObservation::Unavailable;
 
                         if subscription.published() == Some(published) {
@@ -778,6 +798,7 @@ impl World {
 
         let removal = self.network.remove_device(device)?;
 
+        self.device_availability.set_loaded(device, true);
         self.physical_state.remove_device(removal);
 
         self.derived_topology.remove_device(
@@ -876,12 +897,15 @@ impl World {
             let network = &self.network;
             let runtimes = &mut self.island_runtimes;
             let topology = &self.derived_topology;
+            let availability = &self.device_availability;
+
             let invalidation = topology.invalidation();
 
             let topology_dirty = invalidation.topology_dirty_islands();
             let binding_dirty = invalidation.binding_dirty_islands();
             let retired = invalidation.retired_islands();
             let numerical_dirty = invalidation.numerical_dirty_islands();
+            let availability_dirty = invalidation.availability_dirty_islands();
 
             #[cfg(debug_assertions)]
             for (island, _) in topology.islands() {
@@ -897,7 +921,9 @@ impl World {
 
             for &island in topology_dirty {
                 let compiled = compile_topology_island(definitions, network, topology, island)?;
-                let runtime = IslandRuntime::new(compiled, network, timestep)?;
+                let mut runtime = IslandRuntime::new(compiled, network, timestep)?;
+
+                runtime.set_suspended(island_is_suspended(topology, availability, island));
 
                 runtimes.insert(island, runtime);
             }
@@ -918,6 +944,14 @@ impl World {
                 runtime.mark_numerical_dirty();
             }
 
+            for &island in availability_dirty {
+                let Some(runtime) = runtimes.get_mut(island) else {
+                    continue;
+                };
+
+                runtime.set_suspended(island_is_suspended(topology, availability, island));
+            }
+
             #[cfg(debug_assertions)]
             {
                 let physical_state = &self.physical_state;
@@ -933,6 +967,23 @@ impl World {
         }
 
         self.derived_topology.clear_invalidation();
+
+        Ok(())
+    }
+
+    pub fn set_device_loaded(
+        &mut self,
+        device: DeviceId,
+        loaded: bool,
+    ) -> Result<(), NetworkModelError> {
+        self.network.device(device)?;
+
+        let changed = self.device_availability.set_loaded(device, loaded);
+
+        if changed {
+            self.derived_topology
+                .mark_device_availability_dirty(&self.network, device);
+        }
 
         Ok(())
     }
@@ -968,6 +1019,8 @@ impl World {
                     runtime.validate_failed_state_outputs(network, physical_state)?;
                 }
 
+                IslandTickStatus::Suspended => {}
+
                 IslandTickStatus::Pending => {
                     unreachable!(
                         "every live island must be available or unavailable before state validation"
@@ -1000,6 +1053,8 @@ impl World {
                     runtime.scatter_failed_state_outputs(network, physical_state);
                 }
 
+                IslandTickStatus::Suspended => {}
+
                 IslandTickStatus::Pending => {
                     unreachable!("state scatter requires a finalized island tick status");
                 }
@@ -1018,7 +1073,17 @@ impl World {
                 .get(island)
                 .expect("live island must have a runtime after synchronization");
 
-            runtime.finalize_state_outputs(physical_state);
+            match runtime.tick_status() {
+                IslandTickStatus::Available | IslandTickStatus::Unavailable => {
+                    runtime.finalize_state_outputs(physical_state);
+                }
+
+                IslandTickStatus::Suspended => {}
+
+                IslandTickStatus::Pending => {
+                    unreachable!("state finalization requires a finalized island tick status");
+                }
+            }
         }
     }
 
@@ -1050,6 +1115,20 @@ impl World {
     pub const fn config(&self) -> WorldConfig {
         self.config
     }
+}
+
+#[inline]
+fn island_is_suspended(
+    topology: &DerivedTopology,
+    availability: &DeviceAvailability,
+    island: IslandId,
+) -> bool {
+    topology
+        .island(island)
+        .expect("live island must have topology")
+        .components()
+        .iter()
+        .any(|component| availability.is_unloaded(component.device()))
 }
 
 #[cfg(test)]
@@ -4700,7 +4779,6 @@ mod tests {
 
         let state = DeviceState::new(schmitt, DefinitionStateId::new(0));
 
-        // Input = 5 V is above the upper threshold, so establish state = 1.
         world.tick(&definitions).unwrap();
 
         let established = world.physical_state.get(&world.network, state).unwrap();
@@ -4711,8 +4789,6 @@ mod tests {
             "fixture must establish the SchmittBuffer high state",
         );
 
-        // The blocker shares the supply/input nets, therefore it belongs to
-        // the same island as the SchmittBuffer.
         add_unset_conductance(&mut world, &definitions, blocker, high, ground);
 
         let island = world.derived_topology.component_island(
@@ -4744,8 +4820,6 @@ mod tests {
             .subscribe_observer(world, observed, observer)
             .unwrap();
 
-        // Tick 1:
-        // no baseline -> Available(5)
         engine.tick_world(world).unwrap();
 
         {
@@ -4757,11 +4831,6 @@ mod tests {
             assert_eq!(updates[0].value().to_bits(), 5.0f64.to_bits(),);
         }
 
-        // Add an unset conductance directly to the observed island.
-        //
-        // observed_voltage_world() uses:
-        //   wire 1 = negative
-        //   wire 2 = positive
         let negative = wire(1);
         let positive = wire(2);
         let blocker = device(3);
@@ -4798,10 +4867,6 @@ mod tests {
             )
             .unwrap();
 
-        // Deliberately leave blocker parameter 0 unset.
-
-        // Tick 2:
-        // Available(5) -> Unavailable
         engine.tick_world(world).unwrap();
 
         {
@@ -4817,9 +4882,6 @@ mod tests {
             );
         }
 
-        // The topology change rebuilt this runtime. More importantly,
-        // subscription publication must not ask it for a stale observer
-        // value while its final tick status is Unavailable.
         {
             let world_ref = engine.world(world).unwrap();
 
@@ -4839,8 +4901,6 @@ mod tests {
             );
         }
 
-        // Tick 3:
-        // Unavailable -> Unavailable: suppress.
         engine.tick_world(world).unwrap();
 
         assert!(

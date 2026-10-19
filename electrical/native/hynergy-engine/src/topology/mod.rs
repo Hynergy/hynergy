@@ -96,12 +96,9 @@ pub(crate) struct PreparedDeviceTopologyRemoval {
 pub(crate) struct DerivedTopology {
     nets: DenseIdStore<NetId, Net>,
     wire_net_map: Vec<Option<NetId>>,
-
     islands: DenseIdStore<IslandId, IslandTopology>,
     net_island_map: Vec<Option<IslandId>>,
-
     device_chunks: Vec<DeviceTopologyChunk>,
-
     invalidation: WorldInvalidation,
 }
 
@@ -1174,6 +1171,24 @@ impl DerivedTopology {
     }
 
     #[inline]
+    pub(crate) fn mark_device_availability_dirty(&mut self, network: &Network, device: DeviceId) {
+        let location = network
+            .device_location(device)
+            .expect("availability-dirty device must remain resident");
+
+        let chunk = self
+            .device_chunks
+            .get(location.chunk_index() as usize)
+            .expect("resident device must have a topology sidecar chunk");
+
+        let islands = chunk.row_islands(location.row() as usize);
+
+        for &island in islands {
+            self.invalidation.mark_availability_dirty(island);
+        }
+    }
+
+    #[inline]
     fn net_island(&self, net: NetId) -> Option<IslandId> {
         self.net_island_map[net.index()]
     }
@@ -1278,6 +1293,8 @@ pub(crate) struct WorldInvalidation {
     numerical_dirty: SmallVec<[IslandId; 4]>,
     binding_dirty: SmallVec<[IslandId; 4]>,
     retired: SmallVec<[IslandId; 4]>,
+    availability_dirty: Vec<IslandId>,
+    availability_marks: Vec<u64>,
 }
 
 impl WorldInvalidation {
@@ -1329,6 +1346,27 @@ impl WorldInvalidation {
     }
 
     #[inline]
+    fn mark_availability_dirty(&mut self, island: IslandId) {
+        let index = island.index();
+
+        let word_index = index >> 6;
+        let mask = 1_u64 << (index & 63);
+
+        if word_index >= self.availability_marks.len() {
+            self.availability_marks.resize(word_index + 1, 0);
+        }
+
+        let word = &mut self.availability_marks[word_index];
+
+        if *word & mask != 0 {
+            return;
+        }
+
+        *word |= mask;
+        self.availability_dirty.push(island);
+    }
+
+    #[inline]
     fn reserve_topology_dirty(&mut self, additional: usize) {
         self.topology_dirty.reserve(additional);
     }
@@ -1339,6 +1377,17 @@ impl WorldInvalidation {
         self.numerical_dirty.clear();
         self.binding_dirty.clear();
         self.retired.clear();
+
+        for &island in &self.availability_dirty {
+            let index = island.index();
+
+            let word_index = index >> 6;
+            let mask = 1_u64 << (index & 63);
+
+            self.availability_marks[word_index] &= !mask;
+        }
+
+        self.availability_dirty.clear();
     }
 
     #[inline]
@@ -1359,6 +1408,11 @@ impl WorldInvalidation {
     #[inline]
     pub(crate) fn retired_islands(&self) -> &[IslandId] {
         &self.retired
+    }
+
+    #[inline]
+    pub(crate) fn availability_dirty_islands(&self) -> &[IslandId] {
+        &self.availability_dirty
     }
 }
 
