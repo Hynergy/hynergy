@@ -2,8 +2,8 @@ pluginManagement {
     includeBuild("build-logic")
 
     plugins {
-        id("com.azuredoom.hytale-workspace") version "1.0.51"
-        id("com.azuredoom.hytale-tools") version "1.0.51"
+        id("com.azuredoom.hytale-workspace") version "1.0.52"
+        id("com.azuredoom.hytale-tools") version "1.0.52"
     }
 
     repositories {
